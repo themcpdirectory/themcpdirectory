@@ -84,6 +84,12 @@ interface ParsedSemVer {
 	prerelease: string[];
 }
 
+function compareOrdinal(left: string, right: string): number {
+	if (left < right) return -1;
+	if (left > right) return 1;
+	return 0;
+}
+
 function normalizeToCanonical(value: unknown): JsonValue {
 	if (value === null) return null;
 	if (typeof value === "string" || typeof value === "boolean") return value;
@@ -96,7 +102,7 @@ function normalizeToCanonical(value: unknown): JsonValue {
 	if (typeof value === "object") {
 		const entries = Object.entries(value as Record<string, unknown>)
 			.filter(([, entryValue]) => entryValue !== undefined)
-			.sort(([a], [b]) => a.localeCompare(b));
+			.sort(([a], [b]) => compareOrdinal(a, b));
 
 		const out: { [key: string]: JsonValue } = {};
 		for (const [key, entryValue] of entries) {
@@ -160,51 +166,82 @@ function compareSemVer(a: ParsedSemVer, b: ParsedSemVer): number {
 		}
 		if (leftNum && !rightNum) return -1;
 		if (!leftNum && rightNum) return 1;
-		return left.localeCompare(right);
+		return compareOrdinal(left, right);
 	}
 
 	return 0;
 }
 
-function parsePublishedAtTimestamp(value: string | undefined): number {
-	if (value === undefined) return Number.NEGATIVE_INFINITY;
+function parsePublishedAtTimestamp(value: string | undefined): number | null {
+	if (value === undefined) return null;
 	const timestamp = Date.parse(value);
-	return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
+	return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function selectBySemVerWhenComparable<T extends CurrentVersionCandidate>(
+	candidates: Array<{ candidate: T; index: number }>,
+): T {
+	const semverCandidates = candidates
+		.map(({ candidate, index }) => ({ candidate, index, semver: parseSemVer(candidate.version) }));
+
+	const allSemVer = semverCandidates.every((candidate) => candidate.semver !== null);
+	if (!allSemVer) {
+		return candidates[0]!.candidate;
+	}
+
+	const comparableSemVers = semverCandidates as Array<{
+		candidate: T;
+		index: number;
+		semver: ParsedSemVer;
+	}>;
+
+	comparableSemVers.sort((left, right) => {
+		const semverCmp = compareSemVer(right.semver, left.semver);
+		if (semverCmp !== 0) return semverCmp;
+		return left.index - right.index;
+	});
+
+	return comparableSemVers[0]!.candidate;
 }
 
 export function selectCurrentVersion<T extends CurrentVersionCandidate>(versions: readonly T[]): T | null {
 	if (versions.length === 0) return null;
 
 	const activeVersions = versions.filter((version) => version.upstreamStatus === "active");
-	const candidates = activeVersions.length > 0 ? activeVersions : [...versions];
+	const candidates = (activeVersions.length > 0 ? activeVersions : [...versions]).map(
+		(candidate, index) => ({ candidate, index }),
+	);
 
-	const semverCandidates = candidates
-		.map((candidate, index) => ({ candidate, index, semver: parseSemVer(candidate.version) }))
-		.filter(
-			(candidate): candidate is { candidate: T; index: number; semver: ParsedSemVer } =>
-				candidate.semver !== null,
-		);
+	const withTimestamps = candidates.map(({ candidate, index }) => ({
+		candidate,
+		index,
+		timestamp: parsePublishedAtTimestamp(candidate.publishedAt),
+	}));
+	const validTimestampCandidates = withTimestamps.filter(
+		(candidate): candidate is { candidate: T; index: number; timestamp: number } =>
+			candidate.timestamp !== null,
+	);
 
-	if (semverCandidates.length > 0) {
-		semverCandidates.sort((left, right) => {
-			const semverCmp = compareSemVer(right.semver, left.semver);
-			if (semverCmp !== 0) return semverCmp;
-			return left.index - right.index;
-		});
-		return semverCandidates[0]?.candidate ?? null;
-	}
-
-	let best = candidates[0];
-	let bestTimestamp = parsePublishedAtTimestamp(best?.publishedAt);
-	for (const candidate of candidates.slice(1)) {
-		const candidateTimestamp = parsePublishedAtTimestamp(candidate.publishedAt);
-		if (candidateTimestamp > bestTimestamp) {
-			best = candidate;
-			bestTimestamp = candidateTimestamp;
+	if (validTimestampCandidates.length > 0) {
+		let newestTimestamp = validTimestampCandidates[0]!.timestamp;
+		for (const candidate of validTimestampCandidates.slice(1)) {
+			if (candidate.timestamp > newestTimestamp) {
+				newestTimestamp = candidate.timestamp;
+			}
 		}
+
+		const newestCandidates = validTimestampCandidates
+			.filter((candidate) => candidate.timestamp === newestTimestamp)
+			.map(({ candidate, index }) => ({ candidate, index }));
+
+		if (newestCandidates.length === 1) {
+			return newestCandidates[0]!.candidate;
+		}
+
+		return selectBySemVerWhenComparable(newestCandidates);
 	}
 
-	return best ?? null;
+	return selectBySemVerWhenComparable(candidates);
 }
 
 function normalizeRepository(

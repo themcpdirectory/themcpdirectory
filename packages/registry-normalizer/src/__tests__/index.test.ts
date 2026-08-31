@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { RegistryServerResponse } from "@themcpdirectory/registry-client";
 import { RegistryPageSchema } from "@themcpdirectory/registry-client";
@@ -116,6 +117,26 @@ describe("hashRegistryPayload", () => {
     const hashB = hashRegistryPayload({ a: { y: true, z: 1 }, b: 2 });
 
     expect(hashA).toBe(hashB);
+  });
+
+  it("uses locale-independent ordinal key ordering for canonical hashing", () => {
+    const payloadA = {
+      meta: { "ä": 2, z: 1 },
+      items: [{ b: 2, a: 1 }, { "ß": 4, s: 3 }],
+    };
+    const payloadB = {
+      items: [{ a: 1, b: 2 }, { s: 3, "ß": 4 }],
+      meta: { z: 1, "ä": 2 },
+    };
+
+    const canonical = "{\"items\":[{\"a\":1,\"b\":2},{\"s\":3,\"ß\":4}],\"meta\":{\"z\":1,\"ä\":2}}";
+    const expected = createHash("sha256").update(canonical).digest("hex");
+
+    const hashA = hashRegistryPayload(payloadA);
+    const hashB = hashRegistryPayload(payloadB);
+
+    expect(hashA).toBe(hashB);
+    expect(hashA).toBe(expected);
   });
 
   it("preserves array-order significance", () => {
@@ -314,7 +335,60 @@ describe("selectCurrentVersion", () => {
     ];
 
     const selected = selectCurrentVersion(versions);
-    expect(selected?.version).toBe("2.1.0");
+    expect(selected?.version).toBe("latest");
+  });
+
+  it("uses publication recency across active mixed SemVer and non-SemVer candidates", () => {
+    const versions: CurrentVersionCandidate[] = [
+      {
+        version: "2.1.0",
+        upstreamStatus: "active",
+        publishedAt: "2026-01-10T00:00:00Z",
+      },
+      {
+        version: "nightly-2026-02",
+        upstreamStatus: "active",
+        publishedAt: "2026-02-10T00:00:00Z",
+      },
+      {
+        version: "2.2.0",
+        upstreamStatus: "deprecated",
+        publishedAt: "2026-03-10T00:00:00Z",
+      },
+    ];
+
+    const selected = selectCurrentVersion(versions);
+    expect(selected?.version).toBe("nightly-2026-02");
+  });
+
+  it("uses SemVer fallback only when comparison is meaningful", () => {
+    const mixedWithoutRecency: CurrentVersionCandidate[] = [
+      { version: "latest", upstreamStatus: "active" },
+      { version: "2.1.0", upstreamStatus: "active" },
+      { version: "2.0.0", upstreamStatus: "active" },
+    ];
+
+    expect(selectCurrentVersion(mixedWithoutRecency)?.version).toBe("latest");
+
+    const semverOnlyWithoutRecency: CurrentVersionCandidate[] = [
+      { version: "1.1.0", upstreamStatus: "active" },
+      { version: "1.3.0", upstreamStatus: "active" },
+      { version: "1.2.0", upstreamStatus: "active" },
+    ];
+
+    expect(selectCurrentVersion(semverOnlyWithoutRecency)?.version).toBe("1.3.0");
+  });
+
+  it("does not mutate the input versions", () => {
+    const versions: CurrentVersionCandidate[] = [
+      { version: "latest", upstreamStatus: "active" },
+      { version: "2.0.0", upstreamStatus: "active" },
+    ];
+    const snapshot = structuredClone(versions);
+
+    selectCurrentVersion(versions);
+
+    expect(versions).toEqual(snapshot);
   });
 
   it("prefers active versions over deprecated ones", () => {
