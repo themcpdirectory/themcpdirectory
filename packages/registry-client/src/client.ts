@@ -12,6 +12,7 @@ export type RegistryErrorKind =
   | "cursor_loop"
   | "response_too_large"
   | "invalid_content_type"
+  | "unsafe_url"
   | "redirect_unsafe"
   | "redirect_limit"
   | "redirect_loop"
@@ -92,6 +93,12 @@ function backoffMs(attempt: number): number {
   return Math.min(1000 * 2 ** attempt, MAX_RETRY_AFTER_MS);
 }
 
+function isAllowedJsonContentType(contentType: string): boolean {
+  const mediaType = contentType.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  if (mediaType === "application/json") return true;
+  return /^application\/[a-z0-9!#$&^_.+-]+\+json$/.test(mediaType);
+}
+
 export class OfficialRegistryClient {
   readonly #options: Required<RegistryClientOptions>;
 
@@ -135,6 +142,18 @@ export class OfficialRegistryClient {
     const url = new URL("/v0.1/servers", this.#options.baseUrl);
     if (cursor) url.searchParams.set("cursor", cursor);
 
+    const validation = await this.#options.validateUrl(url.href);
+    if (!validation.ok) {
+      throw new RegistryError({
+        kind: "unsafe_url",
+        message: `Initial URL blocked: ${validation.reason}`,
+        retryable: false,
+        attempt: 0,
+      });
+    }
+
+    const initialUrl = validation.url;
+
     const maxAttempts = this.#options.maxRetries + 1;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -142,7 +161,7 @@ export class OfficialRegistryClient {
       const timer = setTimeout(() => controller.abort(), this.#options.timeoutMs);
 
       try {
-        const response = await this.#fetchWithRedirects(url.href, {
+        const response = await this.#fetchWithRedirects(initialUrl, {
           signal: controller.signal,
           headers: { accept: "application/json" },
         });
@@ -167,7 +186,7 @@ export class OfficialRegistryClient {
 
         // Content-type validation
         const contentType = response.headers.get("content-type") ?? "";
-        if (!contentType.includes("application/json")) {
+        if (!isAllowedJsonContentType(contentType)) {
           throw new RegistryError({
             kind: "invalid_content_type",
             message: `Expected application/json, got ${contentType}`,

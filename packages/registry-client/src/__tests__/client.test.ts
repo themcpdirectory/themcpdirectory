@@ -313,6 +313,54 @@ describe("OfficialRegistryClient.pages()", () => {
   });
 
   describe("content type validation", () => {
+    it("accepts application/json and application/*+json media types", async () => {
+      const acceptedContentTypes = [
+        "application/json",
+        "Application/JSON",
+        "application/json; charset=utf-8",
+        "application/ld+json",
+        "application/problem+json; charset=utf-8",
+      ];
+
+      for (const contentType of acceptedContentTypes) {
+        const client = makeClient({
+          fetch: async () =>
+            new Response(JSON.stringify(VALID_LAST_PAGE), {
+              status: 200,
+              headers: { "content-type": contentType },
+            }),
+        });
+
+        const pages = [];
+        for await (const page of client.pages()) {
+          pages.push(page);
+        }
+        expect(pages).toHaveLength(1);
+      }
+    });
+
+    it("rejects JSON lookalike media types", async () => {
+      for (const contentType of ["application/jsonp", "x-application/json", "text/json"]) {
+        const client = makeClient({
+          fetch: async () =>
+            new Response(JSON.stringify(VALID_LAST_PAGE), {
+              status: 200,
+              headers: { "content-type": contentType },
+            }),
+        });
+
+        try {
+          for await (const _page of client.pages()) {
+            void _page;
+          }
+          expect.unreachable("should have thrown");
+        } catch (e) {
+          const err = e as RegistryError;
+          expect(err.kind).toBe("invalid_content_type");
+        }
+      }
+    });
+
     it("rejects non-JSON content type", async () => {
       const client = makeClient({
         fetch: async () =>
@@ -591,6 +639,51 @@ describe("OfficialRegistryClient.pages()", () => {
       }
       expect(signals).toHaveLength(2);
       expect(signals[0]).toBe(signals[1]);
+    });
+
+    it("validates initial URL before first fetch and blocks unsafe destinations", async () => {
+      let fetchCalls = 0;
+      const client = makeClient({
+        validateUrl: async () => ({ ok: false as const, reason: "blocked IPv4 address" }),
+        fetch: async () => {
+          fetchCalls++;
+          return jsonResponse(VALID_LAST_PAGE);
+        },
+      });
+
+      try {
+        for await (const _page of client.pages()) {
+          void _page;
+        }
+        expect.unreachable("should have thrown");
+      } catch (e) {
+        const err = e as RegistryError;
+        expect(err.kind).toBe("unsafe_url");
+      }
+
+      expect(fetchCalls).toBe(0);
+    });
+
+    it("uses normalized initial URL returned by validateUrl", async () => {
+      const fetchedUrls: string[] = [];
+      const normalizedUrl = "https://registry.modelcontextprotocol.io/v0.1/servers?normalized=1";
+      const client = makeClient({
+        validateUrl: async () => ({ ok: true as const, url: normalizedUrl }),
+        fetch: async (input) => {
+          const url = typeof input === "string" ? input : (input as Request).url;
+          fetchedUrls.push(url);
+          return jsonResponse(VALID_LAST_PAGE);
+        },
+      });
+
+      const pages = [];
+      for await (const page of client.pages()) {
+        pages.push(page);
+      }
+
+      expect(pages).toHaveLength(1);
+      expect(fetchedUrls).toHaveLength(1);
+      expect(fetchedUrls[0]).toBe(normalizedUrl);
     });
   });
 
