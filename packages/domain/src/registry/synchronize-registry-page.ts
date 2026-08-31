@@ -34,7 +34,17 @@ export interface SyncPageResult {
   readonly recordsCreated: number;
   readonly recordsUpdated: number;
   readonly recordsFailed: number;
+  readonly recordFailures: readonly SyncRecordFailure[];
   readonly nextCursor?: string;
+}
+
+export type SyncRecordFailureCode = "ambiguous_identity" | "ingestion_error";
+
+export interface SyncRecordFailure {
+  readonly recordIndex: number;
+  readonly serverName: string;
+  readonly code: SyncRecordFailureCode;
+  readonly message: string;
 }
 
 export class AmbiguousIdentityError extends Error {
@@ -50,6 +60,18 @@ interface RecordWriteStats {
 }
 
 type SyncDatabase = Pick<Database, "select" | "insert" | "update" | "delete">;
+
+type SyncTransactionDatabase = Pick<
+  Database,
+  "select" | "insert" | "update" | "delete" | "execute"
+>;
+
+type PostgresError = Error & {
+  readonly code?: string;
+  readonly constraint_name?: string;
+};
+
+const PG_UNIQUE_VIOLATION = "23505";
 
 function parseOptionalTimestamp(value: string | undefined): Date | null {
   if (value === undefined) return null;
@@ -76,7 +98,7 @@ function deriveBaseSlug(normalized: NormalizedRegistryServer): string {
 }
 
 async function allocateServerSlug(
-  db: SyncDatabase,
+  db: SyncTransactionDatabase,
   normalized: NormalizedRegistryServer,
 ): Promise<string> {
   const base = deriveBaseSlug(normalized);
@@ -89,6 +111,97 @@ async function allocateServerSlug(
   }
 
   throw new Error("Unable to allocate a unique server slug.");
+}
+
+function snapshotIdentityKey(sourceId: string, normalized: NormalizedRegistryServer): string {
+  return [
+    "snapshot",
+    sourceId,
+    normalized.canonicalRegistryName,
+    normalized.version,
+    normalized.payloadHash,
+  ].join(":");
+}
+
+function upstreamIdentityKey(sourceId: string, normalized: NormalizedRegistryServer): string {
+  return ["upstream", sourceId, normalized.canonicalRegistryName].join(":");
+}
+
+function repositoryIdentityKey(normalized: NormalizedRegistryServer): string | null {
+  if (!normalized.repository?.source || !normalized.repository.externalId) {
+    return null;
+  }
+
+  return [
+    "repository",
+    normalized.repository.source,
+    normalized.repository.externalId,
+    normalized.repository.subfolder ?? "",
+  ].join(":");
+}
+
+function packageIdentityKey(packageEntry: {
+  registryType: string;
+  identifier: string;
+  registryBaseUrl?: string;
+}): string {
+  return [
+    "package",
+    packageEntry.registryType,
+    packageEntry.identifier,
+    packageEntry.registryBaseUrl ?? "",
+  ].join(":");
+}
+
+function aliasIdentityKey(normalized: NormalizedRegistryServer): string {
+  return `alias:${normalized.canonicalRegistryName.toLowerCase()}`;
+}
+
+function slugIdentityKey(normalized: NormalizedRegistryServer): string {
+  return `slug:${deriveBaseSlug(normalized)}`;
+}
+
+function buildDeterministicLockKeys(
+  sourceId: string,
+  normalized: NormalizedRegistryServer,
+): string[] {
+  const keys = new Set<string>();
+  keys.add(upstreamIdentityKey(sourceId, normalized));
+  keys.add(snapshotIdentityKey(sourceId, normalized));
+  keys.add(aliasIdentityKey(normalized));
+  keys.add(slugIdentityKey(normalized));
+
+  const repositoryKey = repositoryIdentityKey(normalized);
+  if (repositoryKey) {
+    keys.add(repositoryKey);
+  }
+
+  for (const packageEntry of normalized.packages) {
+    keys.add(packageIdentityKey(packageEntry));
+  }
+
+  return [...keys].sort();
+}
+
+async function acquireIdentityLocks(
+  tx: SyncTransactionDatabase,
+  sourceId: string,
+  normalized: NormalizedRegistryServer,
+): Promise<void> {
+  const keys = buildDeterministicLockKeys(sourceId, normalized);
+
+  for (const key of keys) {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
+  }
+}
+
+function isUniqueViolation(error: unknown): error is PostgresError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as PostgresError).code === PG_UNIQUE_VIOLATION
+  );
 }
 
 function uniqueServerIdOrNull(step: string, serverIds: string[]): string | null {
@@ -219,7 +332,7 @@ function mapUpstreamToListingStatus(upstreamStatus: string | undefined):
 }
 
 async function upsertRegistrySnapshot(
-  db: SyncDatabase,
+  db: SyncTransactionDatabase,
   sourceId: string,
   normalized: NormalizedRegistryServer,
   rawPayload: RegistryPage["servers"][number],
@@ -257,6 +370,17 @@ async function upsertRegistrySnapshot(
       firstSeenAt: observedAt,
       lastSeenAt: observedAt,
     })
+    .onConflictDoUpdate({
+      target: [
+        registrySnapshots.registrySourceId,
+        registrySnapshots.externalName,
+        registrySnapshots.externalVersion,
+        registrySnapshots.payloadHash,
+      ],
+      set: {
+        lastSeenAt: observedAt,
+      },
+    })
     .returning({ id: registrySnapshots.id });
 
   if (!inserted) {
@@ -267,7 +391,7 @@ async function upsertRegistrySnapshot(
 }
 
 async function upsertServer(
-  db: SyncDatabase,
+  db: SyncTransactionDatabase,
   sourceServerId: string | null,
   normalized: NormalizedRegistryServer,
   observedAt: Date,
@@ -300,44 +424,65 @@ async function upsertServer(
     return { serverId: existing.id, created: false };
   }
 
-  const slug = await allocateServerSlug(db, normalized);
   const repository = normalized.repository;
-  const [created] = await db
-    .insert(servers)
-    .values({
-      slug,
-      title: normalized.title ?? normalized.canonicalRegistryName,
-      shortDescription: normalized.description,
-      canonicalRegistryName: normalized.canonicalRegistryName,
-      listingStatus: "active",
-      moderationStatus: "normal",
-      homepageUrl: normalized.websiteUrl,
-      repositoryUrl: repository?.url,
-      repositorySource: repository?.source,
-      repositoryExternalId: repository?.externalId,
-      repositorySubfolder: repository?.subfolder,
-      firstSeenAt: observedAt,
-      lastSeenAt: observedAt,
-    })
-    .returning({ id: servers.id });
+  for (let attempt = 0; attempt < 5000; attempt++) {
+    const slug = await allocateServerSlug(db, normalized);
+    try {
+      const [created] = await db
+        .insert(servers)
+        .values({
+          slug,
+          title: normalized.title ?? normalized.canonicalRegistryName,
+          shortDescription: normalized.description,
+          canonicalRegistryName: normalized.canonicalRegistryName,
+          listingStatus: "active",
+          moderationStatus: "normal",
+          homepageUrl: normalized.websiteUrl,
+          repositoryUrl: repository?.url,
+          repositorySource: repository?.source,
+          repositoryExternalId: repository?.externalId,
+          repositorySubfolder: repository?.subfolder,
+          firstSeenAt: observedAt,
+          lastSeenAt: observedAt,
+        })
+        .returning({ id: servers.id });
 
-  if (!created) {
-    throw new Error("Failed to create canonical server.");
+      if (!created) {
+        throw new Error("Failed to create canonical server.");
+      }
+
+      return { serverId: created.id, created: true };
+    } catch (error) {
+      if (!isUniqueViolation(error)) {
+        throw error;
+      }
+
+      const resolved = await resolveCanonicalServerId(db, normalized);
+      if (resolved) {
+        return upsertServer(db, resolved, normalized, observedAt);
+      }
+      if (attempt === 4999) {
+        throw new Error("Unable to allocate a unique server slug.");
+      }
+    }
   }
 
-  return { serverId: created.id, created: true };
+  throw new Error("Unable to allocate a unique server slug.");
 }
 
 async function upsertServerVersion(
-  db: SyncDatabase,
+  db: SyncTransactionDatabase,
   serverId: string,
   sourceId: string,
   snapshotId: string,
   normalized: NormalizedRegistryServer,
   observedAt: Date,
 ): Promise<{ versionId: string; created: boolean }> {
+  const upstreamStatus = normalized.upstream.status;
+  const publishedAt = parseOptionalTimestamp(normalized.upstream.publishedAt);
+
   const [existing] = await db
-    .select({ id: serverVersions.id, firstSeenAt: serverVersions.firstSeenAt })
+    .select({ id: serverVersions.id })
     .from(serverVersions)
     .where(
       and(
@@ -346,9 +491,6 @@ async function upsertServerVersion(
         eq(serverVersions.version, normalized.version),
       ),
     );
-
-  const upstreamStatus = normalized.upstream.status;
-  const publishedAt = parseOptionalTimestamp(normalized.upstream.publishedAt);
 
   if (existing) {
     await db
@@ -384,6 +526,19 @@ async function upsertServerVersion(
       lastSeenAt: observedAt,
       normalizedPayload: normalized.normalizedPayload,
     })
+    .onConflictDoUpdate({
+      target: [serverVersions.serverId, serverVersions.version, serverVersions.registrySourceId],
+      set: {
+        registrySnapshotId: snapshotId,
+        schemaUri: normalized.schemaUri,
+        upstreamStatus,
+        description: normalized.description,
+        title: normalized.title,
+        publishedAt,
+        lastSeenAt: observedAt,
+        normalizedPayload: normalized.normalizedPayload,
+      },
+    })
     .returning({ id: serverVersions.id });
 
   if (!created) {
@@ -394,7 +549,7 @@ async function upsertServerVersion(
 }
 
 async function replaceVersionChildren(
-  db: SyncDatabase,
+  db: SyncTransactionDatabase,
   versionId: string,
   normalized: NormalizedRegistryServer,
 ): Promise<void> {
@@ -481,12 +636,13 @@ async function refreshCurrentVersionAndListingStatus(db: SyncDatabase, serverId:
 }
 
 async function synchronizeServerRecord(
-  db: SyncDatabase,
+  db: SyncTransactionDatabase,
   source: RegistrySyncSource,
   rawServerPayload: RegistryPage["servers"][number],
   observedAt: Date,
 ): Promise<RecordWriteStats> {
   const normalized = normalizeRegistryServer(rawServerPayload);
+  await acquireIdentityLocks(db, source.id, normalized);
   const snapshot = await upsertRegistrySnapshot(
     db,
     source.id,
@@ -524,8 +680,9 @@ export async function synchronizeRegistryPage(
   let recordsCreated = 0;
   let recordsUpdated = 0;
   let recordsFailed = 0;
+  const recordFailures: SyncRecordFailure[] = [];
 
-  for (const rawServer of page.servers) {
+  for (const [recordIndex, rawServer] of page.servers.entries()) {
     try {
       const stats = await db.transaction(async (tx) => {
         return synchronizeServerRecord(tx, source, rawServer, context.observedAt);
@@ -534,10 +691,24 @@ export async function synchronizeRegistryPage(
       recordsUpdated += stats.updated;
     } catch (error) {
       recordsFailed += 1;
+      const serverName = rawServer.server.name;
       if (error instanceof AmbiguousIdentityError) {
-        throw error;
+        recordFailures.push({
+          recordIndex,
+          serverName,
+          code: "ambiguous_identity",
+          message: error.message,
+        });
+        continue;
       }
-      throw error;
+
+      const message = error instanceof Error ? `${error.name}: ${error.message}` : "Unknown ingestion error";
+      recordFailures.push({
+        recordIndex,
+        serverName,
+        code: "ingestion_error",
+        message: message.slice(0, 400),
+      });
     }
   }
 
@@ -546,6 +717,7 @@ export async function synchronizeRegistryPage(
     recordsCreated,
     recordsUpdated,
     recordsFailed,
+    recordFailures,
     ...(page.metadata.nextCursor !== undefined ? { nextCursor: page.metadata.nextCursor } : {}),
   };
 

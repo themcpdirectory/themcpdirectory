@@ -1,4 +1,5 @@
 import PgBoss from "pg-boss";
+import { pathToFileURL } from "node:url";
 import { desc, eq, sql } from "drizzle-orm";
 import {
 	createDatabase,
@@ -21,14 +22,14 @@ import {
 } from "@themcpdirectory/registry-client";
 import { synchronizeRegistryPage } from "@themcpdirectory/domain";
 
-const REGISTRY_SYNC_QUEUE = "registry.sync";
+export const REGISTRY_SYNC_QUEUE = "registry.sync";
 
-interface RegistrySyncJobData {
+export interface RegistrySyncJobData {
 	sourceKey?: string;
 	cursorStart?: string;
 }
 
-interface SyncRunSummary {
+export interface SyncRunSummary {
 	runId: string;
 	status: "succeeded" | "partially_failed" | "failed";
 	recordsSeen: number;
@@ -38,6 +39,19 @@ interface SyncRunSummary {
 	cursorStart: string | null;
 	cursorEnd: string | null;
 	errorSummary: string | null;
+}
+
+export class RegistrySyncTerminalError extends Error {
+	readonly summary: SyncRunSummary;
+
+	constructor(summary: SyncRunSummary) {
+		super(
+			summary.errorSummary ??
+				`Registry sync finished with status '${summary.status}' and ${summary.recordsFailed} failed records.`,
+		);
+		this.name = "RegistrySyncTerminalError";
+		this.summary = summary;
+	}
 }
 
 interface CountSnapshot {
@@ -60,7 +74,7 @@ function toSafeErrorSummary(error: unknown): string {
 	return "Unknown synchronization error";
 }
 
-function parseRegistrySyncJobData(data: unknown): RegistrySyncJobData {
+export function parseRegistrySyncJobData(data: unknown): RegistrySyncJobData {
 	if (!data || typeof data !== "object") {
 		return {};
 	}
@@ -135,7 +149,7 @@ async function* singleFixturePageGenerator(): AsyncGenerator<RegistryPage> {
 	yield RegistryPageSchema.parse(structuredClone(VALID_REGISTRY_PAGE));
 }
 
-async function runRegistrySync(params: {
+export async function runRegistrySync(params: {
 	db: Database;
 	sourceKey: string;
 	baseUrl: string;
@@ -186,22 +200,24 @@ async function runRegistrySync(params: {
 		for await (const page of pages) {
 			cursorEnd = asCursor(page.metadata.nextCursor) ?? cursorEnd;
 
-			try {
-				const result = await synchronizeRegistryPage(params.db, source, page, {
-					observedAt: new Date(),
-					syncRunId: run.id,
-					...(resumeCursor !== null ? { cursorStart: resumeCursor } : {}),
-					...(cursorEnd !== null ? { cursorEnd } : {}),
-				});
+			const result = await synchronizeRegistryPage(params.db, source, page, {
+				observedAt: new Date(),
+				syncRunId: run.id,
+				...(resumeCursor !== null ? { cursorStart: resumeCursor } : {}),
+				...(cursorEnd !== null ? { cursorEnd } : {}),
+			});
 
-				recordsSeen += result.recordsSeen;
-				recordsCreated += result.recordsCreated;
-				recordsUpdated += result.recordsUpdated;
-				recordsFailed += result.recordsFailed;
-			} catch (error) {
-				recordsSeen += page.servers.length;
-				recordsFailed += page.servers.length;
-				errorSummaries.push(toSafeErrorSummary(error));
+			recordsSeen += result.recordsSeen;
+			recordsCreated += result.recordsCreated;
+			recordsUpdated += result.recordsUpdated;
+			recordsFailed += result.recordsFailed;
+
+			if (result.recordFailures.length > 0) {
+				for (const failure of result.recordFailures) {
+					errorSummaries.push(
+						`record[${failure.recordIndex}] ${failure.serverName}: ${failure.code} ${failure.message}`,
+					);
+				}
 			}
 		}
 	} catch (error) {
@@ -218,6 +234,8 @@ async function runRegistrySync(params: {
 				? "partially_failed"
 				: "succeeded";
 
+	const errorSummary = errorSummaries.length > 0 ? errorSummaries.join(" | ").slice(0, 2000) : null;
+
 	await params.db
 		.update(registrySyncRuns)
 		.set({
@@ -228,11 +246,11 @@ async function runRegistrySync(params: {
 			recordsCreated,
 			recordsUpdated,
 			recordsFailed,
-			errorSummary: errorSummaries.length > 0 ? errorSummaries.join(" | ").slice(0, 2000) : null,
+			errorSummary,
 		})
 		.where(eq(registrySyncRuns.id, run.id));
 
-	return {
+	const summary: SyncRunSummary = {
 		runId: run.id,
 		status,
 		recordsSeen,
@@ -241,8 +259,31 @@ async function runRegistrySync(params: {
 		recordsFailed,
 		cursorStart: resumeCursor,
 		cursorEnd,
-		errorSummary: errorSummaries.length > 0 ? errorSummaries.join(" | ").slice(0, 2000) : null,
+		errorSummary,
 	};
+
+	if (status !== "succeeded") {
+		throw new RegistrySyncTerminalError(summary);
+	}
+
+	return summary;
+}
+
+export async function processRegistrySyncJob(params: {
+	db: Database;
+	jobData: RegistrySyncJobData;
+	baseUrl: string;
+	pages?: AsyncIterable<RegistryPage>;
+}) {
+	const summary = await runRegistrySync({
+		db: params.db,
+		sourceKey: params.jobData.sourceKey ?? "official",
+		baseUrl: params.baseUrl,
+		...(params.jobData.cursorStart !== undefined ? { cursorStart: params.jobData.cursorStart } : {}),
+		...(params.pages ? { pages: params.pages } : {}),
+	});
+
+	return summary;
 }
 
 async function runFixtureSyncCommand(db: Database, baseUrl: string): Promise<void> {
@@ -276,7 +317,7 @@ async function runFixtureSyncCommand(db: Database, baseUrl: string): Promise<voi
 	});
 }
 
-async function startWorker(): Promise<void> {
+export async function startWorker(): Promise<void> {
 	const env = loadEnv();
 	const db = createDatabase(env.DATABASE_URL);
 
@@ -294,14 +335,13 @@ async function startWorker(): Promise<void> {
 		retryBackoff: true,
 	});
 
-	await boss.work(REGISTRY_SYNC_QUEUE, async ([job]) => {
+	const handler: PgBoss.WorkHandler<RegistrySyncJobData> = async ([job]) => {
 		const jobData = parseRegistrySyncJobData(job?.data);
 
-		const summary = await runRegistrySync({
+		const summary = await processRegistrySyncJob({
 			db,
-			sourceKey: jobData.sourceKey ?? "official",
 			baseUrl: env.MCP_REGISTRY_BASE_URL,
-			...(jobData.cursorStart !== undefined ? { cursorStart: jobData.cursorStart } : {}),
+			jobData,
 		});
 
 		console.info({
@@ -317,7 +357,9 @@ async function startWorker(): Promise<void> {
 			cursorStart: summary.cursorStart,
 			cursorEnd: summary.cursorEnd,
 		});
-	});
+	};
+
+	await boss.work(REGISTRY_SYNC_QUEUE, handler);
 
 	const shutdown = async () => {
 		await boss.stop({ graceful: true });
@@ -330,8 +372,19 @@ async function startWorker(): Promise<void> {
 	console.info({ event: "worker_started", queue: REGISTRY_SYNC_QUEUE });
 }
 
-startWorker().catch((error) => {
-	console.error({ event: "worker_failed", error: toSafeErrorSummary(error) });
-	process.exit(1);
-});
+function isCliEntry(): boolean {
+	const entry = process.argv[1];
+	if (!entry) {
+		return false;
+	}
+
+	return pathToFileURL(entry).href === import.meta.url;
+}
+
+if (isCliEntry()) {
+	startWorker().catch((error) => {
+		console.error({ event: "worker_failed", error: toSafeErrorSummary(error) });
+		process.exit(1);
+	});
+}
 

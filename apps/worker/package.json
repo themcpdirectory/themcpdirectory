@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "eslint": "9.39.5",
+    "postgres": "3.4.7",
     "tsx": "4.23.13",
     "@themcpdirectory/eslint-config": "workspace:*",
     "@themcpdirectory/typescript-config": "workspace:*",

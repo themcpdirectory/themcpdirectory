@@ -17,7 +17,6 @@ import {
   type RegistryPage,
 } from "@themcpdirectory/registry-client";
 import {
-  AmbiguousIdentityError,
   synchronizeRegistryPage,
 } from "../synchronize-registry-page.js";
 import { createTempDatabase } from "./postgres-test-db.js";
@@ -35,6 +34,25 @@ function makePage(mutate?: (page: RegistryPage) => void): RegistryPage {
   const page = RegistryPageSchema.parse(structuredClone(VALID_REGISTRY_PAGE));
   mutate?.(page);
   return page;
+}
+
+function makeSingleServerPage(
+  index: number,
+  mutate?: (entry: RegistryPage["servers"][number]) => void,
+): RegistryPage {
+  const source = makePage();
+  const entry = source.servers[index];
+  if (!entry) {
+    throw new Error(`Expected fixture server at index ${index}`);
+  }
+
+  const cloned = structuredClone(entry);
+  mutate?.(cloned);
+
+  return {
+    metadata: { ...source.metadata },
+    servers: [cloned],
+  };
 }
 
 async function createSource(db: Database, key = "official") {
@@ -347,7 +365,7 @@ describe("synchronizeRegistryPage integration", () => {
     expect(repoVersion).toHaveLength(0);
   });
 
-  it("fails safely on ambiguous identity instead of selecting silently", async () => {
+  it("reports ambiguous identity failure without mutating the ambiguous record", async () => {
     const source = await createSource(db);
     const observedAt = new Date("2026-09-01T10:00:00.000Z");
 
@@ -405,11 +423,15 @@ describe("synchronizeRegistryPage integration", () => {
       first.repository = undefined;
     });
 
-    await expect(
-      synchronizeRegistryPage(db, source, page, {
-        observedAt,
-      }),
-    ).rejects.toBeInstanceOf(AmbiguousIdentityError);
+    const result = await synchronizeRegistryPage(db, source, page, {
+      observedAt,
+    });
+
+    expect(result.recordsSeen).toBe(2);
+    expect(result.recordsFailed).toBe(1);
+    expect(result.recordFailures).toHaveLength(1);
+    expect(result.recordFailures[0]?.code).toBe("ambiguous_identity");
+    expect(result.recordFailures[0]?.serverName).toBe("io.github.example/completely-new-identity");
 
     const [created] = await db
       .select({ count: sql<number>`count(*)` })
@@ -461,5 +483,182 @@ describe("synchronizeRegistryPage integration", () => {
       .from(servers)
       .where(and(eq(servers.id, server!.id), isNull(servers.currentVersionId)));
     expect(nullCurrentOnDeleted).toHaveLength(1);
+  });
+
+  it("converges under concurrent ingestion of identical payload", async () => {
+    const source = await createSource(db);
+    const page = makePage();
+
+    const concurrent = await Promise.allSettled([
+      synchronizeRegistryPage(db, source, page, {
+        observedAt: new Date("2026-09-01T11:00:00.000Z"),
+      }),
+      synchronizeRegistryPage(db, source, page, {
+        observedAt: new Date("2026-09-01T11:00:01.000Z"),
+      }),
+    ]);
+
+    for (const result of concurrent) {
+      expect(result.status).toBe("fulfilled");
+    }
+
+    const counts = await countRows(db);
+    expect(Number(counts.servers)).toBe(2);
+    expect(Number(counts.versions)).toBe(2);
+    expect(Number(counts.snapshots)).toBe(2);
+  });
+
+  it("retries slug allocation deterministically for concurrent distinct identities", async () => {
+    const source = await createSource(db);
+
+    const alpha = makeSingleServerPage(0, (entry) => {
+      entry.server.name = "io.github.alpha/test-server";
+      entry.server.repository = undefined;
+      entry.server.packages = [
+        {
+          registryType: "npm",
+          identifier: "@alpha/test-server",
+          transport: { type: "stdio" },
+        },
+      ];
+    });
+
+    const beta = makeSingleServerPage(0, (entry) => {
+      entry.server.name = "io.github.beta/test-server";
+      entry.server.repository = undefined;
+      entry.server.packages = [
+        {
+          registryType: "npm",
+          identifier: "@beta/test-server",
+          transport: { type: "stdio" },
+        },
+      ];
+    });
+
+    const concurrent = await Promise.allSettled([
+      synchronizeRegistryPage(db, source, alpha, {
+        observedAt: new Date("2026-09-01T11:30:00.000Z"),
+      }),
+      synchronizeRegistryPage(db, source, beta, {
+        observedAt: new Date("2026-09-01T11:30:00.000Z"),
+      }),
+    ]);
+
+    for (const result of concurrent) {
+      expect(result.status).toBe("fulfilled");
+    }
+
+    const createdServers = await db
+      .select({ slug: servers.slug, canonicalRegistryName: servers.canonicalRegistryName })
+      .from(servers)
+      .where(
+        sql`${servers.canonicalRegistryName} in ('io.github.alpha/test-server', 'io.github.beta/test-server')`,
+      );
+
+    expect(createdServers).toHaveLength(2);
+    expect(new Set(createdServers.map((server) => String(server.slug))).size).toBe(2);
+  });
+
+  it("continues after an ambiguous record and reports exact per-record accounting", async () => {
+    const source = await createSource(db);
+    const observedAt = new Date("2026-09-01T12:00:00.000Z");
+
+    const [one] = await db
+      .insert(servers)
+      .values({
+        slug: "conflict-one",
+        title: "Conflict One",
+        shortDescription: "one",
+        listingStatus: "active",
+        moderationStatus: "normal",
+        firstSeenAt: observedAt,
+        lastSeenAt: observedAt,
+      })
+      .returning();
+
+    const [two] = await db
+      .insert(servers)
+      .values({
+        slug: "conflict-two",
+        title: "Conflict Two",
+        shortDescription: "two",
+        listingStatus: "active",
+        moderationStatus: "normal",
+        firstSeenAt: observedAt,
+        lastSeenAt: observedAt,
+      })
+      .returning();
+
+    for (const serverId of [one!.id, two!.id]) {
+      const [version] = await db
+        .insert(serverVersions)
+        .values({
+          serverId,
+          registrySourceId: source.id,
+          version: "1.0.0",
+          firstSeenAt: observedAt,
+          lastSeenAt: observedAt,
+          normalizedPayload: { server: { version: "1.0.0" } },
+        })
+        .returning();
+
+      await db.insert(serverPackages).values({
+        serverVersionId: version!.id,
+        registryType: "npm",
+        identifier: "@collision/test-server",
+        transportType: "stdio",
+      });
+    }
+
+    const successEntry = makeSingleServerPage(1, (entry) => {
+      entry.server.name = "io.github.example/successful-server";
+      entry.server.repository = undefined;
+      entry.server.packages = [
+        {
+          registryType: "npm",
+          identifier: "@example/successful-server",
+          transport: { type: "stdio" },
+        },
+      ];
+    }).servers[0]!;
+
+    const ambiguousEntry = makeSingleServerPage(0, (entry) => {
+      entry.server.name = "io.github.example/ambiguous-server";
+      entry.server.repository = undefined;
+      entry.server.packages = [
+        {
+          registryType: "npm",
+          identifier: "@collision/test-server",
+          transport: { type: "stdio" },
+        },
+      ];
+    }).servers[0]!;
+
+    const mixedPage: RegistryPage = {
+      metadata: { count: 2, nextCursor: "cursor-mixed" },
+      servers: [successEntry, ambiguousEntry],
+    };
+
+    const result = await synchronizeRegistryPage(db, source, mixedPage, {
+      observedAt,
+    });
+
+    expect(result.recordsSeen).toBe(2);
+    expect(result.recordsFailed).toBe(1);
+    expect(result.recordFailures).toHaveLength(1);
+    expect(result.recordFailures[0]?.code).toBe("ambiguous_identity");
+    expect(result.recordFailures[0]?.recordIndex).toBe(1);
+
+    const [successfulServer] = await db
+      .select({ id: servers.id })
+      .from(servers)
+      .where(eq(servers.canonicalRegistryName, "io.github.example/successful-server"));
+    expect(successfulServer).toBeDefined();
+
+    const [ambiguousServer] = await db
+      .select({ id: servers.id })
+      .from(servers)
+      .where(eq(servers.canonicalRegistryName, "io.github.example/ambiguous-server"));
+    expect(ambiguousServer).toBeUndefined();
   });
 });
