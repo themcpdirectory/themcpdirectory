@@ -11,11 +11,16 @@
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@themcpdirectory/db": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
   "devDependencies": {
     "eslint": "9.39.5",
     "@themcpdirectory/eslint-config": "workspace:*",
     "@themcpdirectory/typescript-config": "workspace:*",
     "@types/node": "^20",
+    "postgres": "3.4.7",
     "typescript": "5.9.3",
     "vitest": "4.1.11"
   }

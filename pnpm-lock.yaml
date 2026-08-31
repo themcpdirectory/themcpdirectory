@@ -311,6 +311,9 @@ importers:
       '@themcpdirectory/registry-normalizer':
         specifier: workspace:*
         version: link:../registry-normalizer
+      '@themcpdirectory/search':
+        specifier: workspace:*
+        version: link:../search
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(pg@8.23.0)(postgres@3.4.7)
@@ -412,6 +415,13 @@ importers:
         version: 4.1.11(@types/node@20.19.43)(vite@8.2.2(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13))
 
   packages/search:
+    dependencies:
+      '@themcpdirectory/db':
+        specifier: workspace:*
+        version: link:../db
+      drizzle-orm:
+        specifier: 0.45.2
+        version: 0.45.2(pg@8.23.0)(postgres@3.4.7)
     devDependencies:
       '@themcpdirectory/eslint-config':
         specifier: workspace:*
@@ -425,6 +435,9 @@ importers:
       eslint:
         specifier: 9.39.5
         version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
+      postgres:
+        specifier: 3.4.7
+        version: 3.4.7
       typescript:
         specifier: 5.9.3
         version: 5.9.3
