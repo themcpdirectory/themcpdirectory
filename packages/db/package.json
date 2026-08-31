@@ -1,0 +1,26 @@
+{
+  "name": "@themcpdirectory/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "db:generate": "echo 'db:generate not yet implemented'",
+    "db:migrate": "echo 'db:migrate not yet implemented'",
+    "db:seed": "echo 'db:seed not yet implemented'",
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests",
+    "test:integration": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "@themcpdirectory/eslint-config": "workspace:*",
+    "@themcpdirectory/typescript-config": "workspace:*",
+    "@types/node": "^20",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

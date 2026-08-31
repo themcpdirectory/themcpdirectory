@@ -27,6 +27,7 @@
 **Files:** Root workspace/configuration files, shared tooling packages, minimal `apps/api`, `apps/worker`, and future-phase package manifests.
 
 **Interfaces:**
+
 - Produces root commands `dev`, `build`, `lint`, `typecheck`, `test`, `test:integration`, `test:e2e`, `db:generate`, `db:migrate`, and `db:seed`.
 - Produces shared TypeScript and ESLint configuration consumed by every workspace.
 
@@ -42,6 +43,7 @@
 **Files:** `packages/db/src/schema/*`, database client and migration helpers, `packages/db/drizzle/*`, integration database utilities.
 
 **Interfaces:**
+
 - Produces Drizzle tables and inferred row types for Registry sources/runs/snapshots, publishers, servers, aliases, versions, packages, remotes, icons, categories, repository snapshots, trust signals, and compatibility.
 - Produces `createDatabase(databaseUrl)` and migration/seed entry points.
 
@@ -57,6 +59,7 @@
 **Files:** `packages/security/src/url.ts`, `packages/registry-client/src/schema.ts`, pagination client, normalized errors, and fixtures.
 
 **Interfaces:**
+
 - Produces `validatePublicHttpUrl(value)` for untrusted metadata.
 - Produces `OfficialRegistryClient.pages(options)` yielding validated `RegistryPage` values.
 
@@ -72,6 +75,7 @@
 **Files:** `packages/registry-normalizer/src/*` and fixture-driven unit tests.
 
 **Interfaces:**
+
 - Produces `normalizeRegistryServer(input): NormalizedRegistryServer`.
 - Produces `hashRegistryPayload(input): string` using stable canonical JSON.
 - Produces `selectCurrentVersion(versions)` without requiring valid SemVer.
@@ -88,6 +92,7 @@
 **Files:** `packages/domain/src/registry/*`, `apps/worker/src/*`, database integration tests, and worker scripts.
 
 **Interfaces:**
+
 - Produces `synchronizeRegistryPage(db, source, page, context): SyncPageResult`.
 - Produces identity resolution by upstream mapping, stable repository ID, package identity, approved alias, then creation.
 - Produces pg-boss queue `registry.sync` and a direct fixture sync command.
@@ -104,6 +109,7 @@
 **Files:** `packages/search/src/*`, `packages/domain/src/servers/*`, search refresh logic and tests.
 
 **Interfaces:**
+
 - Produces `searchServers(db, input): Promise<SearchResult[]>`.
 - Produces `getServerByIdentifier(db, identifier)` with canonical/alias result metadata.
 - Produces homepage and category query functions independent of Next.js.
@@ -120,6 +126,7 @@
 **Files:** `packages/db/src/seed/*`, required realistic fixtures, category assignments, and seed tests.
 
 **Interfaces:**
+
 - Produces deterministic `pnpm db:seed` data covering every specified server/identity state.
 
 - [ ] Write a failing seed integration test asserting all required fixture cases and 15 curated categories.
@@ -132,6 +139,7 @@
 **Files:** `apps/web/app/*`, `packages/ui/src/*`, styles, metadata routes, and component tests.
 
 **Interfaces:**
+
 - Produces server-rendered `/`, `/search`, `/categories`, `/categories/[slug]`, and `/[slug]` routes.
 - Produces canonical redirects for aliases, route metadata, `robots.txt`, and `sitemap.xml`.
 
@@ -147,6 +155,7 @@
 **Files:** `packages/domain/src/github/*`, worker job registration, GitHub response schemas and tests.
 
 **Interfaces:**
+
 - Produces `enrichGitHubRepository(db, serverId, options)` and queue `github.enrich`.
 - Persists stable repository ID, owner/name, status counts, license, push/release timestamps, payload, and check time.
 
@@ -161,6 +170,7 @@
 **Files:** Root `README.md`, development/security/contributing docs, package scripts, and CI adjustments.
 
 **Interfaces:**
+
 - Documents only implemented Phase A-C behavior and exact local commands.
 
 - [ ] Document architecture, prerequisites, environment, migrations, seeding, fixture/live sync, tests, build, project structure, contributing, and security reporting.

@@ -1,0 +1,26 @@
+{
+  "name": "@themcpdirectory/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "@themcpdirectory/eslint-config": "workspace:*",
+    "@themcpdirectory/typescript-config": "workspace:*",
+    "@themcpdirectory/vitest-config": "workspace:*",
+    "@types/node": "^20",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@themcpdirectory/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests",
+    "test:integration": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "4.7.11",
+    "@themcpdirectory/config": "workspace:*"
+  },
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "@themcpdirectory/eslint-config": "workspace:*",
+    "@themcpdirectory/typescript-config": "workspace:*",
+    "@themcpdirectory/vitest-config": "workspace:*",
+    "@types/node": "^20",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

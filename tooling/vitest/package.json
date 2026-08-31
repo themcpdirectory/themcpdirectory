@@ -1,0 +1,12 @@
+{
+  "name": "@themcpdirectory/vitest-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./base": "./base.ts"
+  },
+  "dependencies": {
+    "vitest": "4.1.11"
+  }
+}

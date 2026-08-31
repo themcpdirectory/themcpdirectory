@@ -1,0 +1,22 @@
+{
+  "name": "@themcpdirectory/auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "@themcpdirectory/eslint-config": "workspace:*",
+    "@themcpdirectory/typescript-config": "workspace:*",
+    "@types/node": "^20",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

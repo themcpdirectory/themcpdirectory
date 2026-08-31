@@ -1,0 +1,29 @@
+{
+  "name": "themcpdirectory",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The open directory for the MCP ecosystem.",
+  "packageManager": "pnpm@11.17.0",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=11"
+  },
+  "scripts": {
+    "build": "turbo build",
+    "db:generate": "pnpm --filter @themcpdirectory/db db:generate",
+    "db:migrate": "pnpm --filter @themcpdirectory/db db:migrate",
+    "db:seed": "pnpm --filter @themcpdirectory/db db:seed",
+    "dev": "turbo dev --concurrency=100%",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "test:e2e": "pnpm --filter @themcpdirectory/web test:e2e",
+    "test:integration": "turbo test:integration",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "prettier": "3.9.6",
+    "turbo": "2.10.12"
+  }
+}
