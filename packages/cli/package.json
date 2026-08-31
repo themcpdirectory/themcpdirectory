@@ -1,11 +1,8 @@
 {
   "name": "@themcpdirectory/cli",
   "version": "0.1.0",
-  "private": false,
+  "private": true,
   "type": "module",
-  "bin": {
-    "mcpdir": "./src/cli.ts"
-  },
   "exports": {
     ".": "./src/index.ts"
   },
