@@ -1,2 +1,2 @@
-// Not yet implemented — placeholder for future phases
-export {};
+export * from "./schema/index.js";
+export { createDatabase, type Database } from "./client.js";
