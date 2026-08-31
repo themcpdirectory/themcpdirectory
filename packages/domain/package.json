@@ -12,6 +12,13 @@
     "test:integration": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@themcpdirectory/db": "workspace:*",
+    "@themcpdirectory/registry-client": "workspace:*",
+    "@themcpdirectory/registry-normalizer": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "postgres": "3.4.7"
+  },
   "devDependencies": {
     "eslint": "9.39.5",
     "@themcpdirectory/eslint-config": "workspace:*",
