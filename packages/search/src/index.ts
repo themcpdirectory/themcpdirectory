@@ -85,9 +85,9 @@ export interface ServerIdentifierMatch {
 
 export class AmbiguousServerIdentifierError extends Error {
 	readonly identifier: string;
-	readonly matchedBy: Exclude<IdentifierMatchType, "alias">;
+	readonly matchedBy: IdentifierMatchType;
 
-	constructor(identifier: string, matchedBy: Exclude<IdentifierMatchType, "alias">, matches: number) {
+	constructor(identifier: string, matchedBy: IdentifierMatchType, matches: number) {
 		super(`Ambiguous identifier '${identifier}' matched ${matches} servers via ${matchedBy}.`);
 		this.name = "AmbiguousServerIdentifierError";
 		this.identifier = identifier;
@@ -297,7 +297,7 @@ export async function refreshServerSearchDocument(
 						select string_agg(distinct lower(sp.identifier), ' ' order by lower(sp.identifier))
 						from ${serverVersions} sv
 						inner join ${serverPackages} sp on sp.server_version_id = sv.id
-						where sv.server_id = s.id
+						where sv.id = s.current_version_id
 					), ''),
 					coalesce((
 						select string_agg(distinct lower(c.slug || ' ' || c.name), ' ' order by lower(c.slug || ' ' || c.name))
@@ -489,7 +489,7 @@ async function resolveAliasLookup(db: QueryDatabase, identifier: string): Promis
 
 	if (rows.length === 0) return null;
 	if (rows.length > 1) {
-		throw new AmbiguousServerIdentifierError(identifier, "canonical_registry_name", rows.length);
+		throw new AmbiguousServerIdentifierError(identifier, "alias", rows.length);
 	}
 
 	const row = rows[0];
@@ -565,7 +565,7 @@ async function resolvePackageLookup(
 			servers.longDescription,
 			servers.currentVersionId,
 		)
-		.limit(3);
+		.limit(2);
 
 	if (rows.length === 0) return null;
 	if (rows.length > 1) {

@@ -404,45 +404,158 @@ describe("search integration", () => {
     );
   });
 
-  it("can refresh one scoped server deterministically and idempotently", async () => {
-    const first = await seedServer(db, sourceIds, {
-      slug: "scoped-first",
-      title: "Scoped First",
-      shortDescription: "scoped alpha",
+  it("refresh updates deterministic search data after related-row mutations with scoped and idempotent behavior", async () => {
+    const primary = await seedServer(db, sourceIds, {
+      slug: "mutable-primary",
+      title: "Mutable Primary",
+      shortDescription: "original description",
+      aliases: ["legacy-handle"],
+      publisher: { slug: "old-publisher", displayName: "Old Publisher", verified: true },
+      packageIdentifier: "@scope/legacy-package",
+      category: { slug: "legacy-ops", name: "Legacy Ops" },
       officialSource: true,
     });
 
-    const second = await seedServer(db, sourceIds, {
-      slug: "scoped-second",
-      title: "Scoped Second",
-      shortDescription: "scoped beta",
+    const untouched = await seedServer(db, sourceIds, {
+      slug: "untouched-secondary",
+      title: "Untouched Secondary",
+      shortDescription: "unchanged profile",
+      aliases: ["stays-secondary"],
+      packageIdentifier: "@scope/secondary-package",
+      category: { slug: "secondary", name: "Secondary" },
       officialSource: true,
     });
 
-    await refreshServerSearchDocument(db, { serverId: first.id });
+    await refreshServerSearchDocument(db);
 
-    const [firstRow] = await db
+    const [beforePrimary] = await db
       .select({ text: servers.searchText, document: servers.searchDocument })
       .from(servers)
-      .where(eq(servers.id, first.id));
+      .where(eq(servers.id, primary.id));
 
-    const [secondRow] = await db
+    const [beforeUntouched] = await db
       .select({ text: servers.searchText, document: servers.searchDocument })
       .from(servers)
-      .where(eq(servers.id, second.id));
+      .where(eq(servers.id, untouched.id));
 
-    expect(firstRow?.text).toContain("scoped first");
-    expect(firstRow?.document).toBeTruthy();
-    expect(secondRow?.text).toBeNull();
-    expect(secondRow?.document).toBeNull();
+    expect(beforePrimary?.text).toContain("legacy-handle");
+    expect(beforePrimary?.text).toContain("@scope/legacy-package");
+    expect(beforePrimary?.text).toContain("legacy-ops");
+    expect(beforePrimary?.text).toContain("old publisher");
 
-    await refreshServerSearchDocument(db, { serverId: first.id });
+    const [newPublisher] = await db
+      .insert(publishers)
+      .values({
+        slug: "new-publisher",
+        displayName: "New Publisher",
+        verificationState: "verified",
+      })
+      .returning({ id: publishers.id });
 
-    const [afterSecondRefresh] = await db
+    if (!newPublisher) throw new Error("expected new publisher row");
+
+    await db.update(servers).set({ publisherId: newPublisher.id }).where(eq(servers.id, primary.id));
+
+    await db
+      .delete(serverAliases)
+      .where(and(eq(serverAliases.serverId, primary.id), eq(serverAliases.alias, "legacy-handle")));
+    await db.insert(serverAliases).values({
+      serverId: primary.id,
+      alias: "current-handle",
+      kind: "manual",
+    });
+
+    const [legacyCategory] = await db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(eq(categories.slug, "legacy-ops"));
+    if (!legacyCategory) throw new Error("expected legacy category");
+
+    await db
+      .delete(serverCategories)
+      .where(and(eq(serverCategories.serverId, primary.id), eq(serverCategories.categoryId, legacyCategory.id)));
+
+    const [modernCategory] = await db
+      .insert(categories)
+      .values({ slug: "modern-ops", name: "Modern Ops" })
+      .returning({ id: categories.id });
+    if (!modernCategory) throw new Error("expected modern category");
+
+    await db.insert(serverCategories).values({
+      serverId: primary.id,
+      categoryId: modernCategory.id,
+      source: "manual",
+      confidence: 1,
+    });
+
+    const [newVersion] = await db
+      .insert(serverVersions)
+      .values({
+        serverId: primary.id,
+        registrySourceId: sourceIds.official,
+        version: "2.0.0",
+        firstSeenAt: new Date("2026-09-02T12:00:00.000Z"),
+        lastSeenAt: new Date("2026-09-02T12:00:00.000Z"),
+        normalizedPayload: { seed: "v2" },
+        upstreamStatus: "active",
+        title: "Mutable Primary",
+        description: "updated",
+      })
+      .returning({ id: serverVersions.id });
+    if (!newVersion) throw new Error("expected v2 row");
+
+    await db.insert(serverPackages).values({
+      serverVersionId: newVersion.id,
+      registryType: "npm",
+      identifier: "@scope/current-package",
+      transportType: "stdio",
+    });
+
+    await db.update(servers).set({ currentVersionId: newVersion.id }).where(eq(servers.id, primary.id));
+
+    await refreshServerSearchDocument(db, { serverId: primary.id });
+
+    const [afterScopedRefresh] = await db
       .select({ text: servers.searchText, document: servers.searchDocument })
       .from(servers)
-      .where(and(eq(servers.id, first.id), eq(servers.searchText, firstRow?.text ?? "")));
+      .where(eq(servers.id, primary.id));
 
-    expect(afterSecondRefresh).toBeTruthy();
+    expect(afterScopedRefresh?.text).toContain("current-handle");
+    expect(afterScopedRefresh?.text).toContain("@scope/current-package");
+    expect(afterScopedRefresh?.text).toContain("modern-ops");
+    expect(afterScopedRefresh?.text).toContain("new publisher");
+
+    expect(afterScopedRefresh?.text).not.toContain("legacy-handle");
+    expect(afterScopedRefresh?.text).not.toContain("@scope/legacy-package");
+    expect(afterScopedRefresh?.text).not.toContain("legacy-ops");
+    expect(afterScopedRefresh?.text).not.toContain("old publisher");
+
+    const [afterUntouched] = await db
+      .select({ text: servers.searchText, document: servers.searchDocument })
+      .from(servers)
+      .where(eq(servers.id, untouched.id));
+
+    expect(afterUntouched).toEqual(beforeUntouched);
+
+    await refreshServerSearchDocument(db, { serverId: primary.id });
+
+    const [afterIdempotentRefresh] = await db
+      .select({ text: servers.searchText, document: servers.searchDocument })
+      .from(servers)
+      .where(eq(servers.id, primary.id));
+
+    expect(afterIdempotentRefresh).toEqual(afterScopedRefresh);
+
+    const aliasSearch = await searchServers(db, { query: "current-handle", limit: 5 });
+    expect(aliasSearch.map((row) => row.slug)).toContain("mutable-primary");
+
+    const packageSearch = await searchServers(db, { query: "@scope/current-package", limit: 5 });
+    expect(packageSearch.map((row) => row.slug)).toContain("mutable-primary");
+
+    const categorySearch = await searchServers(db, { query: "modern-ops", limit: 5 });
+    expect(categorySearch.map((row) => row.slug)).toContain("mutable-primary");
+
+    const publisherSearch = await searchServers(db, { query: "new publisher", limit: 5 });
+    expect(publisherSearch.map((row) => row.slug)).toContain("mutable-primary");
   });
 });
