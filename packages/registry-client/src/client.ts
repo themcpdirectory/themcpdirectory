@@ -1,3 +1,5 @@
+import { validatePublicHttpUrl } from "@themcpdirectory/security";
+import type { UrlValidationResult } from "@themcpdirectory/security";
 import { RegistryPageSchema } from "./schema.js";
 import type { RegistryPage } from "./schema.js";
 
@@ -9,14 +11,17 @@ export type RegistryErrorKind =
   | "validation"
   | "cursor_loop"
   | "response_too_large"
-  | "invalid_content_type";
+  | "invalid_content_type"
+  | "redirect_unsafe"
+  | "redirect_limit"
+  | "redirect_loop"
+  | "redirect_invalid";
 
 export class RegistryError extends Error {
   readonly kind: RegistryErrorKind;
   readonly status: number | undefined;
   readonly retryable: boolean;
   readonly attempt: number;
-  readonly cause: unknown;
 
   constructor(opts: {
     kind: RegistryErrorKind;
@@ -26,13 +31,12 @@ export class RegistryError extends Error {
     attempt: number;
     cause?: unknown;
   }) {
-    super(opts.message);
+    super(opts.message, opts.cause !== undefined ? { cause: opts.cause } : undefined);
     this.name = "RegistryError";
     this.kind = opts.kind;
     this.status = opts.status;
     this.retryable = opts.retryable;
     this.attempt = opts.attempt;
-    this.cause = opts.cause;
   }
 
   toJSON(): Record<string, unknown> {
@@ -55,6 +59,8 @@ export interface RegistryClientOptions {
   maxResponseBytes: number;
   fetch?: (input: string | Request, init?: RequestInit) => Promise<Response>;
   sleep?: (ms: number) => Promise<void>;
+  clock?: () => number;
+  validateUrl?: (url: string) => Promise<UrlValidationResult>;
 }
 
 export interface PagesOptions {
@@ -62,17 +68,22 @@ export interface PagesOptions {
 }
 
 const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const FOLLOWED_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const MAX_RETRY_AFTER_MS = 60_000;
 
 function isRetryableStatus(status: number): boolean {
   return RETRYABLE_STATUSES.has(status);
 }
 
-function parseRetryAfterMs(header: string | null): number | null {
+function parseRetryAfterMs(header: string | null, now: number): number | null {
   if (!header) return null;
   const seconds = Number(header);
   if (Number.isFinite(seconds) && seconds >= 0) {
     return Math.min(seconds * 1000, MAX_RETRY_AFTER_MS);
+  }
+  const dateMs = Date.parse(header);
+  if (Number.isFinite(dateMs)) {
+    return Math.min(Math.max(dateMs - now, 0), MAX_RETRY_AFTER_MS);
   }
   return null;
 }
@@ -88,6 +99,8 @@ export class OfficialRegistryClient {
     this.#options = {
       fetch: globalThis.fetch.bind(globalThis),
       sleep: (ms: number) => new Promise((r) => setTimeout(r, ms)),
+      clock: Date.now,
+      validateUrl: validatePublicHttpUrl,
       ...options,
     };
   }
@@ -129,9 +142,8 @@ export class OfficialRegistryClient {
       const timer = setTimeout(() => controller.abort(), this.#options.timeoutMs);
 
       try {
-        const response = await this.#options.fetch(url.href, {
+        const response = await this.#fetchWithRedirects(url.href, {
           signal: controller.signal,
-          redirect: "follow",
           headers: { accept: "application/json" },
         });
 
@@ -139,7 +151,8 @@ export class OfficialRegistryClient {
 
         if (!response.ok) {
           if (isRetryableStatus(response.status) && attempt < maxAttempts) {
-            const retryAfter = parseRetryAfterMs(response.headers.get("retry-after"));
+            const now = this.#options.clock();
+            const retryAfter = parseRetryAfterMs(response.headers.get("retry-after"), now);
             await this.#options.sleep(retryAfter ?? backoffMs(attempt - 1));
             continue;
           }
@@ -246,6 +259,85 @@ export class OfficialRegistryClient {
       retryable: true,
       attempt: maxAttempts,
     });
+  }
+
+  async #fetchWithRedirects(initialUrl: string, init: RequestInit): Promise<Response> {
+    let currentUrl = initialUrl;
+    const visited = new Set<string>();
+    let redirectsFollowed = 0;
+
+    while (true) {
+      const response = await this.#options.fetch(currentUrl, {
+        ...init,
+        redirect: "manual",
+      });
+
+      if (!FOLLOWED_REDIRECT_STATUSES.has(response.status)) {
+        return response;
+      }
+
+      response.body?.cancel().catch(() => {});
+
+      if (redirectsFollowed >= this.#options.maxRedirects) {
+        throw new RegistryError({
+          kind: "redirect_limit",
+          message: `Exceeded ${this.#options.maxRedirects} redirects`,
+          retryable: false,
+          attempt: 0,
+        });
+      }
+
+      const location = response.headers.get("location");
+      if (!location) {
+        throw new RegistryError({
+          kind: "redirect_invalid",
+          message: "Redirect missing Location header",
+          status: response.status,
+          retryable: false,
+          attempt: 0,
+        });
+      }
+
+      let nextUrl: URL;
+      try {
+        nextUrl = new URL(location, currentUrl);
+      } catch {
+        throw new RegistryError({
+          kind: "redirect_invalid",
+          message: `Malformed redirect Location: ${location}`,
+          status: response.status,
+          retryable: false,
+          attempt: 0,
+        });
+      }
+
+      nextUrl.username = "";
+      nextUrl.password = "";
+      const target = nextUrl.href;
+
+      if (visited.has(target)) {
+        throw new RegistryError({
+          kind: "redirect_loop",
+          message: `Redirect loop: ${target}`,
+          retryable: false,
+          attempt: 0,
+        });
+      }
+      visited.add(target);
+
+      const validation = await this.#options.validateUrl(target);
+      if (!validation.ok) {
+        throw new RegistryError({
+          kind: "redirect_unsafe",
+          message: `Redirect target blocked: ${validation.reason}`,
+          retryable: false,
+          attempt: 0,
+        });
+      }
+
+      currentUrl = validation.url;
+      redirectsFollowed++;
+    }
   }
 
   async #readBodyLimited(response: Response): Promise<string> {

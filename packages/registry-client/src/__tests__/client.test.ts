@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { OfficialRegistryClient } from "../client.js";
-import type { RegistryClientOptions, RegistryError } from "../client.js";
+import { OfficialRegistryClient, RegistryError } from "../client.js";
+import type { RegistryClientOptions } from "../client.js";
+import { validatePublicHttpUrl } from "@themcpdirectory/security";
 import {
   VALID_REGISTRY_PAGE,
   VALID_EMPTY_PAGE,
@@ -397,6 +398,319 @@ describe("OfficialRegistryClient.pages()", () => {
         const serialized = JSON.stringify(err);
         expect(serialized).not.toContain("SUPER_SECRET_TOKEN");
       }
+    });
+
+    it("stores cause via standard ErrorOptions.cause", () => {
+      const original = new TypeError("boom");
+      const err = new RegistryError({
+        kind: "network",
+        message: "wrapped",
+        retryable: true,
+        attempt: 1,
+        cause: original,
+      });
+      expect(err.cause).toBe(original);
+      expect(err.message).toBe("wrapped");
+    });
+  });
+
+  describe("redirect following", () => {
+    function redirectResponse(status: number, location?: string): Response {
+      const headers = new Headers();
+      if (location !== undefined) headers.set("location", location);
+      return new Response(null, { status, headers });
+    }
+
+    it("follows a public relative redirect to success", async () => {
+      const fetchedUrls: string[] = [];
+      const client = makeClient({
+        validateUrl: async (url) => ({ ok: true as const, url }),
+        fetch: async (input) => {
+          const url = typeof input === "string" ? input : (input as Request).url;
+          fetchedUrls.push(url);
+          if (fetchedUrls.length === 1) {
+            return redirectResponse(302, "/v0.1/servers?redirected=1");
+          }
+          return jsonResponse(VALID_LAST_PAGE);
+        },
+      });
+
+      const pages = [];
+      for await (const page of client.pages()) {
+        pages.push(page);
+      }
+      expect(pages).toHaveLength(1);
+      expect(fetchedUrls).toHaveLength(2);
+      expect(fetchedUrls[1]).toContain("redirected=1");
+    });
+
+    it("blocks redirect to private IP and never fetches the target", async () => {
+      const fetchedUrls: string[] = [];
+      const client = makeClient({
+        validateUrl: validatePublicHttpUrl,
+        fetch: async (input) => {
+          const url = typeof input === "string" ? input : (input as Request).url;
+          fetchedUrls.push(url);
+          return redirectResponse(302, "http://192.168.1.1/evil");
+        },
+      });
+
+      try {
+        for await (const _page of client.pages()) {
+          void _page;
+        }
+        expect.unreachable("should have thrown");
+      } catch (e) {
+        const err = e as RegistryError;
+        expect(err.kind).toBe("redirect_unsafe");
+        expect(err.retryable).toBe(false);
+      }
+      expect(fetchedUrls).toHaveLength(1);
+      expect(fetchedUrls.every((u) => !u.includes("192.168.1.1"))).toBe(true);
+    });
+
+    it("rejects missing Location header on redirect status", async () => {
+      const client = makeClient({
+        validateUrl: async (url) => ({ ok: true as const, url }),
+        fetch: async () => redirectResponse(302),
+      });
+
+      try {
+        for await (const _page of client.pages()) {
+          void _page;
+        }
+        expect.unreachable("should have thrown");
+      } catch (e) {
+        const err = e as RegistryError;
+        expect(err.kind).toBe("redirect_invalid");
+        expect(err.retryable).toBe(false);
+      }
+    });
+
+    it("rejects malformed Location URL", async () => {
+      const client = makeClient({
+        validateUrl: async (url) => ({ ok: true as const, url }),
+        fetch: async () => redirectResponse(302, "http://[::bad"),
+      });
+
+      try {
+        for await (const _page of client.pages()) {
+          void _page;
+        }
+        expect.unreachable("should have thrown");
+      } catch (e) {
+        const err = e as RegistryError;
+        expect(err.kind).toBe("redirect_invalid");
+        expect(err.retryable).toBe(false);
+      }
+    });
+
+    it("enforces hop limit", async () => {
+      let hop = 0;
+      const client = makeClient({
+        maxRedirects: 3,
+        validateUrl: async (url) => ({ ok: true as const, url }),
+        fetch: async () => {
+          hop++;
+          return redirectResponse(302, `/v0.1/servers?hop=${hop}`);
+        },
+      });
+
+      try {
+        for await (const _page of client.pages()) {
+          void _page;
+        }
+        expect.unreachable("should have thrown");
+      } catch (e) {
+        const err = e as RegistryError;
+        expect(err.kind).toBe("redirect_limit");
+        expect(err.retryable).toBe(false);
+      }
+    });
+
+    it("detects redirect loops", async () => {
+      const client = makeClient({
+        maxRedirects: 10,
+        validateUrl: async (url) => ({ ok: true as const, url }),
+        fetch: async (input) => {
+          const url = typeof input === "string" ? input : (input as Request).url;
+          if (url.includes("hop=a")) {
+            return redirectResponse(302, "/v0.1/servers?hop=b");
+          }
+          if (url.includes("hop=b")) {
+            return redirectResponse(302, "/v0.1/servers?hop=a");
+          }
+          return redirectResponse(302, "/v0.1/servers?hop=a");
+        },
+      });
+
+      try {
+        for await (const _page of client.pages()) {
+          void _page;
+        }
+        expect.unreachable("should have thrown");
+      } catch (e) {
+        const err = e as RegistryError;
+        expect(err.kind).toBe("redirect_loop");
+        expect(err.retryable).toBe(false);
+      }
+    });
+
+    it("does not follow non-standard 3xx statuses", async () => {
+      const client = makeClient({
+        validateUrl: async (url) => ({ ok: true as const, url }),
+        fetch: async () => new Response(null, { status: 300 }),
+      });
+
+      try {
+        for await (const _page of client.pages()) {
+          void _page;
+        }
+        expect.unreachable("should have thrown");
+      } catch (e) {
+        const err = e as RegistryError;
+        expect(err.kind).toBe("http");
+      }
+    });
+
+    it("shares one timeout budget across redirect chain", async () => {
+      const signals: (AbortSignal | null | undefined)[] = [];
+      const client = makeClient({
+        validateUrl: async (url) => ({ ok: true as const, url }),
+        fetch: async (input, init) => {
+          signals.push(init?.signal);
+          if (signals.length === 1) {
+            return redirectResponse(302, "/v0.1/servers?hop=1");
+          }
+          return jsonResponse(VALID_LAST_PAGE);
+        },
+      });
+
+      for await (const _page of client.pages()) {
+        void _page;
+      }
+      expect(signals).toHaveLength(2);
+      expect(signals[0]).toBe(signals[1]);
+    });
+  });
+
+  describe("Retry-After HTTP-date", () => {
+    it("parses future HTTP-date and sleeps the correct delta", async () => {
+      let attempts = 0;
+      const sleepMs: number[] = [];
+      const client = makeClient({
+        clock: () => Date.parse("Wed, 01 Sep 2026 00:00:30 GMT"),
+        fetch: async () => {
+          attempts++;
+          if (attempts === 1) {
+            return new Response("rate limited", {
+              status: 429,
+              headers: {
+                "retry-after": "Wed, 01 Sep 2026 00:01:00 GMT",
+                "content-type": "text/plain",
+              },
+            });
+          }
+          return jsonResponse(VALID_LAST_PAGE);
+        },
+        sleep: async (ms) => {
+          sleepMs.push(ms);
+        },
+      });
+
+      const pages = [];
+      for await (const page of client.pages()) {
+        pages.push(page);
+      }
+      expect(sleepMs[0]).toBe(30_000);
+    });
+
+    it("clamps past HTTP-date to zero delay", async () => {
+      let attempts = 0;
+      const sleepMs: number[] = [];
+      const client = makeClient({
+        clock: () => Date.parse("Wed, 01 Sep 2026 01:00:00 GMT"),
+        fetch: async () => {
+          attempts++;
+          if (attempts === 1) {
+            return new Response("rate limited", {
+              status: 429,
+              headers: {
+                "retry-after": "Wed, 01 Sep 2026 00:00:00 GMT",
+                "content-type": "text/plain",
+              },
+            });
+          }
+          return jsonResponse(VALID_LAST_PAGE);
+        },
+        sleep: async (ms) => {
+          sleepMs.push(ms);
+        },
+      });
+
+      const pages = [];
+      for await (const page of client.pages()) {
+        pages.push(page);
+      }
+      expect(sleepMs[0]).toBe(0);
+    });
+
+    it("caps far-future HTTP-date to MAX_RETRY_AFTER_MS", async () => {
+      let attempts = 0;
+      const sleepMs: number[] = [];
+      const client = makeClient({
+        clock: () => Date.parse("Wed, 01 Sep 2026 00:00:00 GMT"),
+        fetch: async () => {
+          attempts++;
+          if (attempts === 1) {
+            return new Response("rate limited", {
+              status: 429,
+              headers: {
+                "retry-after": "Wed, 01 Sep 2026 10:00:00 GMT",
+                "content-type": "text/plain",
+              },
+            });
+          }
+          return jsonResponse(VALID_LAST_PAGE);
+        },
+        sleep: async (ms) => {
+          sleepMs.push(ms);
+        },
+      });
+
+      const pages = [];
+      for await (const page of client.pages()) {
+        pages.push(page);
+      }
+      expect(sleepMs[0]).toBeLessThanOrEqual(60_000);
+    });
+
+    it("falls back to backoff on invalid Retry-After string", async () => {
+      let attempts = 0;
+      const sleepMs: number[] = [];
+      const client = makeClient({
+        clock: () => Date.parse("Wed, 01 Sep 2026 00:00:00 GMT"),
+        fetch: async () => {
+          attempts++;
+          if (attempts === 1) {
+            return new Response("rate limited", {
+              status: 429,
+              headers: { "retry-after": "not-a-date-or-number", "content-type": "text/plain" },
+            });
+          }
+          return jsonResponse(VALID_LAST_PAGE);
+        },
+        sleep: async (ms) => {
+          sleepMs.push(ms);
+        },
+      });
+
+      const pages = [];
+      for await (const page of client.pages()) {
+        pages.push(page);
+      }
+      // Should fall back to exponential backoff: 1000 * 2^0 = 1000
+      expect(sleepMs[0]).toBe(1_000);
     });
   });
 });

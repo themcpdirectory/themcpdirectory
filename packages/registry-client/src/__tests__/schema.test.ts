@@ -4,6 +4,7 @@ import {
   VALID_REGISTRY_PAGE,
   VALID_EMPTY_PAGE,
   VALID_LAST_PAGE,
+  VALID_PAGE_WITHOUT_META,
 } from "../__fixtures__/registry-page.js";
 
 describe("RegistryPageSchema", () => {
@@ -90,5 +91,10 @@ describe("RegistryPageSchema", () => {
       metadata: { count: "two" },
     });
     expect(result.success).toBe(false);
+  });
+
+  it("accepts ServerResponse without _meta (upstream omitempty)", () => {
+    const result = RegistryPageSchema.safeParse(VALID_PAGE_WITHOUT_META);
+    expect(result.success).toBe(true);
   });
 });

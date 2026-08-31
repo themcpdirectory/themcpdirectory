@@ -114,7 +114,7 @@ const ResponseMetaSchema = z
 const ServerResponseSchema = z
   .object({
     server: ServerJSONSchema,
-    _meta: ResponseMetaSchema,
+    _meta: ResponseMetaSchema.optional(),
   })
   .passthrough();
 

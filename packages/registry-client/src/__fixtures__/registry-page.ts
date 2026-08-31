@@ -135,3 +135,19 @@ export const VALID_LAST_PAGE = {
     count: 1,
   },
 } as const;
+
+export const VALID_PAGE_WITHOUT_META = {
+  servers: [
+    {
+      server: {
+        $schema: "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+        name: "io.github.example/no-meta-server",
+        description: "Server response without _meta envelope",
+        version: "1.0.0",
+      },
+    },
+  ],
+  metadata: {
+    count: 1,
+  },
+} as const;
