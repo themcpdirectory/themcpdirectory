@@ -7,7 +7,7 @@ export const registrySnapshots = pgTable(
     id: uuid().primaryKey().defaultRandom(),
     registrySourceId: uuid("registry_source_id")
       .notNull()
-      .references(() => registrySources.id, { onDelete: "cascade" }),
+      .references(() => registrySources.id, { onDelete: "restrict" }),
     externalName: text("external_name").notNull(),
     externalVersion: text("external_version").notNull(),
     schemaUri: text("schema_uri"),

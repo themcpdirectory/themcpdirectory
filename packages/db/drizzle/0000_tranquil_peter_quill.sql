@@ -1,4 +1,3 @@
--- Hand-edited: Drizzle Kit cannot represent CREATE EXTENSION or GIN indexes
 CREATE EXTENSION IF NOT EXISTS citext;--> statement-breakpoint
 CREATE EXTENSION IF NOT EXISTS pg_trgm;--> statement-breakpoint
 CREATE TABLE "categories" (
@@ -59,7 +58,7 @@ CREATE TABLE "publisher_memberships" (
 --> statement-breakpoint
 CREATE TABLE "publishers" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"slug" text NOT NULL,
+	"slug" "citext" NOT NULL,
 	"display_name" text NOT NULL,
 	"description" text,
 	"website_url" text,
@@ -95,8 +94,7 @@ CREATE TABLE "registry_sources" (
 	"enabled" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "registry_sources_key_unique" UNIQUE("key"),
-	CONSTRAINT "registry_sources_kind_check" CHECK ("registry_sources"."kind" in ('mcp-registry'))
+	CONSTRAINT "registry_sources_key_unique" UNIQUE("key")
 );
 --> statement-breakpoint
 CREATE TABLE "registry_sync_runs" (
@@ -242,7 +240,7 @@ CREATE TABLE "server_versions" (
 --> statement-breakpoint
 CREATE TABLE "servers" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"slug" text NOT NULL,
+	"slug" "citext" NOT NULL,
 	"title" text NOT NULL,
 	"short_description" text NOT NULL,
 	"long_description" text,
@@ -262,7 +260,7 @@ CREATE TABLE "servers" (
 	"open_source" boolean,
 	"first_seen_at" timestamp with time zone NOT NULL,
 	"last_seen_at" timestamp with time zone NOT NULL,
-	"search_document" text,
+	"search_document" "tsvector",
 	"search_text" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -291,7 +289,7 @@ ALTER TABLE "client_compatibility" ADD CONSTRAINT "client_compatibility_server_i
 ALTER TABLE "install_overrides" ADD CONSTRAINT "install_overrides_server_id_servers_id_fk" FOREIGN KEY ("server_id") REFERENCES "public"."servers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "moderation_events" ADD CONSTRAINT "moderation_events_server_id_servers_id_fk" FOREIGN KEY ("server_id") REFERENCES "public"."servers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "publisher_memberships" ADD CONSTRAINT "publisher_memberships_publisher_id_publishers_id_fk" FOREIGN KEY ("publisher_id") REFERENCES "public"."publishers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "registry_snapshots" ADD CONSTRAINT "registry_snapshots_registry_source_id_registry_sources_id_fk" FOREIGN KEY ("registry_source_id") REFERENCES "public"."registry_sources"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "registry_snapshots" ADD CONSTRAINT "registry_snapshots_registry_source_id_registry_sources_id_fk" FOREIGN KEY ("registry_source_id") REFERENCES "public"."registry_sources"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "registry_sync_runs" ADD CONSTRAINT "registry_sync_runs_registry_source_id_registry_sources_id_fk" FOREIGN KEY ("registry_source_id") REFERENCES "public"."registry_sources"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "reports" ADD CONSTRAINT "reports_server_id_servers_id_fk" FOREIGN KEY ("server_id") REFERENCES "public"."servers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "repository_snapshots" ADD CONSTRAINT "repository_snapshots_server_id_servers_id_fk" FOREIGN KEY ("server_id") REFERENCES "public"."servers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -308,6 +306,7 @@ ALTER TABLE "server_versions" ADD CONSTRAINT "server_versions_server_id_servers_
 ALTER TABLE "server_versions" ADD CONSTRAINT "server_versions_registry_source_id_registry_sources_id_fk" FOREIGN KEY ("registry_source_id") REFERENCES "public"."registry_sources"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "server_versions" ADD CONSTRAINT "server_versions_registry_snapshot_id_registry_snapshots_id_fk" FOREIGN KEY ("registry_snapshot_id") REFERENCES "public"."registry_snapshots"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "servers" ADD CONSTRAINT "servers_publisher_id_publishers_id_fk" FOREIGN KEY ("publisher_id") REFERENCES "public"."publishers"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "servers" ADD CONSTRAINT "servers_current_version_id_server_versions_id_fk" FOREIGN KEY ("current_version_id") REFERENCES "public"."server_versions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "trust_signals" ADD CONSTRAINT "trust_signals_server_id_servers_id_fk" FOREIGN KEY ("server_id") REFERENCES "public"."servers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "trust_signals" ADD CONSTRAINT "trust_signals_server_version_id_server_versions_id_fk" FOREIGN KEY ("server_version_id") REFERENCES "public"."server_versions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "client_compatibility_server_id_idx" ON "client_compatibility" USING btree ("server_id");--> statement-breakpoint
@@ -321,6 +320,7 @@ CREATE INDEX "reports_server_id_idx" ON "reports" USING btree ("server_id");--> 
 CREATE INDEX "repository_snapshots_server_id_idx" ON "repository_snapshots" USING btree ("server_id");--> statement-breakpoint
 CREATE INDEX "repository_snapshots_external_repo_id_idx" ON "repository_snapshots" USING btree ("external_repository_id");--> statement-breakpoint
 CREATE INDEX "server_aliases_server_id_idx" ON "server_aliases" USING btree ("server_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "server_aliases_lower_alias_unique" ON "server_aliases" USING btree (lower("alias"));--> statement-breakpoint
 CREATE INDEX "server_categories_category_id_idx" ON "server_categories" USING btree ("category_id");--> statement-breakpoint
 CREATE INDEX "server_health_checks_server_id_idx" ON "server_health_checks" USING btree ("server_id");--> statement-breakpoint
 CREATE INDEX "server_health_checks_server_version_id_idx" ON "server_health_checks" USING btree ("server_version_id");--> statement-breakpoint
@@ -333,10 +333,8 @@ CREATE INDEX "server_versions_registry_snapshot_id_idx" ON "server_versions" USI
 CREATE INDEX "servers_publisher_id_idx" ON "servers" USING btree ("publisher_id");--> statement-breakpoint
 CREATE INDEX "servers_listing_status_idx" ON "servers" USING btree ("listing_status");--> statement-breakpoint
 CREATE INDEX "servers_moderation_status_idx" ON "servers" USING btree ("moderation_status");--> statement-breakpoint
+CREATE INDEX "servers_search_document_idx" ON "servers" USING gin ("search_document");--> statement-breakpoint
+CREATE INDEX "servers_title_trgm_idx" ON "servers" USING gin ("title" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "servers_slug_trgm_idx" ON "servers" USING gin ("slug" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "trust_signals_server_id_idx" ON "trust_signals" USING btree ("server_id");--> statement-breakpoint
-CREATE INDEX "trust_signals_server_version_id_idx" ON "trust_signals" USING btree ("server_version_id");--> statement-breakpoint
--- Hand-edited: Drizzle Kit cannot represent tsvector columns or GIN indexes
-ALTER TABLE "servers" ADD COLUMN "search_tsv" tsvector;--> statement-breakpoint
-CREATE INDEX "servers_search_document_idx" ON "servers" USING GIN("search_tsv");--> statement-breakpoint
-CREATE INDEX "servers_title_trgm_idx" ON "servers" USING GIN("title" gin_trgm_ops);--> statement-breakpoint
-CREATE INDEX "servers_slug_trgm_idx" ON "servers" USING GIN("slug" gin_trgm_ops);
+CREATE INDEX "trust_signals_server_version_id_idx" ON "trust_signals" USING btree ("server_version_id");

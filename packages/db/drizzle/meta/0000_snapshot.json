@@ -1,5 +1,5 @@
 {
-  "id": "050443c3-9380-440c-b049-2300bf254dbc",
+  "id": "f1e1daa2-8d1b-4dd8-ab84-35c7af8f5720",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -460,7 +460,7 @@
         },
         "slug": {
           "name": "slug",
-          "type": "text",
+          "type": "citext",
           "primaryKey": false,
           "notNull": true
         },
@@ -626,7 +626,7 @@
           "tableTo": "registry_sources",
           "columnsFrom": ["registry_source_id"],
           "columnsTo": ["id"],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -710,12 +710,7 @@
         }
       },
       "policies": {},
-      "checkConstraints": {
-        "registry_sources_kind_check": {
-          "name": "registry_sources_kind_check",
-          "value": "\"registry_sources\".\"kind\" in ('mcp-registry')"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.registry_sync_runs": {
@@ -1167,6 +1162,21 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "server_aliases_lower_alias_unique": {
+          "name": "server_aliases_lower_alias_unique",
+          "columns": [
+            {
+              "expression": "lower(\"alias\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1918,7 +1928,7 @@
         },
         "slug": {
           "name": "slug",
-          "type": "text",
+          "type": "citext",
           "primaryKey": false,
           "notNull": true
         },
@@ -2038,7 +2048,7 @@
         },
         "search_document": {
           "name": "search_document",
-          "type": "text",
+          "type": "tsvector",
           "primaryKey": false,
           "notNull": false
         },
@@ -2108,6 +2118,51 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "servers_search_document_idx": {
+          "name": "servers_search_document_idx",
+          "columns": [
+            {
+              "expression": "search_document",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "servers_title_trgm_idx": {
+          "name": "servers_title_trgm_idx",
+          "columns": [
+            {
+              "expression": "\"title\" gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "servers_slug_trgm_idx": {
+          "name": "servers_slug_trgm_idx",
+          "columns": [
+            {
+              "expression": "\"slug\" gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -2116,6 +2171,15 @@
           "tableFrom": "servers",
           "tableTo": "publishers",
           "columnsFrom": ["publisher_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "servers_current_version_id_server_versions_id_fk": {
+          "name": "servers_current_version_id_server_versions_id_fk",
+          "tableFrom": "servers",
+          "tableTo": "server_versions",
+          "columnsFrom": ["current_version_id"],
           "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"

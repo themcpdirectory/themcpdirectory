@@ -1,11 +1,12 @@
 import { pgTable, uuid, text, timestamp, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { citext } from "./column-types.js";
 
 export const publishers = pgTable(
   "publishers",
   {
     id: uuid().primaryKey().defaultRandom(),
-    slug: text().unique().notNull(),
+    slug: citext().unique().notNull(),
     displayName: text("display_name").notNull(),
     description: text(),
     websiteUrl: text("website_url"),

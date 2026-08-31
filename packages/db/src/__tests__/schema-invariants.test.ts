@@ -202,5 +202,82 @@ describe("schema invariants", () => {
       const config = getConfig(serverVersions);
       expect(config.foreignKeys.length).toBeGreaterThan(0);
     });
+
+    it("registry_snapshots.registry_source_id uses restrict on delete", () => {
+      const config = getConfig(registrySnapshots);
+      const fk = config.foreignKeys.find((f) => {
+        const ref = f.reference();
+        return ref.columns.some((c) => c.name === "registry_source_id");
+      });
+      expect(fk).toBeDefined();
+      expect(fk!.onDelete).toBe("restrict");
+    });
+  });
+
+  describe("citext columns", () => {
+    it("publishers.slug emits citext SQL type", () => {
+      const col = findColumn(publishers, "slug");
+      expect(col.getSQLType()).toBe("citext");
+    });
+
+    it("servers.slug emits citext SQL type", () => {
+      const col = findColumn(servers, "slug");
+      expect(col.getSQLType()).toBe("citext");
+    });
+  });
+
+  describe("tsvector column and GIN index", () => {
+    it("servers.search_document emits tsvector SQL type", () => {
+      const col = findColumn(servers, "search_document");
+      expect(col.getSQLType()).toBe("tsvector");
+    });
+
+    it("servers has GIN index named servers_search_document_idx", () => {
+      const config = getConfig(servers);
+      const ginIdx = config.indexes.find(
+        (idx) => idx.config.name === "servers_search_document_idx",
+      );
+      expect(ginIdx).toBeDefined();
+    });
+  });
+
+  describe("lower(alias) unique expression index", () => {
+    it("server_aliases has a unique index on lower(alias)", () => {
+      const config = getConfig(serverAliases);
+      const idx = config.indexes.find(
+        (idx) => idx.config.name === "server_aliases_lower_alias_unique" && idx.config.unique,
+      );
+      expect(idx).toBeDefined();
+    });
+  });
+
+  describe("no restrictive registry kind CHECK", () => {
+    it("registry_sources has no CHECK constraint on kind", () => {
+      const config = getConfig(registrySources);
+      const kindCheck = config.checks.find((c) => c.name?.includes("kind"));
+      expect(kindCheck).toBeUndefined();
+    });
+  });
+
+  describe("mutable-table timestamp conventions", () => {
+    const mutableTables = [
+      { name: "registry_sources", table: registrySources },
+      { name: "publishers", table: publishers },
+      { name: "publisher_memberships", table: publisherMemberships },
+      { name: "servers", table: servers },
+      { name: "server_versions", table: serverVersions },
+      { name: "categories", table: categories },
+      { name: "trust_signals", table: trustSignals },
+      { name: "client_compatibility", table: clientCompatibility },
+      { name: "install_overrides", table: installOverrides },
+      { name: "reports", table: reports },
+    ];
+
+    it.each(mutableTables)("$name has both created_at and updated_at", ({ table }) => {
+      const config = getConfig(table);
+      const colNames = config.columns.map((c) => c.name);
+      expect(colNames).toContain("created_at");
+      expect(colNames).toContain("updated_at");
+    });
   });
 });

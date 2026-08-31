@@ -1,3 +1,4 @@
+export { citext, tsvector } from "./column-types.js";
 export { registrySources } from "./registry-sources.js";
 export { registrySyncRuns } from "./registry-sync-runs.js";
 export { registrySnapshots } from "./registry-snapshots.js";

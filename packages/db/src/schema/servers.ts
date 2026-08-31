@@ -1,12 +1,23 @@
-import { pgTable, uuid, text, boolean, timestamp, index, check } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  uuid,
+  text,
+  boolean,
+  timestamp,
+  index,
+  check,
+  type AnyPgColumn,
+} from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { publishers } from "./publishers.js";
+import { serverVersions } from "./server-versions.js";
+import { citext, tsvector } from "./column-types.js";
 
 export const servers = pgTable(
   "servers",
   {
     id: uuid().primaryKey().defaultRandom(),
-    slug: text().unique().notNull(),
+    slug: citext().unique().notNull(),
     title: text().notNull(),
     shortDescription: text("short_description").notNull(),
     longDescription: text("long_description"),
@@ -19,7 +30,9 @@ export const servers = pgTable(
     listingStatus: text("listing_status").notNull(),
     moderationStatus: text("moderation_status").notNull(),
 
-    currentVersionId: uuid("current_version_id"),
+    currentVersionId: uuid("current_version_id").references((): AnyPgColumn => serverVersions.id, {
+      onDelete: "set null",
+    }),
 
     repositoryUrl: text("repository_url"),
     repositorySource: text("repository_source"),
@@ -36,7 +49,7 @@ export const servers = pgTable(
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
 
-    searchDocument: text("search_document"),
+    searchDocument: tsvector("search_document"),
     searchText: text("search_text"),
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -46,6 +59,9 @@ export const servers = pgTable(
     index("servers_publisher_id_idx").on(t.publisherId),
     index("servers_listing_status_idx").on(t.listingStatus),
     index("servers_moderation_status_idx").on(t.moderationStatus),
+    index("servers_search_document_idx").using("gin", t.searchDocument),
+    index("servers_title_trgm_idx").using("gin", sql`${t.title} gin_trgm_ops`),
+    index("servers_slug_trgm_idx").using("gin", sql`${t.slug} gin_trgm_ops`),
     check(
       "servers_listing_status_check",
       sql`${t.listingStatus} in ('active', 'deprecated', 'deleted_upstream', 'unavailable')`,

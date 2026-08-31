@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, index, check } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, index, check, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { servers } from "./servers.js";
 
@@ -15,6 +15,7 @@ export const serverAliases = pgTable(
   },
   (t) => [
     index("server_aliases_server_id_idx").on(t.serverId),
+    uniqueIndex("server_aliases_lower_alias_unique").on(sql`lower(${t.alias})`),
     check(
       "server_aliases_kind_check",
       sql`${t.kind} in ('slug', 'package', 'legacy_name', 'repository', 'manual')`,
