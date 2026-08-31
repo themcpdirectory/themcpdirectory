@@ -2,5 +2,11 @@
 node_modules/
 dist/
 *.log
-
-docs/ai-docs/
+.env
+.env.local
+.turbo/
+.next/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
