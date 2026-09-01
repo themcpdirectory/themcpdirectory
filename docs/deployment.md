@@ -1,6 +1,6 @@
 # Portainer Deployment
 
-This deployment targets Portainer Business Edition managing a Docker Standalone endpoint. Portainer clones the Git repository and builds one application image used by the web, migration, and worker services.
+This deployment targets Portainer Business Edition managing a Docker Standalone endpoint. GitHub Actions builds one application image for the web, migration, and worker services and publishes it to the GitHub Container Registry (GHCR). Portainer only pulls the published image; it does not build on the Docker host.
 
 ## Prerequisites
 
@@ -8,9 +8,25 @@ This deployment targets Portainer Business Edition managing a Docker Standalone 
 - An existing external Docker network named `proxy`
 - Nginx Proxy Manager attached to the `proxy` network
 - DNS for `themcpdirectory.org` pointing to the proxy host
-- Enough free disk space to build the complete pnpm workspace
+- GitHub Actions enabled for the repository
 
 The production stack does not publish application or PostgreSQL ports on the host. Nginx Proxy Manager reaches the web service through the shared `proxy` network.
+
+## Container Image
+
+The [Publish container workflow](../.github/workflows/publish-container.yml) runs after every push to `main` and can also be started manually. It publishes these tags:
+
+- `ghcr.io/themcpdirectory/themcpdirectory:main` for the latest successful `main` build
+- `ghcr.io/themcpdirectory/themcpdirectory:sha-<full-commit-sha>` for an immutable deployment and rollback target
+
+Before the first Portainer deployment:
+
+1. Push or merge the deployment changes to `main`.
+2. Wait for the **Publish container** workflow to finish successfully.
+3. Open the `themcpdirectory` package in the GitHub organisation, select **Package settings**, then under **Danger Zone** select **Change visibility** and choose **Public**.
+4. Confirm that the image can be pulled without authentication.
+
+New GHCR packages are private by default, even when linked to a public repository. Making the package public is a one-time, irreversible setting and allows Portainer to pull without registry credentials. Subsequent image versions retain the package visibility.
 
 ## Portainer Stack
 
@@ -35,6 +51,7 @@ Add these environment variables in Portainer:
 | `MCP_REGISTRY_BASE_URL` | `https://registry.modelcontextprotocol.io`                                |
 | `NEXT_PUBLIC_BASE_URL`  | `https://themcpdirectory.org`                                             |
 | `GITHUB_TOKEN`          | Optional GitHub token for higher enrichment rate limits                   |
+| `APP_IMAGE`             | Optional immutable `sha-...` image tag; defaults to the `main` tag        |
 
 Percent-encode reserved URL characters in the password used by `DATABASE_URL`. The unencoded value must still be supplied separately as `POSTGRES_PASSWORD`. Do not set `THEMCP_TEST_ADMIN_DATABASE_URL` or commit production values to an environment file.
 
@@ -69,9 +86,16 @@ Issue a Let's Encrypt certificate, enable **Force SSL**, and verify these routes
 
 ## Updates
 
-The stack uses Compose `pull_policy: build`, which rebuilds the application image from the latest Git checkout when Portainer applies the stack. After the first successful manual deployment, GitOps updates can use either polling or a webhook.
+The stack uses Compose `pull_policy: always`. Portainer pulls an already published image whenever it applies or redeploys the stack.
 
-Keep the GitOps **Force redeployment** option off during normal operation because it recreates the stack on every poll or webhook. Use Portainer's manual **Pull and redeploy** action or restart an individual container for a one-off operation. Each worker restart attempts to enqueue one singleton Registry synchronisation job, so run only one worker container.
+For a normal update:
+
+1. Merge the change to `main`.
+2. Wait for both CI and the **Publish container** workflow to pass.
+3. In Portainer, open the stack and use **Pull and redeploy**.
+4. Confirm that `migrate` exits successfully and that `web` and `worker` are running.
+
+Keep GitOps updates disabled unless deployment ordering is automated separately. A Git poll can detect the commit before GitHub Actions has finished publishing its image. Restarting an individual container is also insufficient for an image update because it reuses the existing container. Each worker recreation attempts to enqueue one singleton Registry synchronisation job, so run only one worker container.
 
 Before deploying a database schema change, take a PostgreSQL backup. For example, from the Docker host:
 
@@ -86,8 +110,12 @@ The migration service runs committed Drizzle migrations before the updated web a
 
 ## Rollback
 
-Disable GitOps updates during recovery. For a Git-backed stack, either change **Edit Git settings** to an existing immutable release tag or revert the deployment commit on the tracked branch, then use **Pull and redeploy**. Portainer's stack revision selector is not available for Git-backed stacks.
+Disable GitOps updates during recovery. In the stack environment variables, set `APP_IMAGE` to the image for the last known-good commit, for example:
+
+```text
+ghcr.io/themcpdirectory/themcpdirectory:sha-0123456789abcdef0123456789abcdef01234567
+```
+
+Use **Pull and redeploy**, then verify the migration, web, and worker service states. Remove `APP_IMAGE`, or set it to the desired newer immutable tag, when the incident is resolved. The default `main` tag is convenient for normal deployments but is not a reproducible rollback target.
 
 Application rollback does not automatically reverse database migrations. Keep migrations backwards compatible with the previous application revision. When that is not possible, stop Web and Worker, restore the verified pre-deployment database dump, and deploy its matching application revision before restoring public traffic.
-
-For reproducible multi-version rollback and faster deployments, publish commit-tagged images to a container registry in a later deployment phase. The current host-built image flow is intentionally the smallest operational setup for the MVP.
