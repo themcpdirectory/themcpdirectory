@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 
 export function SiteNav() {
@@ -31,17 +32,22 @@ export function SiteNav() {
         <Link
           href="/"
           style={{
-            fontWeight: 700,
-            fontSize: "0.9375rem",
-            color: "var(--fg)",
             textDecoration: "none",
             display: "inline-flex",
             alignItems: "center",
             minHeight: "2.75rem",
+            minWidth: 0,
           }}
           aria-label="The MCP Directory — home"
         >
-          MCP Directory
+          <Image
+            src="/wordmark.svg"
+            width={822}
+            height={84}
+            alt="The MCP Directory"
+            className="site-wordmark"
+            preload
+          />
         </Link>
 
         {/* Desktop nav */}

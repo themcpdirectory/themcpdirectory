@@ -23,6 +23,24 @@ test.describe("Homepage", () => {
     await expect(page.getByRole("navigation", { name: "Site navigation" })).toBeVisible();
   });
 
+  test("uses the brand wordmark for the home link", async ({ page }) => {
+    await page.goto("/");
+    const logo = page.getByRole("img", { name: "The MCP Directory" });
+
+    await expect(logo).toBeVisible();
+    await expect(logo).toHaveAttribute("src", /wordmark\.svg/);
+    await expect(logo.locator("..")).toHaveAttribute("href", "/");
+  });
+
+  test("publishes the compact brand icon", async ({ page }) => {
+    await page.goto("/");
+    const iconHrefs = await page.locator('link[rel="icon"]').evaluateAll((icons) =>
+      icons.map((icon) => icon.getAttribute("href")),
+    );
+
+    expect(iconHrefs).toContainEqual(expect.stringMatching(/^\/icon\.svg\?/));
+  });
+
   test("has search form with labeled input", async ({ page }) => {
     await page.goto("/");
     const searchInput = page.getByRole("searchbox");
