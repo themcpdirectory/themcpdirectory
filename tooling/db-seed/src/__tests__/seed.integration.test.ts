@@ -96,6 +96,18 @@ function withoutFixtureAlias(aliasValue: string): SeedFixtureBundle {
   };
 }
 
+function withCategoryAssignmentOverrides(
+  categoryAssignments: SeedFixtureBundle["categoryAssignments"],
+  managedCategoryAssignmentKeys: SeedFixtureBundle["managedCategoryAssignmentKeys"] =
+    SEED_FIXTURES.managedCategoryAssignmentKeys,
+): SeedFixtureBundle {
+  return {
+    ...SEED_FIXTURES,
+    categoryAssignments,
+    managedCategoryAssignmentKeys,
+  };
+}
+
 function hasRequiredEnvVar(value: unknown, variableName: string): boolean {
   if (!Array.isArray(value)) {
     return false;
@@ -372,5 +384,108 @@ describe("db seed integration", () => {
       .where(and(eq(serverCategories.serverId, githubId), eq(categories.slug, "commerce")));
 
     expect(preservedUnrelatedImportRows).toEqual([{ source: "import" }]);
+  });
+
+  it("reconciles removed seed-owned manual assignments while preserving unrelated manual and import rows", async () => {
+    const mixedAssignments = SEED_FIXTURES.categoryAssignments.map((assignment) => {
+      if (assignment.serverSlug === "postgresql" && assignment.categorySlug === "infrastructure") {
+        return {
+          ...assignment,
+          source: "manual" as const,
+        };
+      }
+      return assignment;
+    });
+
+    await runSeed({
+      databaseUrl,
+      fixtures: withCategoryAssignmentOverrides(mixedAssignments),
+    });
+
+    const githubId = await getServerIdBySlug(db, "github");
+    const postgresId = await getServerIdBySlug(db, "postgresql");
+    const infrastructureCategoryId = (
+      await db.select({ id: categories.id }).from(categories).where(eq(categories.slug, "infrastructure"))
+    )[0]?.id;
+    const securityCategoryId = (
+      await db.select({ id: categories.id }).from(categories).where(eq(categories.slug, "security"))
+    )[0]?.id;
+    const commerceCategoryId = (
+      await db.select({ id: categories.id }).from(categories).where(eq(categories.slug, "commerce"))
+    )[0]?.id;
+
+    expect(infrastructureCategoryId).toBeTruthy();
+    expect(securityCategoryId).toBeTruthy();
+    expect(commerceCategoryId).toBeTruthy();
+
+    await db.insert(serverCategories).values({
+      serverId: githubId,
+      categoryId: securityCategoryId!,
+      source: "manual",
+      confidence: null,
+    });
+    await db.insert(serverCategories).values({
+      serverId: githubId,
+      categoryId: commerceCategoryId!,
+      source: "import",
+      confidence: null,
+    });
+
+    const withoutManagedManualAssignment = mixedAssignments.filter(
+      (assignment) => !(assignment.serverSlug === "postgresql" && assignment.categorySlug === "infrastructure"),
+    );
+
+    await runSeed({
+      databaseUrl,
+      fixtures: withCategoryAssignmentOverrides(withoutManagedManualAssignment),
+    });
+
+    const postgresqlInfrastructureRows = await db
+      .select({ source: serverCategories.source })
+      .from(serverCategories)
+      .where(
+        and(
+          eq(serverCategories.serverId, postgresId),
+          eq(serverCategories.categoryId, infrastructureCategoryId!),
+        ),
+      );
+
+    expect(postgresqlInfrastructureRows).toEqual([]);
+
+    const preservedUnrelatedManualRows = await db
+      .select({ source: serverCategories.source })
+      .from(serverCategories)
+      .where(
+        and(
+          eq(serverCategories.serverId, githubId),
+          eq(serverCategories.categoryId, securityCategoryId!),
+        ),
+      );
+    expect(preservedUnrelatedManualRows).toEqual([{ source: "manual" }]);
+
+    const preservedUnrelatedImportRows = await db
+      .select({ source: serverCategories.source })
+      .from(serverCategories)
+      .where(
+        and(
+          eq(serverCategories.serverId, githubId),
+          eq(serverCategories.categoryId, commerceCategoryId!),
+        ),
+      );
+    expect(preservedUnrelatedImportRows).toEqual([{ source: "import" }]);
+  });
+
+  it("fails loudly when managed category ownership contains unknown slugs", async () => {
+    const malformedFixtures: SeedFixtureBundle = {
+      ...SEED_FIXTURES,
+      managedCategoryAssignmentKeys: [
+        ...SEED_FIXTURES.managedCategoryAssignmentKeys,
+        { serverSlug: "unknown-owned-server", categorySlug: "databases" },
+      ],
+    };
+
+    await expect(runSeed({ databaseUrl, fixtures: malformedFixtures })).rejects.toThrow(
+      "Unknown server slug 'unknown-owned-server' in managed category assignment ownership set.",
+    );
   });
 });

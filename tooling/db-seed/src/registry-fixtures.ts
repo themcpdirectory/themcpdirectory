@@ -26,7 +26,7 @@ interface ServerCategorySeed {
   readonly source: "manual" | "import";
 }
 
-interface ManagedImportCategoryAssignmentKey {
+interface ManagedCategoryAssignmentKey {
   readonly serverSlug: string;
   readonly categorySlug: string;
 }
@@ -46,7 +46,7 @@ export interface SeedFixtureBundle {
   readonly aliases: readonly AliasSeed[];
   readonly managedAliasValues: readonly string[];
   readonly categoryAssignments: readonly ServerCategorySeed[];
-  readonly managedImportCategoryAssignmentKeys: readonly ManagedImportCategoryAssignmentKey[];
+  readonly managedCategoryAssignmentKeys: readonly ManagedCategoryAssignmentKey[];
 }
 
 const pageOne = RegistryPageSchema.parse({
@@ -421,19 +421,19 @@ export const SEED_FIXTURES: SeedFixtureBundle = {
   managedAliasValues: ["github-server", "postgres", "shared-handle"],
   categoryAssignments: [
     { serverSlug: "github", categorySlug: "developer-tools", source: "import" },
-    { serverSlug: "github", categorySlug: "project-management", source: "import" },
-    { serverSlug: "github", categorySlug: "communication", source: "import" },
+    { serverSlug: "github", categorySlug: "project-management", source: "manual" },
+    { serverSlug: "github", categorySlug: "communication", source: "manual" },
     { serverSlug: "playwright", categorySlug: "browser-automation", source: "import" },
-    { serverSlug: "playwright", categorySlug: "developer-tools", source: "import" },
+    { serverSlug: "playwright", categorySlug: "developer-tools", source: "manual" },
     { serverSlug: "postgresql", categorySlug: "databases", source: "import" },
-    { serverSlug: "postgresql", categorySlug: "infrastructure", source: "import" },
+    { serverSlug: "postgresql", categorySlug: "infrastructure", source: "manual" },
     { serverSlug: "supabase", categorySlug: "databases", source: "import" },
-    { serverSlug: "supabase", categorySlug: "cloud", source: "import" },
+    { serverSlug: "supabase", categorySlug: "cloud", source: "manual" },
     { serverSlug: "legacy-monitor", categorySlug: "monitoring", source: "import" },
     { serverSlug: "retired-notifier", categorySlug: "communication", source: "import" },
-    { serverSlug: "shared-handle", categorySlug: "search", source: "import" },
+    { serverSlug: "shared-handle", categorySlug: "search", source: "manual" },
   ],
-  managedImportCategoryAssignmentKeys: [
+  managedCategoryAssignmentKeys: [
     { serverSlug: "github", categorySlug: "developer-tools" },
     { serverSlug: "github", categorySlug: "project-management" },
     { serverSlug: "github", categorySlug: "communication" },

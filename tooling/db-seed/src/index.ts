@@ -290,7 +290,7 @@ async function upsertServerCategoryAssignments(
   }
 }
 
-async function reconcileManagedImportCategoryAssignments(
+async function reconcileManagedCategoryAssignments(
   db: SeedDb,
   fixtures: SeedFixtureBundle,
   serverIdsBySlug: Map<string, string>,
@@ -309,31 +309,27 @@ async function reconcileManagedImportCategoryAssignments(
   const categoryRows = await db.select({ id: categories.id, slug: categories.slug }).from(categories);
   const categoryIdsBySlug = new Map(categoryRows.map((row) => [row.slug, row.id]));
 
-  const ownedImportAssignmentKeys = new Set<string>();
-  for (const managedKey of fixtures.managedImportCategoryAssignmentKeys) {
+  const ownedAssignmentKeys = new Set<string>();
+  for (const managedKey of fixtures.managedCategoryAssignmentKeys) {
     const serverId = serverIdsBySlug.get(managedKey.serverSlug);
     const categoryId = categoryIdsBySlug.get(managedKey.categorySlug);
 
     if (!serverId) {
       throw new Error(
-        `Unknown server slug '${managedKey.serverSlug}' in managed import category assignment ownership set.`,
+        `Unknown server slug '${managedKey.serverSlug}' in managed category assignment ownership set.`,
       );
     }
     if (!categoryId) {
       throw new Error(
-        `Unknown category slug '${managedKey.categorySlug}' in managed import category assignment ownership set.`,
+        `Unknown category slug '${managedKey.categorySlug}' in managed category assignment ownership set.`,
       );
     }
 
-    ownedImportAssignmentKeys.add(`${serverId}:${categoryId}`);
+    ownedAssignmentKeys.add(`${serverId}:${categoryId}`);
   }
 
-  const currentImportAssignmentKeys = new Set<string>();
+  const currentOwnedAssignmentKeys = new Set<string>();
   for (const assignment of fixtures.categoryAssignments) {
-    if (assignment.source !== "import") {
-      continue;
-    }
-
     const serverId = serverIdsBySlug.get(assignment.serverSlug);
     const categoryId = categoryIdsBySlug.get(assignment.categorySlug);
 
@@ -344,22 +340,20 @@ async function reconcileManagedImportCategoryAssignments(
       throw new Error(`Unknown category slug '${assignment.categorySlug}' in category assignment.`);
     }
 
-    currentImportAssignmentKeys.add(`${serverId}:${categoryId}`);
+    const key = `${serverId}:${categoryId}`;
+    if (ownedAssignmentKeys.has(key)) {
+      currentOwnedAssignmentKeys.add(key);
+    }
   }
 
-  const existingImportRows = await db
+  const existingRows = await db
     .select({ serverId: serverCategories.serverId, categoryId: serverCategories.categoryId })
     .from(serverCategories)
-    .where(
-      and(
-        inArray(serverCategories.serverId, seededServerIds),
-        eq(serverCategories.source, "import"),
-      ),
-    );
+    .where(inArray(serverCategories.serverId, seededServerIds));
 
-  const staleRows = existingImportRows.filter((row) => {
+  const staleRows = existingRows.filter((row) => {
     const key = `${row.serverId}:${row.categoryId}`;
-    return ownedImportAssignmentKeys.has(key) && !currentImportAssignmentKeys.has(key);
+    return ownedAssignmentKeys.has(key) && !currentOwnedAssignmentKeys.has(key);
   });
 
   for (const row of staleRows) {
@@ -433,7 +427,7 @@ export async function runSeed(options: RunSeedOptions): Promise<RunSeedResult> {
     await upsertAliases(db, fixtures, serverIdsBySlug);
     await reconcileManagedAliases(db, fixtures, serverIdsBySlug);
     await upsertServerCategoryAssignments(db, fixtures, serverIdsBySlug);
-    await reconcileManagedImportCategoryAssignments(db, fixtures, serverIdsBySlug);
+    await reconcileManagedCategoryAssignments(db, fixtures, serverIdsBySlug);
 
     await refreshServerSearchDocument(db);
 
