@@ -42,18 +42,17 @@ In Portainer, select **Stacks**, **Add stack**, then **Git repository** and conf
 
 Add these environment variables in Portainer:
 
-| Variable                | Value                                                                     |
-| ----------------------- | ------------------------------------------------------------------------- |
-| `POSTGRES_DB`           | `mcpdirectory`                                                            |
-| `POSTGRES_USER`         | `mcpdirectory`                                                            |
-| `POSTGRES_PASSWORD`     | A long, randomly generated password                                       |
-| `DATABASE_URL`          | `postgresql://mcpdirectory:<encoded-password>@postgres:5432/mcpdirectory` |
-| `MCP_REGISTRY_BASE_URL` | `https://registry.modelcontextprotocol.io`                                |
-| `NEXT_PUBLIC_BASE_URL`  | `https://themcpdirectory.org`                                             |
-| `GITHUB_TOKEN`          | Optional GitHub token for higher enrichment rate limits                   |
-| `APP_IMAGE`             | Optional immutable `sha-...` image tag; defaults to the `main` tag        |
+| Variable                | Value                                                              |
+| ----------------------- | ------------------------------------------------------------------ |
+| `POSTGRES_DB`           | `mcpdirectory`                                                     |
+| `POSTGRES_USER`         | `mcpdirectory`                                                     |
+| `POSTGRES_PASSWORD`     | A long URL-safe password, for example from `openssl rand -hex 32`  |
+| `MCP_REGISTRY_BASE_URL` | `https://registry.modelcontextprotocol.io`                         |
+| `NEXT_PUBLIC_BASE_URL`  | `https://themcpdirectory.org`                                      |
+| `GITHUB_TOKEN`          | Optional GitHub token for higher enrichment rate limits            |
+| `APP_IMAGE`             | Optional immutable `sha-...` image tag; defaults to the `main` tag |
 
-Percent-encode reserved URL characters in the password used by `DATABASE_URL`. The unencoded value must still be supplied separately as `POSTGRES_PASSWORD`. Do not set `THEMCP_TEST_ADMIN_DATABASE_URL` or commit production values to an environment file.
+The stack derives the internal `DATABASE_URL` from the PostgreSQL settings, so do not add it separately. Keep `POSTGRES_USER`, `POSTGRES_DB`, and `POSTGRES_PASSWORD` URL-safe because they form that connection URL. Do not set `THEMCP_TEST_ADMIN_DATABASE_URL` or commit production values to an environment file.
 
 Deploy the stack. Expected service state after startup:
 
@@ -107,6 +106,22 @@ docker exec -i <postgres-container> pg_restore --list < mcpdirectory.dump > /dev
 Copy the verified dump off the Docker host. Regularly test restoration on a disposable database; an untested backup is not a recovery plan.
 
 The migration service runs committed Drizzle migrations before the updated web and worker services start. If migration fails, those services remain stopped and the migration logs should be inspected before retrying.
+
+### Password authentication failures
+
+The PostgreSQL image only uses `POSTGRES_PASSWORD` while initialising an empty data directory. Changing the Portainer variable later does not update the database role stored in an existing `postgres-data` volume.
+
+For a new deployment with no data to preserve, delete the failed stack, remove its `postgres-data` volume, and recreate the stack with the final `POSTGRES_PASSWORD`. Removing the volume permanently deletes its database contents.
+
+To preserve an existing database, open a console on the PostgreSQL container and reset the role password through the local connection:
+
+```sh
+psql -U mcpdirectory -d postgres
+\password mcpdirectory
+\quit
+```
+
+Enter the same URL-safe password in the prompt and in Portainer's `POSTGRES_PASSWORD` variable, then use **Pull and redeploy**. Do not put the password directly in the console command because it would be retained in shell history and logs.
 
 ## Rollback
 
