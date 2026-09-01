@@ -39,6 +39,7 @@ export interface SeedFixtureBundle {
   readonly publishers: readonly PublisherSeed[];
   readonly publisherLinks: readonly PublisherLinkSeed[];
   readonly aliases: readonly AliasSeed[];
+  readonly managedAliasValues: readonly string[];
   readonly categoryAssignments: readonly ServerCategorySeed[];
 }
 
@@ -411,18 +412,19 @@ export const SEED_FIXTURES: SeedFixtureBundle = {
     { alias: "postgres", kind: "manual", serverSlug: "postgresql" },
     { alias: "shared-handle", kind: "manual", serverSlug: "supabase" },
   ],
+  managedAliasValues: ["github-server", "postgres", "shared-handle"],
   categoryAssignments: [
     { serverSlug: "github", categorySlug: "developer-tools", source: "import" },
-    { serverSlug: "github", categorySlug: "project-management", source: "manual" },
-    { serverSlug: "github", categorySlug: "communication", source: "manual" },
+    { serverSlug: "github", categorySlug: "project-management", source: "import" },
+    { serverSlug: "github", categorySlug: "communication", source: "import" },
     { serverSlug: "playwright", categorySlug: "browser-automation", source: "import" },
-    { serverSlug: "playwright", categorySlug: "developer-tools", source: "manual" },
+    { serverSlug: "playwright", categorySlug: "developer-tools", source: "import" },
     { serverSlug: "postgresql", categorySlug: "databases", source: "import" },
-    { serverSlug: "postgresql", categorySlug: "infrastructure", source: "manual" },
+    { serverSlug: "postgresql", categorySlug: "infrastructure", source: "import" },
     { serverSlug: "supabase", categorySlug: "databases", source: "import" },
-    { serverSlug: "supabase", categorySlug: "cloud", source: "manual" },
+    { serverSlug: "supabase", categorySlug: "cloud", source: "import" },
     { serverSlug: "legacy-monitor", categorySlug: "monitoring", source: "import" },
     { serverSlug: "retired-notifier", categorySlug: "communication", source: "import" },
-    { serverSlug: "shared-handle", categorySlug: "search", source: "manual" },
+    { serverSlug: "shared-handle", categorySlug: "search", source: "import" },
   ],
 };

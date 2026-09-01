@@ -12,7 +12,7 @@
     "build": "turbo build",
     "db:generate": "pnpm --filter @themcpdirectory/db db:generate",
     "db:migrate": "pnpm --filter @themcpdirectory/db db:migrate",
-    "db:seed": "pnpm --filter @themcpdirectory/db db:seed",
+    "db:seed": "pnpm --filter @themcpdirectory/db-seed db:seed",
     "dev": "turbo dev --concurrency=100%",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

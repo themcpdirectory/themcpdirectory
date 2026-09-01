@@ -268,12 +268,6 @@ importers:
       '@themcpdirectory/config':
         specifier: workspace:*
         version: link:../config
-      '@themcpdirectory/domain':
-        specifier: workspace:*
-        version: link:../domain
-      '@themcpdirectory/registry-client':
-        specifier: workspace:*
-        version: link:../registry-client
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(pg@8.23.0)(postgres@3.4.7)
@@ -507,6 +501,49 @@ importers:
       eslint:
         specifier: 9.39.5
         version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@types/node@20.19.43)(vite@8.2.2(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13))
+
+  tooling/db-seed:
+    dependencies:
+      '@themcpdirectory/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@themcpdirectory/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@themcpdirectory/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@themcpdirectory/registry-client':
+        specifier: workspace:*
+        version: link:../../packages/registry-client
+      drizzle-orm:
+        specifier: 0.45.2
+        version: 0.45.2(pg@8.23.0)(postgres@3.4.7)
+      postgres:
+        specifier: 3.4.7
+        version: 3.4.7
+    devDependencies:
+      '@themcpdirectory/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint
+      '@themcpdirectory/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
+      tsx:
+        specifier: 4.23.13
+        version: 4.23.13
       typescript:
         specifier: 5.9.3
         version: 5.9.3

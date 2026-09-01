@@ -1,13 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
+import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { createDatabase, type Database } from "../index.js";
+import * as schema from "@themcpdirectory/db";
 
 interface TempDatabase {
   readonly databaseUrl: string;
   readonly databaseName: string;
-  readonly db: Database;
+  readonly db: ReturnType<typeof drizzle<typeof schema>>;
   destroy(): Promise<void>;
 }
 
@@ -68,10 +69,15 @@ function withDatabaseName(connectionString: string, databaseName: string): strin
   return parsed.toString();
 }
 
+function createDatabaseClient(databaseUrl: string): ReturnType<typeof drizzle<typeof schema>> {
+  const client = postgres(databaseUrl);
+  return drizzle(client, { schema });
+}
+
 async function runMigrations(databaseUrl: string): Promise<void> {
   const client = postgres(databaseUrl, { max: 1 });
-  const db = createDatabase(databaseUrl);
-  const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.meta.url));
+  const db = drizzle(client, { schema });
+  const migrationsFolder = fileURLToPath(new URL("../../../../packages/db/drizzle", import.meta.url));
   try {
     await migrate(db, { migrationsFolder });
   } finally {
@@ -94,7 +100,7 @@ export async function createTempDatabase(prefix = "task7_seed"): Promise<TempDat
   const databaseUrl = withDatabaseName(adminConnectionString, databaseName);
   await runMigrations(databaseUrl);
 
-  const db = createDatabase(databaseUrl);
+  const db = createDatabaseClient(databaseUrl);
 
   return {
     databaseUrl,
