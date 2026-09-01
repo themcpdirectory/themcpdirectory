@@ -1,0 +1,71 @@
+:root {
+  --bg: #fafafa;
+  --fg: #0f0f0f;
+  --fg-muted: #52525b;
+  --border: #e4e4e7;
+  --control-border: #71717a;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-fg: #ffffff;
+  --action-bg: #1d4ed8;
+  --action-bg-hover: #1e40af;
+  --action-fg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f4f4f5;
+  --success-fg: #166534;
+  --success-bg: #f0fdf4;
+  --warn-fg: #854d0e;
+  --warn-bg: #fefce8;
+  --error-fg: #991b1b;
+  --error-bg: #fef2f2;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111111;
+    --fg: #f0f0f0;
+    --fg-muted: #a1a1aa;
+    --border: #27272a;
+    --control-border: #a1a1aa;
+    --accent: #3b82f6;
+    --accent-hover: #60a5fa;
+    --accent-fg: #ffffff;
+    --action-bg: #1d4ed8;
+    --action-bg-hover: #1e40af;
+    --action-fg: #ffffff;
+    --surface: #1a1a1a;
+    --surface-2: #222222;
+    --success-fg: #4ade80;
+    --success-bg: #052e16;
+    --warn-fg: #fcd34d;
+    --warn-bg: #1c1300;
+    --error-fg: #f87171;
+    --error-bg: #1f0000;
+  }
+}
+
+@media (forced-colors: active) {
+  :root {
+    --bg: Canvas;
+    --fg: CanvasText;
+    --fg-muted: GrayText;
+    --border: ButtonBorder;
+    --control-border: ButtonBorder;
+    --accent: LinkText;
+    --accent-hover: LinkText;
+    --accent-fg: Canvas;
+    --action-bg: ButtonFace;
+    --action-bg-hover: ButtonFace;
+    --action-fg: ButtonText;
+    --surface: Canvas;
+    --surface-2: ButtonFace;
+    --success-fg: CanvasText;
+    --success-bg: Canvas;
+    --warn-fg: CanvasText;
+    --warn-bg: Canvas;
+    --error-fg: CanvasText;
+    --error-bg: Canvas;
+  }
+}

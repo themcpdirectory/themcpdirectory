@@ -20,6 +20,7 @@
     "vitest": "4.1.11"
   },
   "dependencies": {
-    "@themcpdirectory/registry-client": "workspace:*"
+    "@themcpdirectory/registry-client": "workspace:*",
+    "@themcpdirectory/security": "workspace:*"
   }
 }

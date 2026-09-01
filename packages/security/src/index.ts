@@ -1,4 +1,4 @@
-export { validatePublicHttpUrl } from "./url.js";
+export { normalizeHttpUrl, validatePublicHttpUrl } from "./url.js";
 export type {
   DnsResolver,
   ValidateUrlOptions,

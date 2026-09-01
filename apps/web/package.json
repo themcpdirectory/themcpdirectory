@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
@@ -13,7 +13,13 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@themcpdirectory/config": "workspace:*",
+    "@themcpdirectory/db": "workspace:*",
+    "@themcpdirectory/domain": "workspace:*",
+    "@themcpdirectory/security": "workspace:*",
+    "@themcpdirectory/ui": "workspace:*",
     "next": "16.3.4",
+    "postgres": "3.4.7",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -28,6 +34,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
+    "tsx": "4.23.13",
     "typescript": "5.9.3",
     "vitest": "4.1.11"
   }

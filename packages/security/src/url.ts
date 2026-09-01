@@ -15,6 +15,20 @@ const fail = (reason: string): UrlValidationFail => ({ ok: false, reason });
 
 const LOCAL_SUFFIXES = [".local", ".localhost"];
 
+export function normalizeHttpUrl(value: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return null;
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+  if (parsed.username || parsed.password) return null;
+
+  return parsed.href;
+}
+
 const defaultResolve: DnsResolver = async (hostname: string) => {
   const results: string[] = [];
   try {

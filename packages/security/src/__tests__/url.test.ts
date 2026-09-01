@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validatePublicHttpUrl } from "../url.js";
+import { normalizeHttpUrl, validatePublicHttpUrl } from "../url.js";
 import type { DnsResolver } from "../url.js";
 
 const PUBLIC_DNS: DnsResolver = async () => ["93.184.216.34"];
@@ -15,6 +15,25 @@ const DENY = (u: string, reason?: string) =>
       return !r.ok;
     },
   );
+
+describe("normalizeHttpUrl", () => {
+  it.each([
+    ["https://example.com/path", "https://example.com/path"],
+    ["http://example.com", "http://example.com/"],
+  ])("normalizes %s", (input, expected) => {
+    expect(normalizeHttpUrl(input)).toBe(expected);
+  });
+
+  it.each([
+    "javascript:alert(1)",
+    "data:text/html,<h1>unsafe</h1>",
+    "not a URL",
+    "https://user@example.com/path",
+    "https://user:password@example.com/path",
+  ])("rejects %s", (input) => {
+    expect(normalizeHttpUrl(input)).toBeNull();
+  });
+});
 
 describe("validatePublicHttpUrl", () => {
   describe("accepts valid public URLs", () => {

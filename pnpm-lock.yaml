@@ -51,9 +51,27 @@ importers:
 
   apps/web:
     dependencies:
+      '@themcpdirectory/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@themcpdirectory/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@themcpdirectory/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@themcpdirectory/security':
+        specifier: workspace:*
+        version: link:../../packages/security
+      '@themcpdirectory/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       next:
         specifier: 16.3.4
         version: 16.3.4(@babel/core@7.29.7(supports-color@7.2.0))(@playwright/test@1.62.1)(@types/node@20.19.43)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      postgres:
+        specifier: 3.4.7
+        version: 3.4.7
       react:
         specifier: 19.2.8
         version: 19.2.8
@@ -91,6 +109,9 @@ importers:
       tailwindcss:
         specifier: ^4
         version: 4.3.3
+      tsx:
+        specifier: 4.23.13
+        version: 4.23.13
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -394,6 +415,9 @@ importers:
       '@themcpdirectory/registry-client':
         specifier: workspace:*
         version: link:../registry-client
+      '@themcpdirectory/security':
+        specifier: workspace:*
+        version: link:../security
     devDependencies:
       '@themcpdirectory/eslint-config':
         specifier: workspace:*

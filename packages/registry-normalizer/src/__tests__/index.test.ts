@@ -9,8 +9,7 @@ import {
   type CurrentVersionCandidate,
 } from "../index.js";
 
-function makeValidatedServerResponse(
-): RegistryServerResponse {
+function makeValidatedServerResponse(): RegistryServerResponse {
   const parsed = RegistryPageSchema.parse({
     servers: [
       {
@@ -121,15 +120,21 @@ describe("hashRegistryPayload", () => {
 
   it("uses locale-independent ordinal key ordering for canonical hashing", () => {
     const payloadA = {
-      meta: { "ä": 2, z: 1 },
-      items: [{ b: 2, a: 1 }, { "ß": 4, s: 3 }],
+      meta: { ä: 2, z: 1 },
+      items: [
+        { b: 2, a: 1 },
+        { ß: 4, s: 3 },
+      ],
     };
     const payloadB = {
-      items: [{ a: 1, b: 2 }, { s: 3, "ß": 4 }],
-      meta: { z: 1, "ä": 2 },
+      items: [
+        { a: 1, b: 2 },
+        { s: 3, ß: 4 },
+      ],
+      meta: { z: 1, ä: 2 },
     };
 
-    const canonical = "{\"items\":[{\"a\":1,\"b\":2},{\"s\":3,\"ß\":4}],\"meta\":{\"z\":1,\"ä\":2}}";
+    const canonical = '{"items":[{"a":1,"b":2},{"s":3,"ß":4}],"meta":{"z":1,"ä":2}}';
     const expected = createHash("sha256").update(canonical).digest("hex");
 
     const hashA = hashRegistryPayload(payloadA);
@@ -231,6 +236,22 @@ describe("normalizeRegistryServer", () => {
       isLatest: true,
     });
     expect(normalized.payloadHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it.each([
+    "javascript:alert(1)",
+    "data:text/html,<h1>unsafe</h1>",
+    "not a URL",
+    "https://user:password@example.com/path",
+  ])("drops unsafe website and repository URL %s before persistence", (unsafeUrl) => {
+    const input = makeValidatedServerResponse();
+    input.server.websiteUrl = unsafeUrl;
+    input.server.repository = { ...input.server.repository, url: unsafeUrl };
+
+    const normalized = normalizeRegistryServer(input);
+
+    expect(normalized.websiteUrl).toBeUndefined();
+    expect(normalized.repository).not.toHaveProperty("url");
   });
 
   it("preserves unknown validated upstream fields in normalizedPayload", () => {
