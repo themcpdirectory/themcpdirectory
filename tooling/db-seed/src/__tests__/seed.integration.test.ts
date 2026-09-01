@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   categories,
   publishers,
@@ -13,10 +13,39 @@ import {
   type Database,
 } from "@themcpdirectory/db";
 import { runSeed } from "../index.js";
+import { CURATED_CATEGORIES } from "../categories.js";
 import { SEED_FIXTURES, type SeedFixtureBundle } from "../registry-fixtures.js";
 import { createTempDatabase } from "./postgres-test-db.js";
 
-const EXPECTED_CATEGORY_COUNT = 15;
+const SEEDED_SERVER_SLUGS = [
+  "github",
+  "legacy-monitor",
+  "playwright",
+  "postgresql",
+  "retired-notifier",
+  "shared-handle",
+  "supabase",
+] as const;
+
+const EXPECTED_SERVER_PUBLISHER_LINKS = [
+  { serverSlug: "github", publisherSlug: "github" },
+  { serverSlug: "legacy-monitor", publisherSlug: "community-labs" },
+  { serverSlug: "playwright", publisherSlug: "community-labs" },
+  { serverSlug: "postgresql", publisherSlug: "community-labs" },
+  { serverSlug: "retired-notifier", publisherSlug: "community-labs" },
+  { serverSlug: "shared-handle", publisherSlug: "community-labs" },
+  { serverSlug: "supabase", publisherSlug: "community-labs" },
+] as const;
+
+function sortServerCategoryRows<T extends { serverSlug: string; categorySlug: string }>(rows: readonly T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const serverCmp = a.serverSlug.localeCompare(b.serverSlug);
+    if (serverCmp !== 0) {
+      return serverCmp;
+    }
+    return a.categorySlug.localeCompare(b.categorySlug);
+  });
+}
 
 async function countTables(db: Database) {
   const [counts] = await db
@@ -111,8 +140,26 @@ describe("db seed integration", () => {
     expect(first.status).toBe("ok");
     expect(second.status).toBe("ok");
     expect(secondCounts).toEqual(firstCounts);
-    expect(firstCounts.categories).toBe(EXPECTED_CATEGORY_COUNT);
     expect(firstCounts.searchReady).toBe(firstCounts.servers);
+
+    const categoryRows = await db
+      .select({
+        slug: categories.slug,
+        name: categories.name,
+        description: categories.description,
+        sortOrder: categories.sortOrder,
+      })
+      .from(categories)
+      .orderBy(categories.sortOrder);
+
+    expect(categoryRows).toEqual(
+      CURATED_CATEGORIES.map((category) => ({
+        slug: category.slug,
+        name: category.name,
+        description: category.description,
+        sortOrder: category.sortOrder,
+      })),
+    );
 
     const publisherRows = await db
       .select({ slug: publishers.slug, verificationState: publishers.verificationState })
@@ -127,20 +174,50 @@ describe("db seed integration", () => {
         slug: servers.slug,
         listingStatus: servers.listingStatus,
         currentVersionId: servers.currentVersionId,
-        publisherId: servers.publisherId,
       })
       .from(servers)
-      .where(
-        inArray(servers.slug, ["github", "playwright", "postgresql", "supabase", "legacy-monitor", "retired-notifier", "shared-handle"]),
-      );
+      .where(inArray(servers.slug, [...SEEDED_SERVER_SLUGS]));
 
     const serverBySlug = new Map(serverRows.map((row) => [String(row.slug), row]));
     expect(serverBySlug.get("legacy-monitor")?.listingStatus).toBe("deprecated");
     expect(serverBySlug.get("retired-notifier")?.listingStatus).toBe("deleted_upstream");
     expect(serverBySlug.get("retired-notifier")?.currentVersionId).toBeNull();
 
-    const allPublishersLinked = serverRows.every((row) => row.publisherId !== null);
-    expect(allPublishersLinked).toBe(true);
+    const publisherLinkRows = await db
+      .select({ serverSlug: servers.slug, publisherSlug: publishers.slug })
+      .from(servers)
+      .innerJoin(publishers, eq(publishers.id, servers.publisherId))
+      .where(inArray(servers.slug, [...SEEDED_SERVER_SLUGS]))
+      .orderBy(servers.slug);
+
+    expect(publisherLinkRows).toEqual([...EXPECTED_SERVER_PUBLISHER_LINKS]);
+
+    const seededCategoryAssignmentRows = await db
+      .select({
+        serverSlug: servers.slug,
+        categorySlug: categories.slug,
+        source: serverCategories.source,
+        confidence: serverCategories.confidence,
+      })
+      .from(serverCategories)
+      .innerJoin(servers, eq(servers.id, serverCategories.serverId))
+      .innerJoin(categories, eq(categories.id, serverCategories.categoryId))
+      .where(inArray(servers.slug, [...SEEDED_SERVER_SLUGS]));
+
+    const expectedSeededAssignments = sortServerCategoryRows(
+      SEED_FIXTURES.categoryAssignments.map((assignment) => ({
+        serverSlug: assignment.serverSlug,
+        categorySlug: assignment.categorySlug,
+        source: assignment.source,
+        confidence: null,
+      })),
+    );
+
+    expect(sortServerCategoryRows(seededCategoryAssignmentRows)).toEqual(expectedSeededAssignments);
+    expect(seededCategoryAssignmentRows.every((row) => row.confidence === null)).toBe(true);
+    expect(
+      seededCategoryAssignmentRows.every((row) => row.source === "manual" || row.source === "import"),
+    ).toBe(true);
 
     const githubPkgRows = await db
       .select({
@@ -218,7 +295,7 @@ describe("db seed integration", () => {
     expect(sharedHandleAlias?.serverId).not.toBe(sharedHandleServerId);
   });
 
-  it("reconciles stale seed-managed aliases/import categories while preserving non-seed manual rows", async () => {
+  it("reconciles stale seed-managed aliases/import categories while preserving non-seed manual/import rows", async () => {
     await runSeed({ databaseUrl });
 
     const githubId = await getServerIdBySlug(db, "github");
@@ -228,6 +305,12 @@ describe("db seed integration", () => {
     )[0]?.id;
 
     expect(securityCategoryId).toBeTruthy();
+
+    const commerceCategoryId = (
+      await db.select({ id: categories.id }).from(categories).where(eq(categories.slug, "commerce"))
+    )[0]?.id;
+
+    expect(commerceCategoryId).toBeTruthy();
 
     await db.insert(serverAliases).values({
       serverId: githubId,
@@ -239,6 +322,13 @@ describe("db seed integration", () => {
       serverId: githubId,
       categoryId: securityCategoryId!,
       source: "manual",
+      confidence: null,
+    });
+
+    await db.insert(serverCategories).values({
+      serverId: githubId,
+      categoryId: commerceCategoryId!,
+      source: "import",
       confidence: null,
     });
 
@@ -274,5 +364,13 @@ describe("db seed integration", () => {
       .where(eq(serverCategories.serverId, githubId));
 
     expect(userManualCategoryRows.some((row) => row.source === "manual")).toBe(true);
+
+    const preservedUnrelatedImportRows = await db
+      .select({ source: serverCategories.source })
+      .from(serverCategories)
+      .innerJoin(categories, eq(categories.id, serverCategories.categoryId))
+      .where(and(eq(serverCategories.serverId, githubId), eq(categories.slug, "commerce")));
+
+    expect(preservedUnrelatedImportRows).toEqual([{ source: "import" }]);
   });
 });

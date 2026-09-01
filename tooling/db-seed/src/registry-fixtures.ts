@@ -26,6 +26,11 @@ interface ServerCategorySeed {
   readonly source: "manual" | "import";
 }
 
+interface ManagedImportCategoryAssignmentKey {
+  readonly serverSlug: string;
+  readonly categorySlug: string;
+}
+
 export interface SeedFixtureBundle {
   readonly source: {
     key: string;
@@ -41,6 +46,7 @@ export interface SeedFixtureBundle {
   readonly aliases: readonly AliasSeed[];
   readonly managedAliasValues: readonly string[];
   readonly categoryAssignments: readonly ServerCategorySeed[];
+  readonly managedImportCategoryAssignmentKeys: readonly ManagedImportCategoryAssignmentKey[];
 }
 
 const pageOne = RegistryPageSchema.parse({
@@ -426,5 +432,19 @@ export const SEED_FIXTURES: SeedFixtureBundle = {
     { serverSlug: "legacy-monitor", categorySlug: "monitoring", source: "import" },
     { serverSlug: "retired-notifier", categorySlug: "communication", source: "import" },
     { serverSlug: "shared-handle", categorySlug: "search", source: "import" },
+  ],
+  managedImportCategoryAssignmentKeys: [
+    { serverSlug: "github", categorySlug: "developer-tools" },
+    { serverSlug: "github", categorySlug: "project-management" },
+    { serverSlug: "github", categorySlug: "communication" },
+    { serverSlug: "playwright", categorySlug: "browser-automation" },
+    { serverSlug: "playwright", categorySlug: "developer-tools" },
+    { serverSlug: "postgresql", categorySlug: "databases" },
+    { serverSlug: "postgresql", categorySlug: "infrastructure" },
+    { serverSlug: "supabase", categorySlug: "databases" },
+    { serverSlug: "supabase", categorySlug: "cloud" },
+    { serverSlug: "legacy-monitor", categorySlug: "monitoring" },
+    { serverSlug: "retired-notifier", categorySlug: "communication" },
+    { serverSlug: "shared-handle", categorySlug: "search" },
   ],
 };

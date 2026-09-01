@@ -309,19 +309,43 @@ async function reconcileManagedImportCategoryAssignments(
   const categoryRows = await db.select({ id: categories.id, slug: categories.slug }).from(categories);
   const categoryIdsBySlug = new Map(categoryRows.map((row) => [row.slug, row.id]));
 
-  const ownedImportAssignmentKeys = new Set(
-    fixtures.categoryAssignments
-      .filter((assignment) => assignment.source === "import")
-      .map((assignment) => {
-        const serverId = serverIdsBySlug.get(assignment.serverSlug);
-        const categoryId = categoryIdsBySlug.get(assignment.categorySlug);
-        if (!serverId || !categoryId) {
-          return null;
-        }
-        return `${serverId}:${categoryId}`;
-      })
-      .filter((value): value is string => value !== null),
-  );
+  const ownedImportAssignmentKeys = new Set<string>();
+  for (const managedKey of fixtures.managedImportCategoryAssignmentKeys) {
+    const serverId = serverIdsBySlug.get(managedKey.serverSlug);
+    const categoryId = categoryIdsBySlug.get(managedKey.categorySlug);
+
+    if (!serverId) {
+      throw new Error(
+        `Unknown server slug '${managedKey.serverSlug}' in managed import category assignment ownership set.`,
+      );
+    }
+    if (!categoryId) {
+      throw new Error(
+        `Unknown category slug '${managedKey.categorySlug}' in managed import category assignment ownership set.`,
+      );
+    }
+
+    ownedImportAssignmentKeys.add(`${serverId}:${categoryId}`);
+  }
+
+  const currentImportAssignmentKeys = new Set<string>();
+  for (const assignment of fixtures.categoryAssignments) {
+    if (assignment.source !== "import") {
+      continue;
+    }
+
+    const serverId = serverIdsBySlug.get(assignment.serverSlug);
+    const categoryId = categoryIdsBySlug.get(assignment.categorySlug);
+
+    if (!serverId) {
+      throw new Error(`Unknown server slug '${assignment.serverSlug}' in category assignment.`);
+    }
+    if (!categoryId) {
+      throw new Error(`Unknown category slug '${assignment.categorySlug}' in category assignment.`);
+    }
+
+    currentImportAssignmentKeys.add(`${serverId}:${categoryId}`);
+  }
 
   const existingImportRows = await db
     .select({ serverId: serverCategories.serverId, categoryId: serverCategories.categoryId })
@@ -333,9 +357,10 @@ async function reconcileManagedImportCategoryAssignments(
       ),
     );
 
-  const staleRows = existingImportRows.filter(
-    (row) => !ownedImportAssignmentKeys.has(`${row.serverId}:${row.categoryId}`),
-  );
+  const staleRows = existingImportRows.filter((row) => {
+    const key = `${row.serverId}:${row.categoryId}`;
+    return ownedImportAssignmentKeys.has(key) && !currentImportAssignmentKeys.has(key);
+  });
 
   for (const row of staleRows) {
     await db
