@@ -27,6 +27,8 @@
   },
   "dependencies": {
     "@themcpdirectory/config": "workspace:*",
+    "@themcpdirectory/domain": "workspace:*",
+    "@themcpdirectory/registry-client": "workspace:*",
     "drizzle-orm": "0.45.2",
     "postgres": "3.4.7"
   }
