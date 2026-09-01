@@ -12,6 +12,31 @@ describe("serverCollectionQuerySchema", () => {
     ).toThrow(/q is required when sort is relevance/i);
     expect(() => serverCollectionQuerySchema.parse({ limit: "101" })).toThrow(/100/);
   });
+
+  it("accepts boolean wire values for verified and openSource", () => {
+    const parsedBooleanInput = serverCollectionQuerySchema.parse({
+      verified: true,
+      openSource: false,
+    });
+
+    expect(parsedBooleanInput.verified).toBe(true);
+    expect(parsedBooleanInput.openSource).toBe(false);
+
+    const parsedStringInput = serverCollectionQuerySchema.parse({
+      verified: "true",
+      openSource: "false",
+    });
+
+    expect(parsedStringInput.verified).toBe(true);
+    expect(parsedStringInput.openSource).toBe(false);
+  });
+
+  it("rejects invalid wire values for verified and openSource", () => {
+    expect(() => serverCollectionQuerySchema.parse({ verified: "banana" })).toThrow();
+    expect(() => serverCollectionQuerySchema.parse({ verified: 0 })).toThrow();
+    expect(() => serverCollectionQuerySchema.parse({ openSource: "0" })).toThrow();
+    expect(() => serverCollectionQuerySchema.parse({ openSource: 1 })).toThrow();
+  });
 });
 
 describe("parseServerCollectionResponse", () => {

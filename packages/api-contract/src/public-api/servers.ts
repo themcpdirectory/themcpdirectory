@@ -29,6 +29,11 @@ export const compatibilityStatusSchema = z.enum([
 export const serverSortSchema = z.enum(["relevance", "recent", "updated", "popular", "name"]);
 export type PublicServerSort = z.infer<typeof serverSortSchema>;
 
+const queryBooleanSchema = z.union([
+  z.boolean(),
+  z.enum(["true", "false"]).transform((value) => value === "true"),
+]);
+
 const baseServerCollectionQuerySchema = z
   .object({
     q: z.string().trim().min(1).max(200).optional(),
@@ -37,8 +42,8 @@ const baseServerCollectionQuerySchema = z
     client: supportedClientIdSchema.optional(),
     transport: z.string().trim().min(1).max(64).optional(),
     registryType: z.string().trim().min(1).max(64).optional(),
-    verified: z.coerce.boolean().optional(),
-    openSource: z.coerce.boolean().optional(),
+    verified: queryBooleanSchema.optional(),
+    openSource: queryBooleanSchema.optional(),
     status: listingStatusSchema.optional(),
     sort: serverSortSchema.default("recent"),
     cursor: z.string().min(1).max(2048).optional(),
