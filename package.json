@@ -18,6 +18,7 @@
     "format:check": "prettier --check .",
     "lint": "turbo lint",
     "test": "turbo test",
+    "test:cli": "pnpm --filter @themcpdirectory/cli test",
     "test:e2e": "pnpm --filter @themcpdirectory/web test:e2e",
     "test:integration": "turbo test:integration",
     "typecheck": "turbo typecheck"

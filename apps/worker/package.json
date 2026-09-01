@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/index.js",
+    "start": "tsx dist/index.js",
     "sync:fixtures": "tsx src/index.ts sync-fixture",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
@@ -19,13 +19,14 @@
     "@themcpdirectory/domain": "workspace:*",
     "@themcpdirectory/registry-client": "workspace:*",
     "drizzle-orm": "0.45.2",
-    "pg-boss": "^10.1.6"
+    "pg-boss": "^10.1.6",
+    "tsx": "4.23.13"
   },
   "devDependencies": {
     "eslint": "9.39.5",
     "postgres": "3.4.7",
-    "tsx": "4.23.13",
     "@themcpdirectory/eslint-config": "workspace:*",
+    "@themcpdirectory/test-utils": "workspace:*",
     "@themcpdirectory/typescript-config": "workspace:*",
     "@themcpdirectory/vitest-config": "workspace:*",
     "@types/node": "^20",

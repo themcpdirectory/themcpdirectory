@@ -454,7 +454,10 @@ describe("search integration", () => {
 
     if (!newPublisher) throw new Error("expected new publisher row");
 
-    await db.update(servers).set({ publisherId: newPublisher.id }).where(eq(servers.id, primary.id));
+    await db
+      .update(servers)
+      .set({ publisherId: newPublisher.id })
+      .where(eq(servers.id, primary.id));
 
     await db
       .delete(serverAliases)
@@ -473,7 +476,12 @@ describe("search integration", () => {
 
     await db
       .delete(serverCategories)
-      .where(and(eq(serverCategories.serverId, primary.id), eq(serverCategories.categoryId, legacyCategory.id)));
+      .where(
+        and(
+          eq(serverCategories.serverId, primary.id),
+          eq(serverCategories.categoryId, legacyCategory.id),
+        ),
+      );
 
     const [modernCategory] = await db
       .insert(categories)
@@ -511,7 +519,10 @@ describe("search integration", () => {
       transportType: "stdio",
     });
 
-    await db.update(servers).set({ currentVersionId: newVersion.id }).where(eq(servers.id, primary.id));
+    await db
+      .update(servers)
+      .set({ currentVersionId: newVersion.id })
+      .where(eq(servers.id, primary.id));
 
     await refreshServerSearchDocument(db, { serverId: primary.id });
 

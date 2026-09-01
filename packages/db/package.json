@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@themcpdirectory/eslint-config": "workspace:*",
+    "@themcpdirectory/test-utils": "workspace:*",
     "@themcpdirectory/typescript-config": "workspace:*",
     "@types/node": "^20",
     "drizzle-kit": "0.31.10",

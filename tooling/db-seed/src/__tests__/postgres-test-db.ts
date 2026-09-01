@@ -4,6 +4,7 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "@themcpdirectory/db";
+import { postgresAdminCandidates } from "@themcpdirectory/test-utils";
 
 interface TempDatabase {
   readonly databaseUrl: string;
@@ -12,31 +13,8 @@ interface TempDatabase {
   destroy(): Promise<void>;
 }
 
-function parseUrl(value: string | undefined): URL | null {
-  if (!value) return null;
-  try {
-    return new URL(value);
-  } catch {
-    return null;
-  }
-}
-
-function maybeAdminUrlFromDatabaseUrl(databaseUrl: string | undefined): string | null {
-  const parsed = parseUrl(databaseUrl);
-  if (!parsed) return null;
-  const admin = new URL(parsed.toString());
-  admin.pathname = "/postgres";
-  admin.search = "";
-  admin.hash = "";
-  return admin.toString();
-}
-
 async function chooseAdminConnectionString(): Promise<string> {
-  const candidates = [
-    process.env.THEMCP_TEST_ADMIN_DATABASE_URL,
-    maybeAdminUrlFromDatabaseUrl(process.env.DATABASE_URL),
-    "postgres://localhost:5432/postgres",
-  ].filter((value): value is string => typeof value === "string" && value.length > 0);
+  const candidates = postgresAdminCandidates(process.env, "postgres://localhost:5432/postgres");
 
   for (const candidate of candidates) {
     const sql = postgres(candidate, { max: 1 });
@@ -49,7 +27,9 @@ async function chooseAdminConnectionString(): Promise<string> {
     }
   }
 
-  throw new Error("Unable to establish a local PostgreSQL admin connection for DB integration tests.");
+  throw new Error(
+    "Unable to establish a local PostgreSQL admin connection for DB integration tests.",
+  );
 }
 
 function buildDatabaseName(prefix: string): string {
@@ -77,7 +57,9 @@ function createDatabaseClient(databaseUrl: string): ReturnType<typeof drizzle<ty
 async function runMigrations(databaseUrl: string): Promise<void> {
   const client = postgres(databaseUrl, { max: 1 });
   const db = drizzle(client, { schema });
-  const migrationsFolder = fileURLToPath(new URL("../../../../packages/db/drizzle", import.meta.url));
+  const migrationsFolder = fileURLToPath(
+    new URL("../../../../packages/db/drizzle", import.meta.url),
+  );
   try {
     await migrate(db, { migrationsFolder });
   } finally {

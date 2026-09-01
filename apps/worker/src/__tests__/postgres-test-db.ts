@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import { createDatabase, type Database } from "@themcpdirectory/db";
+import { postgresAdminCandidates } from "@themcpdirectory/test-utils";
 
 interface TempDatabase {
   readonly databaseUrl: string;
@@ -11,31 +12,8 @@ interface TempDatabase {
   destroy(): Promise<void>;
 }
 
-function parseUrl(value: string | undefined): URL | null {
-  if (!value) return null;
-  try {
-    return new URL(value);
-  } catch {
-    return null;
-  }
-}
-
-function maybeAdminUrlFromDatabaseUrl(databaseUrl: string | undefined): string | null {
-  const parsed = parseUrl(databaseUrl);
-  if (!parsed) return null;
-  const admin = new URL(parsed.toString());
-  admin.pathname = "/postgres";
-  admin.search = "";
-  admin.hash = "";
-  return admin.toString();
-}
-
 async function chooseAdminConnectionString(): Promise<string> {
-  const candidates = [
-    process.env.THEMCP_TEST_ADMIN_DATABASE_URL,
-    maybeAdminUrlFromDatabaseUrl(process.env.DATABASE_URL),
-    "postgres://localhost:5432/postgres",
-  ].filter((value): value is string => typeof value === "string" && value.length > 0);
+  const candidates = postgresAdminCandidates(process.env, "postgres://localhost:5432/postgres");
 
   for (const candidate of candidates) {
     const sql = postgres(candidate, { max: 1 });
@@ -71,7 +49,9 @@ function withDatabaseName(connectionString: string, databaseName: string): strin
 async function runMigrations(databaseUrl: string): Promise<void> {
   const client = postgres(databaseUrl, { max: 1 });
   const db = createDatabase(databaseUrl);
-  const migrationsFolder = fileURLToPath(new URL("../../../../packages/db/drizzle", import.meta.url));
+  const migrationsFolder = fileURLToPath(
+    new URL("../../../../packages/db/drizzle", import.meta.url),
+  );
   try {
     await migrate(db, { migrationsFolder });
   } finally {

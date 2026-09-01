@@ -10,13 +10,37 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     name: Verify
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mcpdirectory
+      THEMCP_TEST_ADMIN_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      MCP_REGISTRY_BASE_URL: https://registry.modelcontextprotocol.io
+      NEXT_PUBLIC_BASE_URL: http://localhost:3099
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: mcpdirectory
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mcpdirectory"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -41,8 +65,33 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Validate migrations
+        run: pnpm db:migrate
+
       - name: Test
         run: pnpm test
 
+      - name: Integration tests
+        run: pnpm test:integration
+
+      - name: CLI tests
+        run: pnpm test:cli
+
       - name: Build
         run: pnpm build
+
+      - name: Install Chromium
+        run: pnpm --filter @themcpdirectory/web exec playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: pnpm test:e2e
+
+      - name: Dependency audit
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: pnpm audit --audit-level high
+
+      - name: Secret scan
+        run: >-
+          docker run --rm -v "$PWD:/repo"
+          zricethezav/gitleaks:v8.24.2
+          detect --source=/repo --redact

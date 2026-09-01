@@ -56,7 +56,8 @@ const pageOne = RegistryPageSchema.parse({
         $schema: "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
         name: "io.github.official/github",
         title: "GitHub MCP",
-        description: "Repository, issue, and pull-request workflows from GitHub for local assistants.",
+        description:
+          "Repository, issue, and pull-request workflows from GitHub for local assistants.",
         version: "2.3.0",
         repository: {
           url: "https://github.com/themcpdirectory/github-mcp",
@@ -143,7 +144,8 @@ const pageOne = RegistryPageSchema.parse({
         $schema: "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
         name: "io.database.tools/postgresql",
         title: "PostgreSQL Toolkit",
-        description: "Local and remote PostgreSQL operations for schemas, migrations, and diagnostics.",
+        description:
+          "Local and remote PostgreSQL operations for schemas, migrations, and diagnostics.",
         version: "1.4.0",
         repository: {
           url: "https://github.com/themcpdirectory/postgresql-toolkit",
@@ -227,7 +229,8 @@ const pageTwo = RegistryPageSchema.parse({
         $schema: "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
         name: "io.database.tools/postgresql",
         title: "PostgreSQL Toolkit",
-        description: "Local and remote PostgreSQL operations for schemas, migrations, and diagnostics.",
+        description:
+          "Local and remote PostgreSQL operations for schemas, migrations, and diagnostics.",
         version: "1.5.0",
         repository: {
           url: "https://github.com/themcpdirectory/postgresql-toolkit",
@@ -282,7 +285,8 @@ const pageTwo = RegistryPageSchema.parse({
         $schema: "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
         name: "io.retired.tools/retired-notifier",
         title: "Retired Notifier",
-        description: "Notification endpoint retired upstream and kept only for historical reference.",
+        description:
+          "Notification endpoint retired upstream and kept only for historical reference.",
         version: "0.3.1",
         remotes: [
           {
@@ -334,7 +338,8 @@ const pageTwo = RegistryPageSchema.parse({
         $schema: "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
         name: "io.database.tools/supabase",
         title: "Supabase Data Operator",
-        description: "Database project operations, migrations, and audit helpers for managed Postgres.",
+        description:
+          "Database project operations, migrations, and audit helpers for managed Postgres.",
         version: "1.2.0",
         repository: {
           url: "https://github.com/themcpdirectory/supabase-operator",

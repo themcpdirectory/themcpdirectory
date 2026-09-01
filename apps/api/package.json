@@ -6,23 +6,26 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/index.js",
+    "start": "tsx dist/index.js",
     "lint": "eslint .",
+    "pretest": "pnpm build",
     "test": "vitest run --passWithNoTests",
+    "pretest:integration": "pnpm build",
     "test:integration": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "hono": "4.7.11",
-    "@themcpdirectory/config": "workspace:*"
+    "@hono/node-server": "^2.1.1",
+    "@themcpdirectory/config": "workspace:*",
+    "hono": "4.13.5",
+    "tsx": "4.23.13"
   },
   "devDependencies": {
-    "eslint": "9.39.5",
-    "tsx": "4.23.13",
     "@themcpdirectory/eslint-config": "workspace:*",
     "@themcpdirectory/typescript-config": "workspace:*",
     "@themcpdirectory/vitest-config": "workspace:*",
     "@types/node": "^20",
+    "eslint": "9.39.5",
     "typescript": "5.9.3",
     "vitest": "4.1.11"
   }

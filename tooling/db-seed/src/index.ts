@@ -113,7 +113,10 @@ async function ingestRegistryFixtures(db: SeedDb, fixtures: SeedFixtureBundle): 
   }
 }
 
-async function upsertPublishers(db: SeedDb, fixtures: SeedFixtureBundle): Promise<Map<string, string>> {
+async function upsertPublishers(
+  db: SeedDb,
+  fixtures: SeedFixtureBundle,
+): Promise<Map<string, string>> {
   const publisherIdsBySlug = new Map<string, string>();
 
   for (const publisher of fixtures.publishers) {
@@ -169,7 +172,12 @@ async function lookupServerIdsBySlug(db: SeedDb): Promise<Map<string, string>> {
   return new Map(serverRows.map((row) => [String(row.slug), row.id]));
 }
 
-async function upsertAlias(db: SeedDb, alias: string, serverId: string, kind: "manual"): Promise<void> {
+async function upsertAlias(
+  db: SeedDb,
+  alias: string,
+  serverId: string,
+  kind: "manual",
+): Promise<void> {
   const [existing] = await db
     .select({ id: serverAliases.id })
     .from(serverAliases)
@@ -225,7 +233,9 @@ async function reconcileManagedAliases(
     return;
   }
 
-  const managedAliasValues = new Set(fixtures.managedAliasValues.map((alias) => alias.toLowerCase()));
+  const managedAliasValues = new Set(
+    fixtures.managedAliasValues.map((alias) => alias.toLowerCase()),
+  );
   if (managedAliasValues.size === 0) {
     return;
   }
@@ -234,12 +244,7 @@ async function reconcileManagedAliases(
   const existingManagedAliases = await db
     .select({ id: serverAliases.id, alias: serverAliases.alias })
     .from(serverAliases)
-    .where(
-      and(
-        inArray(serverAliases.serverId, seededServerIds),
-        eq(serverAliases.kind, "manual"),
-      ),
-    );
+    .where(and(inArray(serverAliases.serverId, seededServerIds), eq(serverAliases.kind, "manual")));
 
   const staleAliasIds = existingManagedAliases
     .filter((row) => {
@@ -258,7 +263,9 @@ async function upsertServerCategoryAssignments(
   fixtures: SeedFixtureBundle,
   serverIdsBySlug: Map<string, string>,
 ): Promise<void> {
-  const categoryRows = await db.select({ id: categories.id, slug: categories.slug }).from(categories);
+  const categoryRows = await db
+    .select({ id: categories.id, slug: categories.slug })
+    .from(categories);
   const categoryIdsBySlug = new Map(categoryRows.map((row) => [row.slug, row.id]));
 
   for (const assignment of fixtures.categoryAssignments) {
@@ -306,7 +313,9 @@ async function reconcileManagedCategoryAssignments(
     return;
   }
 
-  const categoryRows = await db.select({ id: categories.id, slug: categories.slug }).from(categories);
+  const categoryRows = await db
+    .select({ id: categories.id, slug: categories.slug })
+    .from(categories);
   const categoryIdsBySlug = new Map(categoryRows.map((row) => [row.slug, row.id]));
 
   const ownedAssignmentKeys = new Set<string>();

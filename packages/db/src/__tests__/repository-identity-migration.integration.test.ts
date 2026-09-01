@@ -3,26 +3,10 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import postgres, { type Sql } from "postgres";
 import { expect, it } from "vitest";
-
-function adminUrlFromDatabaseUrl(databaseUrl: string | undefined): string | null {
-  if (!databaseUrl) return null;
-  try {
-    const url = new URL(databaseUrl);
-    url.pathname = "/postgres";
-    url.search = "";
-    url.hash = "";
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
+import { postgresAdminCandidates } from "@themcpdirectory/test-utils";
 
 async function connectToAdminDatabase(): Promise<{ url: string; sql: Sql }> {
-  const candidates = [
-    process.env.THEMCP_TEST_ADMIN_DATABASE_URL,
-    adminUrlFromDatabaseUrl(process.env.DATABASE_URL),
-    "postgres://localhost:5432/postgres",
-  ].filter((value): value is string => Boolean(value));
+  const candidates = postgresAdminCandidates(process.env, "postgres://localhost:5432/postgres");
 
   for (const url of candidates) {
     const sql = postgres(url, { max: 1 });

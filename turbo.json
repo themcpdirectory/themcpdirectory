@@ -1,6 +1,14 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalEnv": ["DATABASE_URL", "MCP_REGISTRY_BASE_URL", "GITHUB_TOKEN"],
+  "globalEnv": [
+    "DATABASE_URL",
+    "THEMCP_TEST_ADMIN_DATABASE_URL",
+    "MCP_REGISTRY_BASE_URL",
+    "GITHUB_TOKEN",
+    "NEXT_PUBLIC_BASE_URL",
+    "WEB_PORT",
+    "API_PORT"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

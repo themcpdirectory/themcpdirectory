@@ -37,7 +37,9 @@ const EXPECTED_SERVER_PUBLISHER_LINKS = [
   { serverSlug: "supabase", publisherSlug: "community-labs" },
 ] as const;
 
-function sortServerCategoryRows<T extends { serverSlug: string; categorySlug: string }>(rows: readonly T[]): T[] {
+function sortServerCategoryRows<T extends { serverSlug: string; categorySlug: string }>(
+  rows: readonly T[],
+): T[] {
   return [...rows].sort((a, b) => {
     const serverCmp = a.serverSlug.localeCompare(b.serverSlug);
     if (serverCmp !== 0) {
@@ -91,15 +93,15 @@ function withoutFixtureAlias(aliasValue: string): SeedFixtureBundle {
     ...SEED_FIXTURES,
     aliases: SEED_FIXTURES.aliases.filter((alias) => alias.alias !== aliasValue),
     categoryAssignments: SEED_FIXTURES.categoryAssignments.filter(
-      (assignment) => !(assignment.serverSlug === "postgresql" && assignment.categorySlug === "databases"),
+      (assignment) =>
+        !(assignment.serverSlug === "postgresql" && assignment.categorySlug === "databases"),
     ),
   };
 }
 
 function withCategoryAssignmentOverrides(
   categoryAssignments: SeedFixtureBundle["categoryAssignments"],
-  managedCategoryAssignmentKeys: SeedFixtureBundle["managedCategoryAssignmentKeys"] =
-    SEED_FIXTURES.managedCategoryAssignmentKeys,
+  managedCategoryAssignmentKeys: SeedFixtureBundle["managedCategoryAssignmentKeys"] = SEED_FIXTURES.managedCategoryAssignmentKeys,
 ): SeedFixtureBundle {
   return {
     ...SEED_FIXTURES,
@@ -178,7 +180,10 @@ describe("db seed integration", () => {
       .from(publishers)
       .orderBy(publishers.slug);
     expect(publisherRows).toContainEqual({ slug: "github", verificationState: "verified" });
-    expect(publisherRows).toContainEqual({ slug: "community-labs", verificationState: "unverified" });
+    expect(publisherRows).toContainEqual({
+      slug: "community-labs",
+      verificationState: "unverified",
+    });
 
     const serverRows = await db
       .select({
@@ -228,7 +233,9 @@ describe("db seed integration", () => {
     expect(sortServerCategoryRows(seededCategoryAssignmentRows)).toEqual(expectedSeededAssignments);
     expect(seededCategoryAssignmentRows.every((row) => row.confidence === null)).toBe(true);
     expect(
-      seededCategoryAssignmentRows.every((row) => row.source === "manual" || row.source === "import"),
+      seededCategoryAssignmentRows.every(
+        (row) => row.source === "manual" || row.source === "import",
+      ),
     ).toBe(true);
 
     const githubPkgRows = await db
@@ -360,7 +367,11 @@ describe("db seed integration", () => {
     expect(userAliasRows.length).toBe(1);
 
     const postgresDatabasesRows = await db
-      .select({ serverId: serverCategories.serverId, categoryId: serverCategories.categoryId, source: serverCategories.source })
+      .select({
+        serverId: serverCategories.serverId,
+        categoryId: serverCategories.categoryId,
+        source: serverCategories.source,
+      })
       .from(serverCategories)
       .innerJoin(categories, eq(categories.id, serverCategories.categoryId))
       .where(eq(categories.slug, "databases"));
@@ -405,7 +416,10 @@ describe("db seed integration", () => {
     const githubId = await getServerIdBySlug(db, "github");
     const postgresId = await getServerIdBySlug(db, "postgresql");
     const infrastructureCategoryId = (
-      await db.select({ id: categories.id }).from(categories).where(eq(categories.slug, "infrastructure"))
+      await db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(eq(categories.slug, "infrastructure"))
     )[0]?.id;
     const securityCategoryId = (
       await db.select({ id: categories.id }).from(categories).where(eq(categories.slug, "security"))
@@ -432,7 +446,8 @@ describe("db seed integration", () => {
     });
 
     const withoutManagedManualAssignment = mixedAssignments.filter(
-      (assignment) => !(assignment.serverSlug === "postgresql" && assignment.categorySlug === "infrastructure"),
+      (assignment) =>
+        !(assignment.serverSlug === "postgresql" && assignment.categorySlug === "infrastructure"),
     );
 
     await runSeed({
