@@ -1,0 +1,15 @@
+.git
+.github
+.superpowers
+.turbo
+.env
+.env.*
+**/.next
+**/.turbo
+**/coverage
+**/dist
+**/node_modules
+**/playwright-report
+**/test-results
+*.log
+.DS_Store

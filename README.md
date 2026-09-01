@@ -49,6 +49,12 @@ pnpm --filter @themcpdirectory/api dev
 
 See [Local development](docs/development.md) for database reset, migrations, fixture and live ingestion, process commands, tests, and production builds.
 
+## Deployment
+
+The MVP can be deployed from Git to Portainer Business Edition on Docker Standalone. The production stack builds the workspace image, runs migrations, starts the public web directory and Registry worker, keeps PostgreSQL private, and connects the web service to an existing Nginx Proxy Manager network.
+
+See [Portainer deployment](docs/deployment.md) for required environment variables, stack settings, proxy configuration, updates, backups, and rollback constraints.
+
 ## Architecture
 
 ```text

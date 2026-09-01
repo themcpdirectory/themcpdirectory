@@ -1,0 +1,116 @@
+x-app-build: &app-build
+  context: .
+  dockerfile: Dockerfile
+  args:
+    NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://themcpdirectory.org}
+
+x-app-environment: &app-environment
+  DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+  MCP_REGISTRY_BASE_URL: ${MCP_REGISTRY_BASE_URL:-https://registry.modelcontextprotocol.io}
+  NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://themcpdirectory.org}
+  WEB_PORT: "3000"
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mcpdirectory}
+      POSTGRES_USER: ${POSTGRES_USER:-mcpdirectory}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - app
+    logging: *default-logging
+    stop_grace_period: 30s
+
+  migrate:
+    image: themcpdirectory-app:local
+    pull_policy: build
+    build: *app-build
+    command: ["pnpm", "db:migrate"]
+    restart: "no"
+    environment: *app-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app
+    logging: *default-logging
+
+  web:
+    image: themcpdirectory-app:local
+    pull_policy: build
+    build: *app-build
+    restart: unless-stopped
+    init: true
+    environment: *app-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/').then((response)=>{if(!response.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    expose:
+      - "3000"
+    networks:
+      app: {}
+      proxy:
+        aliases:
+          - mcpdirectory-web
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+    stop_grace_period: 30s
+
+  worker:
+    image: themcpdirectory-app:local
+    pull_policy: build
+    build: *app-build
+    command: ["pnpm", "--filter", "@themcpdirectory/worker", "start"]
+    restart: unless-stopped
+    init: true
+    environment:
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - MCP_REGISTRY_BASE_URL=${MCP_REGISTRY_BASE_URL:-https://registry.modelcontextprotocol.io}
+      - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL:-https://themcpdirectory.org}
+      - WEB_PORT=3000
+      - GITHUB_TOKEN
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - app
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+    stop_grace_period: 30s
+
+volumes:
+  postgres-data:
+
+networks:
+  app:
+  proxy:
+    external: true
+    name: proxy
