@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
+  apiErrorCodeSchema,
   clientObject,
+  createCollectionResponseSchema,
   createResourceResponseSchema,
   errorResponseSchema,
   requestIdSchema,
@@ -51,10 +53,57 @@ describe("shared public-api contracts", () => {
       },
     });
   });
+
+  it("enforces collection envelopes and exact approved error codes", () => {
+    const collectionSchema = createCollectionResponseSchema(
+      z.object({ slug: z.string(), title: z.string() }).strict(),
+    );
+
+    expect(
+      collectionSchema.parse({
+        data: [{ slug: "github", title: "GitHub" }],
+        meta: { requestId: "req_phase_d_003", nextCursor: null },
+      }),
+    ).toEqual({
+      data: [{ slug: "github", title: "GitHub" }],
+      meta: { requestId: "req_phase_d_003", nextCursor: null },
+    });
+
+    expect(() =>
+      collectionSchema.parse({
+        data: [{ slug: "github", title: "GitHub" }],
+        meta: { requestId: "req_phase_d_003" },
+      }),
+    ).toThrow(/nextCursor/i);
+
+    expect(() =>
+      collectionSchema.parse({
+        data: [{ slug: "github", title: "GitHub" }],
+        meta: { requestId: "req_phase_d_003", nextCursor: null, extra: true },
+      }),
+    ).toThrow(/unrecognized key/i);
+
+    expect(apiErrorCodeSchema.options).toEqual([
+      "VALIDATION_ERROR",
+      "SERVER_NOT_FOUND",
+      "AMBIGUOUS_SERVER",
+      "INSTALL_UNAVAILABLE",
+      "UPSTREAM_DELETED",
+      "CURSOR_INVALID",
+      "RATE_LIMITED",
+      "INTERNAL_ERROR",
+    ]);
+
+    for (const code of apiErrorCodeSchema.options) {
+      expect(apiErrorCodeSchema.parse(code)).toBe(code);
+    }
+
+    expect(() => apiErrorCodeSchema.parse("NOT_AN_APPROVED_CODE")).toThrow();
+  });
 });
 
 describe("clientObject", () => {
-  it("accepts unknown additive fields for client parsers", () => {
+  it("accepts additive fields but rejects invalid declared field types", () => {
     const schema = clientObject({ slug: z.string(), title: z.string() });
     const parsed = schema.parse({
       slug: "github",
@@ -63,5 +112,13 @@ describe("clientObject", () => {
     }) as Record<string, unknown>;
 
     expect(parsed.futureField).toEqual({ safe: true });
+
+    expect(() =>
+      schema.parse({
+        slug: 123,
+        title: "GitHub",
+        futureField: { safe: true },
+      }),
+    ).toThrow(/slug/i);
   });
 });
