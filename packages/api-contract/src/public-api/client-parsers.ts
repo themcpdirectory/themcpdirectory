@@ -4,6 +4,9 @@ import {
   listingStatusSchema,
 } from "./servers.js";
 import type {
+  InstallManifestResponse,
+} from "./install.js";
+import type {
   ResolvedServerResponse,
   ServerCollectionResponse,
   ServerDetailResponse,
@@ -171,6 +174,89 @@ const resolveServerIdentifierClientResponseSchema = clientObject({
   meta: clientObject({ requestId: requestIdSchema }),
 });
 
+const packageVariantClientSchema = clientObject({
+  id: uuidSchema,
+  kind: z.literal("package"),
+  registryType: z.string().min(1),
+  identifier: z.string().min(1),
+  version: z.string().min(1),
+  runtimeHint: z.string().min(1),
+  transport: z.string().min(1),
+  runtimeArguments: z.array(clientObject({ type: z.enum(["positional", "named"]) })),
+  packageArguments: z.array(clientObject({ type: z.enum(["positional", "named"]) })),
+  environmentVariables: z.array(
+    clientObject({
+      name: z.string().regex(/^[A-Z][A-Z0-9_]*$/),
+      description: z.string().min(1).nullable(),
+      required: z.boolean(),
+      defaultValue: z.string().min(1).nullable(),
+      valueSource: z.literal("environment"),
+    }),
+  ),
+  integrity: clientObject({
+    algorithm: z.literal("sha256"),
+    digest: z.string().regex(/^[a-f0-9]{64}$/i),
+  }).nullable(),
+});
+
+const remoteVariantClientSchema = clientObject({
+  id: uuidSchema,
+  kind: z.literal("remote"),
+  transport: z.string().min(1),
+  urlTemplate: httpUrlSchema,
+  headers: z.array(clientObject({ name: z.string().min(1), value: z.string().min(1) })),
+  variables: z.array(
+    clientObject({
+      name: z.string().min(1),
+      description: z.string().min(1).nullable(),
+      required: z.boolean(),
+      defaultValue: z.string().min(1).nullable(),
+    }),
+  ),
+});
+
+const installManifestClientSchema = clientObject({
+  schemaVersion: z.literal(1),
+  server: clientObject({
+    id: uuidSchema,
+    slug: slugSchema,
+    title: z.string().min(1),
+    version: z.string().min(1).nullable(),
+  }),
+  provenance: clientObject({
+    registry: z.string().min(1),
+    registryName: z.string().min(1),
+    observedAt: rfc3339UtcSchema,
+  }),
+  variants: z.array(
+    z.discriminatedUnion("kind", [packageVariantClientSchema, remoteVariantClientSchema]),
+  ),
+  compatibility: clientObject({
+    "claude-code": compatibilityStatusSchema.optional(),
+    codex: compatibilityStatusSchema.optional(),
+    cursor: compatibilityStatusSchema.optional(),
+  }),
+});
+
+const installManifestClientResponseSchema = clientObject({
+  data: installManifestClientSchema,
+  meta: clientObject({ requestId: requestIdSchema }),
+});
+
+function getInstallManifestSchemaVersion(input: unknown): number | undefined {
+  if (!input || typeof input !== "object") {
+    return undefined;
+  }
+
+  const data = Reflect.get(input, "data");
+  if (!data || typeof data !== "object") {
+    return undefined;
+  }
+
+  const schemaVersion = Reflect.get(data, "schemaVersion");
+  return typeof schemaVersion === "number" ? schemaVersion : undefined;
+}
+
 export function parseServerCollectionResponse(
   input: unknown,
 ): ServerCollectionResponse {
@@ -185,4 +271,16 @@ export function parseResolvedServerResponse(
   input: unknown,
 ): ResolvedServerResponse {
   return resolveServerIdentifierClientResponseSchema.parse(input) as ResolvedServerResponse;
+}
+
+export function parseInstallManifestResponse(
+  input: unknown,
+): InstallManifestResponse {
+  const schemaVersion = getInstallManifestSchemaVersion(input);
+
+  if (schemaVersion !== undefined && schemaVersion !== 1) {
+    throw new UnsupportedManifestVersionError(schemaVersion);
+  }
+
+  return installManifestClientResponseSchema.parse(input) as InstallManifestResponse;
 }

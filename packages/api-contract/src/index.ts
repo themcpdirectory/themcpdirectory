@@ -42,8 +42,28 @@ export {
 	type SupportedClientId,
 } from "./public-api/servers.js";
 export {
+	parseInstallManifestResponse,
 	parseResolvedServerResponse,
 	parseServerCollectionResponse,
 	parseServerDetailResponse,
 	UnsupportedManifestVersionError,
 } from "./public-api/client-parsers.js";
+export {
+	installManifestQuerySchema,
+	installManifestResponseSchema,
+	type InstallManifestResponse,
+	type InstallManifestV1,
+} from "./public-api/install.js";
+export {
+	categoryDetailResponseSchema,
+	categoriesCollectionResponseSchema,
+	clientDetailResponseSchema,
+	clientsCollectionResponseSchema,
+	publisherDetailResponseSchema,
+	type PublicCategoryDetail,
+	type PublicCategorySummary,
+	type PublicClientDetail,
+	type PublicClientSummary,
+	type PublicPublisherDetail,
+} from "./public-api/discovery.js";
+export { createPublicApiOpenApiDocument } from "./public-api/openapi.js";
