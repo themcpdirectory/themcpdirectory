@@ -1,9 +1,3 @@
-x-app-build: &app-build
-  context: .
-  dockerfile: Dockerfile
-  args:
-    NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://themcpdirectory.org}
-
 x-app-environment: &app-environment
   DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
   MCP_REGISTRY_BASE_URL: ${MCP_REGISTRY_BASE_URL:-https://registry.modelcontextprotocol.io}
@@ -38,9 +32,8 @@ services:
     stop_grace_period: 30s
 
   migrate:
-    image: themcpdirectory-app:local
-    pull_policy: build
-    build: *app-build
+    image: ${APP_IMAGE:-ghcr.io/themcpdirectory/themcpdirectory:main}
+    pull_policy: always
     command: ["pnpm", "db:migrate"]
     restart: "no"
     environment: *app-environment
@@ -52,9 +45,8 @@ services:
     logging: *default-logging
 
   web:
-    image: themcpdirectory-app:local
-    pull_policy: build
-    build: *app-build
+    image: ${APP_IMAGE:-ghcr.io/themcpdirectory/themcpdirectory:main}
+    pull_policy: always
     restart: unless-stopped
     init: true
     environment: *app-environment
@@ -84,9 +76,8 @@ services:
     stop_grace_period: 30s
 
   worker:
-    image: themcpdirectory-app:local
-    pull_policy: build
-    build: *app-build
+    image: ${APP_IMAGE:-ghcr.io/themcpdirectory/themcpdirectory:main}
+    pull_policy: always
     command: ["pnpm", "--filter", "@themcpdirectory/worker", "start"]
     restart: unless-stopped
     init: true
