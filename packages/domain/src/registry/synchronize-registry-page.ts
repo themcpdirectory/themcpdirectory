@@ -1,4 +1,4 @@
-import { and, eq, isNull, or, sql } from "drizzle-orm";
+import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
 import {
   registrySnapshots,
   serverAliases,
@@ -15,6 +15,7 @@ import {
   selectCurrentVersion,
   type NormalizedRegistryServer,
 } from "@themcpdirectory/registry-normalizer";
+import { repositoryIdentityLockKey } from "../github/github-client.js";
 
 export interface RegistrySyncSource {
   readonly id: string;
@@ -35,6 +36,7 @@ export interface SyncPageResult {
   readonly recordsUpdated: number;
   readonly recordsFailed: number;
   readonly recordFailures: readonly SyncRecordFailure[];
+  readonly githubEnrichmentServerIds: readonly string[];
   readonly nextCursor?: string;
 }
 
@@ -57,6 +59,8 @@ export class AmbiguousIdentityError extends Error {
 interface RecordWriteStats {
   created: number;
   updated: number;
+  serverId: string;
+  shouldEnrichGitHub: boolean;
 }
 
 type SyncDatabase = Pick<Database, "select" | "insert" | "update" | "delete">;
@@ -104,7 +108,10 @@ async function allocateServerSlug(
   const base = deriveBaseSlug(normalized);
   for (let index = 0; index < 5000; index++) {
     const candidate = index === 0 ? base : `${base}-${index + 1}`;
-    const [existing] = await db.select({ id: servers.id }).from(servers).where(eq(servers.slug, candidate));
+    const [existing] = await db
+      .select({ id: servers.id })
+      .from(servers)
+      .where(eq(servers.slug, candidate));
     if (!existing) {
       return candidate;
     }
@@ -132,12 +139,7 @@ function repositoryIdentityKey(normalized: NormalizedRegistryServer): string | n
     return null;
   }
 
-  return [
-    "repository",
-    normalized.repository.source,
-    normalized.repository.externalId,
-    normalized.repository.subfolder ?? "",
-  ].join(":");
+  return repositoryIdentityLockKey(normalized.repository.source, normalized.repository.externalId);
 }
 
 function packageIdentityKey(packageEntry: {
@@ -320,11 +322,9 @@ async function resolveCanonicalServerId(
   return null;
 }
 
-function mapUpstreamToListingStatus(upstreamStatus: string | undefined):
-  | "active"
-  | "deprecated"
-  | "deleted_upstream"
-  | "unavailable" {
+function mapUpstreamToListingStatus(
+  upstreamStatus: string | undefined,
+): "active" | "deprecated" | "deleted_upstream" | "unavailable" {
   if (upstreamStatus === "deprecated") return "deprecated";
   if (upstreamStatus === "deleted") return "deleted_upstream";
   if (upstreamStatus === "active") return "active";
@@ -395,14 +395,45 @@ async function upsertServer(
   sourceServerId: string | null,
   normalized: NormalizedRegistryServer,
   observedAt: Date,
-): Promise<{ serverId: string; created: boolean }> {
+): Promise<{ serverId: string; created: boolean; repositoryIdentityConflict: boolean }> {
   if (sourceServerId) {
-    const [existing] = await db.select().from(servers).where(eq(servers.id, sourceServerId));
+    const [existing] = await db
+      .select()
+      .from(servers)
+      .where(eq(servers.id, sourceServerId))
+      .for("update");
     if (!existing) {
       throw new Error("Resolved server no longer exists.");
     }
 
     const repository = normalized.repository;
+    const [repositoryIdentityOwner] =
+      repository?.source && repository.externalId
+        ? await db
+            .select({ id: servers.id })
+            .from(servers)
+            .where(
+              and(
+                eq(servers.repositorySource, repository.source),
+                eq(servers.repositoryExternalId, repository.externalId),
+                ne(servers.id, existing.id),
+              ),
+            )
+            .limit(1)
+        : [];
+    const hasVerifiedRepositoryIdentity =
+      existing.repositorySource !== null && existing.repositoryExternalId !== null;
+    const shouldPreserveRepository =
+      hasVerifiedRepositoryIdentity || repositoryIdentityOwner !== undefined;
+    const hasConflictingRepositoryIdentity =
+      hasVerifiedRepositoryIdentity &&
+      repository?.source !== undefined &&
+      repository.externalId !== undefined &&
+      (repository.source !== existing.repositorySource ||
+        repository.externalId !== existing.repositoryExternalId);
+    if (hasConflictingRepositoryIdentity) {
+      throw new AmbiguousIdentityError("Registry repository identity conflicts with the server.");
+    }
 
     await db
       .update(servers)
@@ -411,17 +442,30 @@ async function upsertServer(
         shortDescription: normalized.description,
         canonicalRegistryName: normalized.canonicalRegistryName,
         homepageUrl: normalized.websiteUrl ?? existing.homepageUrl,
-        repositoryUrl: repository?.url ?? existing.repositoryUrl,
-        repositorySource: repository?.source ?? existing.repositorySource,
-        repositoryExternalId: repository?.externalId ?? existing.repositoryExternalId,
-        repositorySubfolder: repository?.subfolder ?? existing.repositorySubfolder,
+        repositoryUrl: shouldPreserveRepository
+          ? existing.repositoryUrl
+          : (repository?.url ?? existing.repositoryUrl),
+        repositorySource: shouldPreserveRepository
+          ? existing.repositorySource
+          : (repository?.source ?? existing.repositorySource),
+        repositoryExternalId: shouldPreserveRepository
+          ? existing.repositoryExternalId
+          : (repository?.externalId ?? existing.repositoryExternalId),
+        repositorySubfolder: shouldPreserveRepository
+          ? existing.repositorySubfolder
+          : (repository?.subfolder ?? existing.repositorySubfolder),
         licenseSpdx:
-          (normalized.normalizedPayload.server as { license?: string }).license ?? existing.licenseSpdx,
+          (normalized.normalizedPayload.server as { license?: string }).license ??
+          existing.licenseSpdx,
         lastSeenAt: observedAt,
       })
       .where(eq(servers.id, existing.id));
 
-    return { serverId: existing.id, created: false };
+    return {
+      serverId: existing.id,
+      created: false,
+      repositoryIdentityConflict: repositoryIdentityOwner !== undefined,
+    };
   }
 
   const repository = normalized.repository;
@@ -451,7 +495,7 @@ async function upsertServer(
         throw new Error("Failed to create canonical server.");
       }
 
-      return { serverId: created.id, created: true };
+      return { serverId: created.id, created: true, repositoryIdentityConflict: false };
     } catch (error) {
       if (!isUniqueViolation(error)) {
         throw error;
@@ -600,7 +644,10 @@ async function replaceVersionChildren(
   }
 }
 
-async function refreshCurrentVersionAndListingStatus(db: SyncDatabase, serverId: string): Promise<void> {
+async function refreshCurrentVersionAndListingStatus(
+  db: SyncDatabase,
+  serverId: string,
+): Promise<void> {
   const versions = await db
     .select({
       id: serverVersions.id,
@@ -620,11 +667,15 @@ async function refreshCurrentVersionAndListingStatus(db: SyncDatabase, serverId:
   );
 
   const selectedVersion = current
-    ? versions.find((version) => version.version === current.version && version.upstreamStatus === current.upstreamStatus)
+    ? versions.find(
+        (version) =>
+          version.version === current.version && version.upstreamStatus === current.upstreamStatus,
+      )
     : undefined;
 
   const listingStatus = mapUpstreamToListingStatus(selectedVersion?.upstreamStatus ?? undefined);
-  const currentVersionId = selectedVersion?.upstreamStatus === "deleted" ? null : selectedVersion?.id ?? null;
+  const currentVersionId =
+    selectedVersion?.upstreamStatus === "deleted" ? null : (selectedVersion?.id ?? null);
 
   await db
     .update(servers)
@@ -665,10 +716,29 @@ async function synchronizeServerRecord(
   await replaceVersionChildren(db, versionWrite.versionId, normalized);
   await refreshCurrentVersionAndListingStatus(db, serverWrite.serverId);
 
-  const created = Number(snapshot.created) + Number(serverWrite.created) + Number(versionWrite.created);
-  const updated = Number(!snapshot.created) + Number(!serverWrite.created) + Number(!versionWrite.created);
+  const [repository] = await db
+    .select({ source: servers.repositorySource, url: servers.repositoryUrl })
+    .from(servers)
+    .where(eq(servers.id, serverWrite.serverId));
+  let shouldEnrichGitHub = false;
+  if (
+    !serverWrite.repositoryIdentityConflict &&
+    repository?.source === "github" &&
+    repository.url !== null
+  ) {
+    try {
+      shouldEnrichGitHub = new URL(repository.url).hostname.toLowerCase() === "github.com";
+    } catch {
+      shouldEnrichGitHub = false;
+    }
+  }
 
-  return { created, updated };
+  const created =
+    Number(snapshot.created) + Number(serverWrite.created) + Number(versionWrite.created);
+  const updated =
+    Number(!snapshot.created) + Number(!serverWrite.created) + Number(!versionWrite.created);
+
+  return { created, updated, serverId: serverWrite.serverId, shouldEnrichGitHub };
 }
 
 export async function synchronizeRegistryPage(
@@ -681,6 +751,7 @@ export async function synchronizeRegistryPage(
   let recordsUpdated = 0;
   let recordsFailed = 0;
   const recordFailures: SyncRecordFailure[] = [];
+  const githubEnrichmentServerIds = new Set<string>();
 
   for (const [recordIndex, rawServer] of page.servers.entries()) {
     try {
@@ -689,6 +760,7 @@ export async function synchronizeRegistryPage(
       });
       recordsCreated += stats.created;
       recordsUpdated += stats.updated;
+      if (stats.shouldEnrichGitHub) githubEnrichmentServerIds.add(stats.serverId);
     } catch (error) {
       recordsFailed += 1;
       const serverName = rawServer.server.name;
@@ -702,7 +774,8 @@ export async function synchronizeRegistryPage(
         continue;
       }
 
-      const message = error instanceof Error ? `${error.name}: ${error.message}` : "Unknown ingestion error";
+      const message =
+        error instanceof Error ? `${error.name}: ${error.message}` : "Unknown ingestion error";
       recordFailures.push({
         recordIndex,
         serverName,
@@ -718,6 +791,7 @@ export async function synchronizeRegistryPage(
     recordsUpdated,
     recordsFailed,
     recordFailures,
+    githubEnrichmentServerIds: [...githubEnrichmentServerIds],
     ...(page.metadata.nextCursor !== undefined ? { nextCursor: page.metadata.nextCursor } : {}),
   };
 

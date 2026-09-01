@@ -31,3 +31,25 @@ export {
   type ServerPackageDetail,
   type ServerRemoteDetail,
 } from "./servers/search.js";
+
+export {
+  GitHubEnrichmentServerNotFoundError,
+  GitHubRepositoryChangedError,
+  GitHubRepositoryIdentityConflictError,
+  GitHubRepositoryUrlError,
+  enrichGitHubRepository,
+  type EnrichGitHubRepositoryOptions,
+} from "./github/enrich-github-repository.js";
+
+export {
+  GitHubHttpError,
+  GitHubRateLimitError,
+  GitHubRepositoryUnavailableError,
+  GitHubResponseValidationError,
+  GitHubTimeoutError,
+  fetchGitHubRepository,
+  fetchLatestGitHubRelease,
+  type GitHubRelease,
+  type GitHubRepository,
+  type GitHubRequestOptions,
+} from "./github/github-client.js";

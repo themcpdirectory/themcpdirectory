@@ -335,12 +335,18 @@ importers:
       '@themcpdirectory/search':
         specifier: workspace:*
         version: link:../search
+      '@themcpdirectory/security':
+        specifier: workspace:*
+        version: link:../security
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(pg@8.23.0)(postgres@3.4.7)
       postgres:
         specifier: 3.4.7
         version: 3.4.7
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
     devDependencies:
       '@themcpdirectory/eslint-config':
         specifier: workspace:*

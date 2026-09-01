@@ -17,8 +17,10 @@
     "@themcpdirectory/search": "workspace:*",
     "@themcpdirectory/registry-client": "workspace:*",
     "@themcpdirectory/registry-normalizer": "workspace:*",
+    "@themcpdirectory/security": "workspace:*",
     "drizzle-orm": "0.45.2",
-    "postgres": "3.4.7"
+    "postgres": "3.4.7",
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "eslint": "9.39.5",

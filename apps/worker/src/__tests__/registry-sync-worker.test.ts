@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { desc, eq } from "drizzle-orm";
+import PgBoss from "pg-boss";
 import {
   registrySources,
   registrySyncRuns,
@@ -14,9 +15,12 @@ import {
   type RegistryPage,
 } from "@themcpdirectory/registry-client";
 import {
+  REGISTRY_SYNC_QUEUE,
   RegistrySyncTerminalError,
+  initializeWorkerQueues,
   processRegistrySyncJob,
   runRegistrySync,
+  type RegistrySyncJobData,
 } from "../index.js";
 import { createTempDatabase } from "./postgres-test-db.js";
 
@@ -49,12 +53,33 @@ async function latestRun(db: Database, sourceId: string) {
 
 describe("registry sync worker", () => {
   let db: Database;
+  let databaseUrl: string;
   let destroy: (() => Promise<void>) | undefined;
 
   beforeEach(async () => {
     const temp = await createTempDatabase();
     db = temp.db;
+    databaseUrl = temp.databaseUrl;
     destroy = temp.destroy;
+  });
+
+  it("creates one pending initial Registry sync job", async () => {
+    const boss = new PgBoss({ connectionString: databaseUrl });
+    await boss.start();
+    try {
+      const first = await initializeWorkerQueues(boss);
+      const duplicate = await initializeWorkerQueues(boss);
+      const job = await boss.getJobById<RegistrySyncJobData>(
+        REGISTRY_SYNC_QUEUE,
+        first.initialRegistrySyncJobId!,
+      );
+
+      expect(first.initialRegistrySyncJobId).toEqual(expect.any(String));
+      expect(duplicate.initialRegistrySyncJobId).toBeNull();
+      expect(job?.data).toEqual({ sourceKey: "official" });
+    } finally {
+      await boss.stop({ graceful: true });
+    }
   });
 
   afterEach(async () => {
@@ -207,5 +232,51 @@ describe("registry sync worker", () => {
     expect(run.recordsSeen).toBe(0);
     expect(run.recordsFailed).toBe(0);
     expect(run.errorSummary).toContain("upstream unavailable");
+  });
+
+  it("queues GitHub enrichment candidates after Registry persistence", async () => {
+    const queuedServerIds: string[] = [];
+
+    await runRegistrySync({
+      db,
+      sourceKey: "official",
+      baseUrl: "https://registry.modelcontextprotocol.io",
+      pages: fromPages(makePage()),
+      async enqueueGitHubEnrichment(serverId) {
+        queuedServerIds.push(serverId);
+      },
+    });
+
+    const [githubServer] = await db
+      .select({ id: servers.id })
+      .from(servers)
+      .where(eq(servers.canonicalRegistryName, "io.github.example/test-server"));
+    expect(queuedServerIds).toEqual([githubServer!.id]);
+  });
+
+  it("retains persisted record counts when post-commit enrichment enqueueing fails", async () => {
+    let terminalError: RegistrySyncTerminalError | undefined;
+    try {
+      await runRegistrySync({
+        db,
+        sourceKey: "official",
+        baseUrl: "https://registry.modelcontextprotocol.io",
+        pages: fromPages(makePage()),
+        async enqueueGitHubEnrichment() {
+          throw new Error("queue unavailable");
+        },
+      });
+    } catch (error) {
+      if (error instanceof RegistrySyncTerminalError) terminalError = error;
+    }
+
+    expect(terminalError?.summary).toMatchObject({
+      status: "partially_failed",
+      recordsSeen: 2,
+      recordsFailed: 0,
+      cursorEnd: null,
+    });
+    expect(terminalError?.summary.recordsCreated).toBeGreaterThan(0);
+    expect(terminalError?.summary.errorSummary).toContain("queue unavailable");
   });
 });

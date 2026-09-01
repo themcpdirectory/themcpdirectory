@@ -7,6 +7,7 @@ import {
   jsonb,
   timestamp,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { servers } from "./servers.js";
 
@@ -38,5 +39,6 @@ export const repositorySnapshots = pgTable(
   (t) => [
     index("repository_snapshots_server_id_idx").on(t.serverId),
     index("repository_snapshots_external_repo_id_idx").on(t.externalRepositoryId),
+    uniqueIndex("repository_snapshots_check_uidx").on(t.serverId, t.provider, t.checkedAt),
   ],
 );

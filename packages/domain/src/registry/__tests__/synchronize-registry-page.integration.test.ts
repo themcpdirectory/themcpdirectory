@@ -16,9 +16,7 @@ import {
   VALID_REGISTRY_PAGE,
   type RegistryPage,
 } from "@themcpdirectory/registry-client";
-import {
-  synchronizeRegistryPage,
-} from "../synchronize-registry-page.js";
+import { synchronizeRegistryPage } from "../synchronize-registry-page.js";
 import { createTempDatabase } from "./postgres-test-db.js";
 
 interface TableCounts {
@@ -130,6 +128,154 @@ describe("synchronizeRegistryPage integration", () => {
     const secondCounts = await countRows(db);
 
     expect(secondCounts).toEqual(firstCounts);
+  });
+
+  it("preserves a verified repository identity during later URL-only Registry syncs", async () => {
+    const source = await createSource(db);
+    const page = makeSingleServerPage(0, (entry) => {
+      if (!entry.server.repository) throw new Error("Expected repository fixture");
+      delete entry.server.repository.id;
+    });
+
+    await synchronizeRegistryPage(db, source, page, {
+      observedAt: new Date("2026-09-01T10:00:00.000Z"),
+    });
+    const [created] = await db
+      .select()
+      .from(servers)
+      .where(eq(servers.canonicalRegistryName, page.servers[0]!.server.name));
+    await db
+      .update(servers)
+      .set({
+        repositoryUrl: "https://github.com/new-owner/renamed-server",
+        repositorySource: "github",
+        repositoryExternalId: "12345678",
+      })
+      .where(eq(servers.id, created!.id));
+
+    await synchronizeRegistryPage(db, source, page, {
+      observedAt: new Date("2026-09-01T10:05:00.000Z"),
+    });
+
+    const [updated] = await db.select().from(servers).where(eq(servers.id, created!.id));
+    expect(updated).toMatchObject({
+      repositoryUrl: "https://github.com/new-owner/renamed-server",
+      repositorySource: "github",
+      repositoryExternalId: "12345678",
+    });
+  });
+
+  it("keeps conflicting repository attribution off the upstream-mapped server", async () => {
+    const source = await createSource(db);
+    const observedAt = new Date("2026-09-01T10:00:00.000Z");
+    await db.insert(servers).values({
+      slug: "repository-identity-owner",
+      title: "Repository identity owner",
+      shortDescription: "Existing owner",
+      listingStatus: "active",
+      moderationStatus: "normal",
+      repositoryUrl: "https://github.com/existing/owner",
+      repositorySource: "github",
+      repositoryExternalId: "abc123",
+      firstSeenAt: observedAt,
+      lastSeenAt: observedAt,
+    });
+    const [upstreamServer] = await db
+      .insert(servers)
+      .values({
+        slug: "repository-identity-upstream",
+        title: "Repository identity upstream",
+        shortDescription: "Existing upstream mapping",
+        canonicalRegistryName: "io.github.example/test-server",
+        repositoryUrl: "https://github.com/legacy/upstream-attribution",
+        repositorySource: "github",
+        listingStatus: "active",
+        moderationStatus: "normal",
+        firstSeenAt: observedAt,
+        lastSeenAt: observedAt,
+      })
+      .returning({ id: servers.id });
+
+    const result = await synchronizeRegistryPage(db, source, makeSingleServerPage(0), {
+      observedAt,
+    });
+    const [persisted] = await db.select().from(servers).where(eq(servers.id, upstreamServer!.id));
+
+    expect(result).toMatchObject({
+      recordsFailed: 0,
+      githubEnrichmentServerIds: [],
+      recordFailures: [],
+    });
+    expect(persisted).toMatchObject({
+      repositoryUrl: "https://github.com/legacy/upstream-attribution",
+      repositorySource: "github",
+      repositoryExternalId: null,
+    });
+  });
+
+  it("serializes URL-only Registry syncs with concurrent identity enrichment", async () => {
+    const source = await createSource(db);
+    const page = makeSingleServerPage(0, (entry) => {
+      if (!entry.server.repository) throw new Error("Expected repository fixture");
+      delete entry.server.repository.id;
+    });
+    await synchronizeRegistryPage(db, source, page, {
+      observedAt: new Date("2026-09-01T10:00:00.000Z"),
+    });
+    const [created] = await db
+      .select()
+      .from(servers)
+      .where(eq(servers.canonicalRegistryName, page.servers[0]!.server.name));
+    let releaseIdentityUpdate: (() => void) | undefined;
+    let markRowLocked: (() => void) | undefined;
+    const rowLocked = new Promise<void>((resolve) => {
+      markRowLocked = resolve;
+    });
+    const waitForSync = new Promise<void>((resolve) => {
+      releaseIdentityUpdate = resolve;
+    });
+    const identityUpdate = db.transaction(async (tx) => {
+      await tx.select().from(servers).where(eq(servers.id, created!.id)).for("update");
+      markRowLocked?.();
+      await waitForSync;
+      await tx
+        .update(servers)
+        .set({
+          repositoryUrl: "https://github.com/new-owner/renamed-server",
+          repositorySource: "github",
+          repositoryExternalId: "12345678",
+        })
+        .where(eq(servers.id, created!.id));
+    });
+
+    await rowLocked;
+    const sync = synchronizeRegistryPage(db, source, page, {
+      observedAt: new Date("2026-09-01T10:05:00.000Z"),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    releaseIdentityUpdate?.();
+    await Promise.all([identityUpdate, sync]);
+
+    const [updated] = await db.select().from(servers).where(eq(servers.id, created!.id));
+    expect(updated).toMatchObject({
+      repositoryUrl: "https://github.com/new-owner/renamed-server",
+      repositorySource: "github",
+      repositoryExternalId: "12345678",
+    });
+  });
+
+  it("reports successful GitHub repositories as enrichment candidates", async () => {
+    const source = await createSource(db);
+
+    const result = await synchronizeRegistryPage(db, source, makePage(), {
+      observedAt: new Date("2026-09-01T10:00:00.000Z"),
+    });
+    const [githubServer] = await db
+      .select({ id: servers.id })
+      .from(servers)
+      .where(eq(servers.canonicalRegistryName, "io.github.example/test-server"));
+
+    expect(result.githubEnrichmentServerIds).toEqual([githubServer!.id]);
   });
 
   it("creates a new immutable snapshot when payload changes for same source/name/version", async () => {
@@ -315,7 +461,9 @@ describe("synchronizeRegistryPage integration", () => {
     const [packageVersion] = await db
       .select()
       .from(serverVersions)
-      .where(and(eq(serverVersions.serverId, serverByPackage!.id), eq(serverVersions.version, "9.9.9")));
+      .where(
+        and(eq(serverVersions.serverId, serverByPackage!.id), eq(serverVersions.version, "9.9.9")),
+      );
 
     await db.insert(serverPackages).values({
       serverVersionId: packageVersion!.id,
@@ -349,19 +497,25 @@ describe("synchronizeRegistryPage integration", () => {
     const upstreamVersion = await db
       .select()
       .from(serverVersions)
-      .where(and(eq(serverVersions.serverId, serverByUpstream!.id), eq(serverVersions.version, "1.2.0")));
+      .where(
+        and(eq(serverVersions.serverId, serverByUpstream!.id), eq(serverVersions.version, "1.2.0")),
+      );
     expect(upstreamVersion).toHaveLength(1);
 
     const aliasVersion = await db
       .select()
       .from(serverVersions)
-      .where(and(eq(serverVersions.serverId, serverByAlias!.id), eq(serverVersions.version, "0.1.0")));
+      .where(
+        and(eq(serverVersions.serverId, serverByAlias!.id), eq(serverVersions.version, "0.1.0")),
+      );
     expect(aliasVersion).toHaveLength(1);
 
     const repoVersion = await db
       .select()
       .from(serverVersions)
-      .where(and(eq(serverVersions.serverId, serverByRepo!.id), eq(serverVersions.version, "1.2.0")));
+      .where(
+        and(eq(serverVersions.serverId, serverByRepo!.id), eq(serverVersions.version, "1.2.0")),
+      );
     expect(repoVersion).toHaveLength(0);
   });
 
@@ -475,7 +629,12 @@ describe("synchronizeRegistryPage integration", () => {
     const activeCurrentVersion = await db
       .select()
       .from(serverVersions)
-      .where(and(eq(serverVersions.id, server!.currentVersionId!), eq(serverVersions.upstreamStatus, "active")));
+      .where(
+        and(
+          eq(serverVersions.id, server!.currentVersionId!),
+          eq(serverVersions.upstreamStatus, "active"),
+        ),
+      );
     expect(activeCurrentVersion).toHaveLength(0);
 
     const nullCurrentOnDeleted = await db

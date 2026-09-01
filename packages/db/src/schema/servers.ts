@@ -5,6 +5,7 @@ import {
   boolean,
   timestamp,
   index,
+  uniqueIndex,
   check,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
@@ -62,6 +63,9 @@ export const servers = pgTable(
     index("servers_search_document_idx").using("gin", t.searchDocument),
     index("servers_title_trgm_idx").using("gin", sql`${t.title} gin_trgm_ops`),
     index("servers_slug_trgm_idx").using("gin", sql`${t.slug} gin_trgm_ops`),
+    uniqueIndex("servers_repository_identity_uidx")
+      .on(t.repositorySource, t.repositoryExternalId)
+      .where(sql`${t.repositorySource} is not null and ${t.repositoryExternalId} is not null`),
     check(
       "servers_listing_status_check",
       sql`${t.listingStatus} in ('active', 'deprecated', 'deleted_upstream', 'unavailable')`,
