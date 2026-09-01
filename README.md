@@ -1,4 +1,4 @@
-# The MCP Directory
+![The MCP Directory Logo](assets/wordmark-with-bg-1000x216.svg)
 
 The MCP Directory is an open directory for discovering Model Context Protocol (MCP) servers. This repository currently implements the Phase A-C foundation: Registry ingestion, deterministic normalization, PostgreSQL search, GitHub repository enrichment, fixture data, and a server-rendered public directory.
 
