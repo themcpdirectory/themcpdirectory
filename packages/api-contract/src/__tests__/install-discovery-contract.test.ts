@@ -127,7 +127,7 @@ describe("installManifestResponseSchema", () => {
       installManifestResponseExample,
     );
 
-    for (const unsafeField of ["command", "script", "expression"] as const) {
+    for (const unsafeField of ["command", "script", "expression", "hook", "postinstall"] as const) {
       expect(() =>
         installManifestResponseSchema.parse({
           ...installManifestResponseExample,
@@ -144,6 +144,79 @@ describe("installManifestResponseSchema", () => {
       ).toThrow(/unrecognized key/i);
     }
   });
+
+  it("rejects unsupported package registry metadata and command-like runtime hints", () => {
+    const sourcePackageVariant = installManifestResponseExample.data.variants[0];
+    if (!sourcePackageVariant || sourcePackageVariant.kind !== "package") {
+      throw new Error("Expected a package variant in the install manifest example");
+    }
+
+    expect(() =>
+      installManifestResponseSchema.parse({
+        ...installManifestResponseExample,
+        data: {
+          ...installManifestResponseExample.data,
+          variants: [{ ...sourcePackageVariant, registryType: "rubygems" }],
+        },
+      }),
+    ).toThrow();
+
+    expect(() =>
+      installManifestResponseSchema.parse({
+        ...installManifestResponseExample,
+        data: {
+          ...installManifestResponseExample.data,
+          variants: [{ ...sourcePackageVariant, version: "latest" }],
+        },
+      }),
+    ).toThrow();
+
+    expect(() =>
+      installManifestResponseSchema.parse({
+        ...installManifestResponseExample,
+        data: {
+          ...installManifestResponseExample.data,
+          variants: [{ ...sourcePackageVariant, version: "^1.2.3" }],
+        },
+      }),
+    ).toThrow();
+
+    expect(() =>
+      installManifestResponseSchema.parse({
+        ...installManifestResponseExample,
+        data: {
+          ...installManifestResponseExample.data,
+          variants: [{ ...sourcePackageVariant, runtimeHint: "npx --yes" }],
+        },
+      }),
+    ).toThrow();
+
+    expect(() =>
+      installManifestResponseSchema.parse({
+        ...installManifestResponseExample,
+        data: {
+          ...installManifestResponseExample.data,
+          variants: [{ ...sourcePackageVariant, transport: "streamable-http" }],
+        },
+      }),
+    ).toThrow();
+
+    expect(
+      installManifestResponseSchema.parse({
+        ...installManifestResponseExample,
+        data: {
+          ...installManifestResponseExample.data,
+          variants: [{ ...sourcePackageVariant, runtimeHint: null }],
+        },
+      }),
+    ).toEqual({
+      ...installManifestResponseExample,
+      data: {
+        ...installManifestResponseExample.data,
+        variants: [{ ...sourcePackageVariant, runtimeHint: null }],
+      },
+    });
+  });
 });
 
 describe("parseInstallManifestResponse", () => {
@@ -155,6 +228,53 @@ describe("parseInstallManifestResponse", () => {
       }),
     ).toThrow(UnsupportedManifestVersionError);
   });
+
+  it.each([
+    ["runtimeArguments", "name", 123],
+    ["runtimeArguments", "valueHint", 123],
+    ["runtimeArguments", "description", true],
+    ["runtimeArguments", "required", "yes"],
+    ["packageArguments", "name", 123],
+    ["packageArguments", "valueHint", 123],
+    ["packageArguments", "description", true],
+    ["packageArguments", "required", "yes"],
+  ] as const)(
+    "rejects malformed known %s.%s fields while remaining additive for unknown keys",
+    (argumentCollection, field, invalidValue) => {
+      const sourcePackageVariant = installManifestResponseExample.data.variants[0];
+      if (!sourcePackageVariant || sourcePackageVariant.kind !== "package") {
+        throw new Error("Expected a package variant in the install manifest example");
+      }
+
+      const sourceArguments = sourcePackageVariant[argumentCollection] ?? [];
+      const sourceArgument = sourceArguments[0];
+      if (!sourceArgument) {
+        throw new Error(`Expected ${argumentCollection} in the install manifest example`);
+      }
+
+      expect(() =>
+        parseInstallManifestResponse({
+          ...installManifestResponseExample,
+          data: {
+            ...installManifestResponseExample.data,
+            variants: [
+              {
+                ...sourcePackageVariant,
+                [argumentCollection]: [
+                  {
+                    ...sourceArgument,
+                    [field]: invalidValue,
+                    futureArgumentField: "preserved",
+                  },
+                ],
+              },
+              installManifestResponseExample.data.variants[1],
+            ],
+          },
+        }),
+      ).toThrow();
+    },
+  );
 
   it("keeps additive client fields while validating known install fields", () => {
     const sourcePackageVariant = installManifestResponseExample.data.variants[0];

@@ -9,6 +9,17 @@ import {
 } from "./shared.js";
 import { compatibilityStatusSchema, supportedClientIdSchema } from "./servers.js";
 
+const EXACT_IMMUTABLE_PACKAGE_VERSION_PATTERN =
+  /^(?!latest$)(?!.*[\s~^*<>])[0-9A-Za-z][0-9A-Za-z.+-]*$/i;
+
+export const installManifestPackageRegistryTypeSchema = z.enum(["npm", "pypi"]);
+export const installManifestPackageVersionSchema = z
+  .string()
+  .regex(EXACT_IMMUTABLE_PACKAGE_VERSION_PATTERN);
+export const installManifestPackageRuntimeHintSchema = z.enum(["npx"]);
+export const installManifestPackageTransportSchema = z.literal("stdio");
+export const installManifestRemoteTransportSchema = z.enum(["streamable-http", "sse"]);
+
 const argumentSchema = strictObject({
   type: z.enum(["positional", "named"]),
   valueHint: z.string().min(1).nullable().optional(),
@@ -59,11 +70,11 @@ const installManifestServerSchema = strictObject({
       strictObject({
         id: uuidSchema,
         kind: z.literal("package"),
-        registryType: z.string().min(1),
+        registryType: installManifestPackageRegistryTypeSchema,
         identifier: z.string().min(1),
-        version: z.string().min(1),
-        runtimeHint: z.string().min(1),
-        transport: z.string().min(1),
+        version: installManifestPackageVersionSchema,
+        runtimeHint: installManifestPackageRuntimeHintSchema.nullable(),
+        transport: installManifestPackageTransportSchema,
         runtimeArguments: z.array(argumentSchema),
         packageArguments: z.array(argumentSchema),
         environmentVariables: z.array(environmentVariableSchema),
@@ -75,7 +86,7 @@ const installManifestServerSchema = strictObject({
       strictObject({
         id: uuidSchema,
         kind: z.literal("remote"),
-        transport: z.string().min(1),
+        transport: installManifestRemoteTransportSchema,
         urlTemplate: httpUrlSchema,
         headers: z.array(headerSchema),
         variables: z.array(remoteVariableSchema),

@@ -6,6 +6,13 @@ import {
 import type {
   InstallManifestResponse,
 } from "./install.js";
+import {
+  installManifestPackageRegistryTypeSchema,
+  installManifestPackageRuntimeHintSchema,
+  installManifestPackageTransportSchema,
+  installManifestPackageVersionSchema,
+  installManifestRemoteTransportSchema,
+} from "./install.js";
 import type {
   ResolvedServerResponse,
   ServerCollectionResponse,
@@ -174,16 +181,24 @@ const resolveServerIdentifierClientResponseSchema = clientObject({
   meta: clientObject({ requestId: requestIdSchema }),
 });
 
+const installManifestArgumentClientSchema = clientObject({
+  type: z.enum(["positional", "named"]),
+  name: z.string().min(1).nullable().optional(),
+  valueHint: z.string().min(1).nullable().optional(),
+  description: z.string().min(1).nullable().optional(),
+  required: z.boolean().optional(),
+});
+
 const packageVariantClientSchema = clientObject({
   id: uuidSchema,
   kind: z.literal("package"),
-  registryType: z.string().min(1),
+  registryType: installManifestPackageRegistryTypeSchema,
   identifier: z.string().min(1),
-  version: z.string().min(1),
-  runtimeHint: z.string().min(1),
-  transport: z.string().min(1),
-  runtimeArguments: z.array(clientObject({ type: z.enum(["positional", "named"]) })),
-  packageArguments: z.array(clientObject({ type: z.enum(["positional", "named"]) })),
+  version: installManifestPackageVersionSchema,
+  runtimeHint: installManifestPackageRuntimeHintSchema.nullable(),
+  transport: installManifestPackageTransportSchema,
+  runtimeArguments: z.array(installManifestArgumentClientSchema),
+  packageArguments: z.array(installManifestArgumentClientSchema),
   environmentVariables: z.array(
     clientObject({
       name: z.string().regex(/^[A-Z][A-Z0-9_]*$/),
@@ -202,7 +217,7 @@ const packageVariantClientSchema = clientObject({
 const remoteVariantClientSchema = clientObject({
   id: uuidSchema,
   kind: z.literal("remote"),
-  transport: z.string().min(1),
+  transport: installManifestRemoteTransportSchema,
   urlTemplate: httpUrlSchema,
   headers: z.array(clientObject({ name: z.string().min(1), value: z.string().min(1) })),
   variables: z.array(
