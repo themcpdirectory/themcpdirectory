@@ -14,4 +14,36 @@ export {
 	errorResponseSchema,
 	type ApiErrorCode,
 } from "./public-api/errors.js";
-export { UnsupportedManifestVersionError } from "./public-api/client-parsers.js";
+export {
+	compatibilityStatusSchema,
+	listingStatusSchema,
+	resolveServerIdentifierResponseSchema,
+	searchCollectionQuerySchema,
+	serverCategorySchema,
+	serverCollectionQuerySchema,
+	serverCollectionResponseSchema,
+	serverDetailResponseSchema,
+	serverSortSchema,
+	serverSummaryServerSchema,
+	supportedClientIdSchema,
+	type PublicPublisherSummary,
+	type PublicRepositorySummary,
+	type PublicServerCategory,
+	type PublicServerDetail,
+	type PublicServerSignals,
+	type PublicServerSort,
+	type PublicServerSummary,
+	type PublicServerTimestamps,
+	type PublicTrustProfile,
+	type ResolvedServerIdentifier,
+	type ResolvedServerResponse,
+	type ServerCollectionResponse,
+	type ServerDetailResponse,
+	type SupportedClientId,
+} from "./public-api/servers.js";
+export {
+	parseResolvedServerResponse,
+	parseServerCollectionResponse,
+	parseServerDetailResponse,
+	UnsupportedManifestVersionError,
+} from "./public-api/client-parsers.js";

@@ -1,0 +1,70 @@
+import { describe, expect, it } from "vitest";
+import {
+  parseResolvedServerResponse,
+  parseServerCollectionResponse,
+  serverCollectionQuerySchema,
+} from "../index.js";
+
+describe("serverCollectionQuerySchema", () => {
+  it("rejects relevance without q and clamps limit semantics to the contract", () => {
+    expect(() =>
+      serverCollectionQuerySchema.parse({ sort: "relevance", limit: "30" }),
+    ).toThrow(/q is required when sort is relevance/i);
+    expect(() => serverCollectionQuerySchema.parse({ limit: "101" })).toThrow(/100/);
+  });
+});
+
+describe("parseServerCollectionResponse", () => {
+  it("keeps unknown additive fields in client mode while validating known fields", () => {
+    const parsed = parseServerCollectionResponse({
+      data: [
+        {
+          id: "4d5d0cfe-7c48-4df8-9c18-3f5af777d2bb",
+          slug: "github",
+          title: "GitHub",
+          description: "Access GitHub repositories.",
+          publisher: {
+            slug: "github",
+            name: "GitHub",
+            verified: true,
+            futurePublisherField: 1,
+          },
+          version: "1.2.3",
+          repository: { url: "https://github.com/modelcontextprotocol/servers" },
+          listingStatus: "active",
+          signals: {
+            officialRegistry: true,
+            publisherVerified: true,
+            sourceAvailable: true,
+            openSource: true,
+          },
+          futureField: "preserved",
+        },
+      ],
+      meta: { requestId: "req_phase_d_010", nextCursor: null },
+    });
+
+    expect((parsed.data[0] as Record<string, unknown>).futureField).toBe("preserved");
+  });
+});
+
+describe("parseResolvedServerResponse", () => {
+  it("preserves canonical-vs-alias metadata for callers", () => {
+    const parsed = parseResolvedServerResponse({
+      data: {
+        id: "4d5d0cfe-7c48-4df8-9c18-3f5af777d2bb",
+        slug: "github",
+        title: "GitHub",
+        version: "1.2.3",
+        canonicalUrl: "https://themcpdirectory.org/github",
+        matchedBy: "alias",
+        matchedValue: "github-server",
+        needsRedirect: true,
+      },
+      meta: { requestId: "req_phase_d_011" },
+    });
+
+    expect(parsed.data.matchedBy).toBe("alias");
+    expect(parsed.data.needsRedirect).toBe(true);
+  });
+});
