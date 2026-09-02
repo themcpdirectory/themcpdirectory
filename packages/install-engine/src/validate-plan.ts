@@ -170,6 +170,10 @@ function hasMixedPathSeparators(value: string): boolean {
   return value.includes("/") && value.includes("\\");
 }
 
+function hasPathSeparator(value: string): boolean {
+  return value.includes("/") || value.includes("\\");
+}
+
 function isUncPath(value: string): boolean {
   return value.startsWith("\\\\") || value.startsWith("//");
 }
@@ -309,24 +313,42 @@ function isAbsoluteExecutablePath(value: string): boolean {
   }
 }
 
+function assertExecutableShape(
+  command: string,
+  code: "INVALID_DESCRIPTOR" | "INVALID_EXECUTABLE",
+  field: "executableAllowList" | "executable",
+  metacharactersMessage: string,
+  inlineArgumentsMessage: string,
+  relativePathMessage: string,
+): void {
+  if (INVALID_EXECUTABLE_PATTERN.test(command)) {
+    fail(code, metacharactersMessage, field);
+  }
+
+  if (hasPathSeparator(command)) {
+    if (!isAbsoluteExecutablePath(command)) {
+      fail(code, relativePathMessage, field);
+    }
+
+    return;
+  }
+
+  if (/\s/u.test(command)) {
+    fail(code, inlineArgumentsMessage, field);
+  }
+}
+
 function validateDescriptorExecutable(executable: unknown): string {
   const command = assertNonEmptySafeString(executable, "INVALID_DESCRIPTOR", "executableAllowList");
 
-  if (INVALID_EXECUTABLE_PATTERN.test(command)) {
-    fail(
-      "INVALID_DESCRIPTOR",
-      "Descriptor executableAllowList entries must not include shell metacharacters",
-      "executableAllowList",
-    );
-  }
-
-  if (/\s/u.test(command) && !isAbsoluteExecutablePath(command)) {
-    fail(
-      "INVALID_DESCRIPTOR",
-      "Descriptor executableAllowList entries must not include inline arguments",
-      "executableAllowList",
-    );
-  }
+  assertExecutableShape(
+    command,
+    "INVALID_DESCRIPTOR",
+    "executableAllowList",
+    "Descriptor executableAllowList entries must not include shell metacharacters",
+    "Descriptor executableAllowList entries must not include inline arguments",
+    "Descriptor executableAllowList entries must be bare executable names or absolute paths",
+  );
 
   return command;
 }
@@ -427,11 +449,35 @@ function normalizeDescriptor(descriptor: AdapterSafetyDescriptor): NormalizedDes
     supportedCapabilities.add(capability as AdapterCapability);
   }
 
+  const deeplink = normalizeCursorDeeplinkDescriptor(
+    descriptor.deeplink,
+    client,
+    supportedCapabilities,
+  );
+
+  if (supportedCapabilities.has("cursor-deeplink")) {
+    if (client !== "cursor") {
+      fail(
+        "INVALID_DESCRIPTOR",
+        "The cursor-deeplink capability requires the cursor client",
+        "supportedCapabilities",
+      );
+    }
+
+    if (deeplink?.kind !== "cursor-install") {
+      fail(
+        "INVALID_DESCRIPTOR",
+        'The cursor-deeplink capability requires deeplink { kind: "cursor-install" }',
+        "deeplink",
+      );
+    }
+  }
+
   return {
     client,
     executableAllowList,
     configRoots,
-    deeplink: normalizeCursorDeeplinkDescriptor(descriptor.deeplink, client, supportedCapabilities),
+    deeplink,
     supportedCapabilities,
   };
 }
@@ -465,21 +511,14 @@ function validatePathWithinRoots(rawPath: unknown, roots: readonly NormalizedRoo
 function validateExecutable(executable: unknown, descriptor: NormalizedDescriptor): string {
   const command = assertNonEmptySafeString(executable, "INVALID_EXECUTABLE", "executable");
 
-  if (INVALID_EXECUTABLE_PATTERN.test(command)) {
-    fail(
-      "INVALID_EXECUTABLE",
-      `Executable ${command} must not include shell metacharacters`,
-      "executable",
-    );
-  }
-
-  if (/\s/u.test(command) && !isAbsoluteExecutablePath(command)) {
-    fail(
-      "INVALID_EXECUTABLE",
-      `Executable ${command} must not include inline arguments`,
-      "executable",
-    );
-  }
+  assertExecutableShape(
+    command,
+    "INVALID_EXECUTABLE",
+    "executable",
+    `Executable ${command} must not include shell metacharacters`,
+    `Executable ${command} must not include inline arguments`,
+    `Executable ${command} must be a bare executable name or absolute path`,
+  );
 
   if (!descriptor.executableAllowList.has(command)) {
     fail(

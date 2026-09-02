@@ -195,7 +195,6 @@ function makeDescriptor(
       "native-add-remote",
       "env-reference",
       "persisted-secret",
-      "cursor-deeplink",
     ],
     ...overrides,
   };
@@ -745,9 +744,11 @@ describe("install plan hashing and validation", () => {
     );
   });
 
-  it("rejects unsafe descriptor executables but allows absolute executable paths containing spaces", () => {
+  it("rejects unsafe descriptor executables and allows bare names plus absolute executable paths containing spaces", () => {
     const validateInstallPlan = getValidateInstallPlan();
+    const bareCursorExecutable = "cursor.exe";
     const macCursorExecutable = "/Applications/Cursor App/Cursor.app/Contents/MacOS/Cursor";
+    const windowsCursorExecutable = "C:\\Program Files\\Cursor\\Cursor.exe";
 
     expectPlanValidationError(
       () =>
@@ -765,6 +766,76 @@ describe("install plan hashing and validation", () => {
         ),
       { name: "PlanValidationError", code: "INVALID_DESCRIPTOR" },
     );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan(),
+          makeDescriptor({ executableAllowList: ["./codex"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_DESCRIPTOR" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan(),
+          makeDescriptor({ executableAllowList: ["../bin/claude"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_DESCRIPTOR" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan(),
+          makeDescriptor({ executableAllowList: ["subdir/cursor.exe"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_DESCRIPTOR" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan(),
+          makeDescriptor({ executableAllowList: [".\\codex.exe"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_DESCRIPTOR" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan(),
+          makeDescriptor({ executableAllowList: ["..\\bin\\claude.exe"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_DESCRIPTOR" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan(),
+          makeDescriptor({ executableAllowList: ["subdir\\cursor.exe"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_DESCRIPTOR" },
+    );
+
+    const descriptor = makeDescriptor({
+      client: "cursor",
+      executableAllowList: [bareCursorExecutable, macCursorExecutable, windowsCursorExecutable],
+      configRoots: ["/Users/test/.cursor"],
+      supportedCapabilities: ["native-add-stdio"],
+    });
+
+    const bareValidated = validateInstallPlan(
+      makeInstallPlan({
+        client: "cursor",
+        operations: [
+          makeClientCommandOperation({
+            executable: bareCursorExecutable,
+            capability: "native-add-stdio",
+          }),
+        ],
+      }),
+      descriptor,
+    ) as { readonly operations: readonly [{ readonly executable: string }] };
+
+    expect(bareValidated.operations[0]!.executable).toBe(bareCursorExecutable);
 
     const validated = validateInstallPlan(
       makeInstallPlan({
@@ -776,15 +847,61 @@ describe("install plan hashing and validation", () => {
           }),
         ],
       }),
-      makeDescriptor({
-        client: "cursor",
-        executableAllowList: [macCursorExecutable],
-        configRoots: ["/Users/test/.cursor"],
-        supportedCapabilities: ["native-add-stdio"],
-      }),
+      descriptor,
     ) as { readonly operations: readonly [{ readonly executable: string }] };
 
     expect(validated.operations[0]!.executable).toBe(macCursorExecutable);
+
+    const windowsValidated = validateInstallPlan(
+      makeInstallPlan({
+        client: "cursor",
+        operations: [
+          makeClientCommandOperation({
+            executable: windowsCursorExecutable,
+            capability: "native-add-stdio",
+          }),
+        ],
+      }),
+      descriptor,
+    ) as { readonly operations: readonly [{ readonly executable: string }] };
+
+    expect(windowsValidated.operations[0]!.executable).toBe(windowsCursorExecutable);
+  });
+
+  it("rejects operation executables that use relative subpaths in posix and windows styles", () => {
+    const validateInstallPlan = getValidateInstallPlan();
+    const cursorDescriptor = makeDescriptor({
+      client: "cursor",
+      executableAllowList: ["cursor.exe"],
+      configRoots: ["/Users/test/.cursor"],
+      supportedCapabilities: ["native-add-stdio"],
+    });
+
+    for (const executable of [
+      "./codex",
+      "../bin/claude",
+      "subdir/cursor.exe",
+      ".\\codex.exe",
+      "..\\bin\\claude.exe",
+      "subdir\\cursor.exe",
+    ]) {
+      expectPlanValidationError(
+        () =>
+          validateInstallPlan(
+            makeInstallPlan({
+              client: "cursor",
+              operations: [
+                makeClientCommandOperation({
+                  executable,
+                  capability: "native-add-stdio",
+                }),
+              ],
+            }),
+            cursorDescriptor,
+          ),
+        { name: "PlanValidationError", code: "INVALID_EXECUTABLE" },
+      );
+    }
   });
 
   it("rejects config mutations outside approved roots on posix and windows semantics", () => {
@@ -1101,6 +1218,46 @@ describe("install plan hashing and validation", () => {
             executableAllowList: ["codex"],
             configRoots: ["/Users/test/.codex"],
             supportedCapabilities: ["cursor-deeplink"],
+            deeplink: { kind: "cursor-install" },
+          }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_DESCRIPTOR" },
+    );
+  });
+
+  it("requires cursor deeplink capability and descriptor to stay paired on cursor descriptors", () => {
+    const validateInstallPlan = getValidateInstallPlan();
+
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan(),
+          makeDescriptor({ supportedCapabilities: ["native-add-stdio", "cursor-deeplink"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_DESCRIPTOR" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan({ client: "cursor" }),
+          makeDescriptor({
+            client: "cursor",
+            executableAllowList: ["cursor.exe"],
+            configRoots: ["/Users/test/.cursor"],
+            supportedCapabilities: ["native-add-stdio", "cursor-deeplink"],
+          }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_DESCRIPTOR" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan({ client: "cursor" }),
+          makeDescriptor({
+            client: "cursor",
+            executableAllowList: ["cursor.exe"],
+            configRoots: ["/Users/test/.cursor"],
+            supportedCapabilities: ["native-add-stdio"],
             deeplink: { kind: "cursor-install" },
           }),
         ),
