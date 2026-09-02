@@ -10,11 +10,24 @@ export {
   ResolveIntentError,
   type ResolveIntentErrorReason,
 } from "./intent.js";
+export { hashInstallManifest, hashResolvedInstallIntent, serializeInstallPlan } from "./hash.js";
 export { assertExactPinnedVersion, parseSemVer, type ParsedSemVer } from "./semver.js";
 export { selectInstallVariant } from "./select-variant.js";
 export {
+  PlanValidationError,
+  validateInstallPlan,
+  type PlanValidationErrorCode,
+  type PlanValidationErrorReason,
+} from "./validate-plan.js";
+export {
+  type AdapterCapability,
+  type AdapterSafetyDescriptor,
   type ClientId,
+  type ClientCommandOperation,
   type ClientScope,
+  type ConfigRemoveOperation,
+  type ConfigWriteOperation,
+  type DeeplinkOperation,
   type EnvironmentVariableInputDefinition,
   type InstallInputDefinition,
   type InstallInputKind,
@@ -22,12 +35,19 @@ export {
   type InstallManifestPackageVariantV1,
   type InstallManifestRemoteVariantV1,
   type InstallManifestVariantV1,
+  type InstallOperation,
+  type InstallPlan,
+  type InstallPlanBase,
   type PackageArgumentInputDefinition,
   type PackageRuntimeArgumentInputDefinition,
+  type Plan,
+  type JsonPrimitive,
+  type JsonValue,
   type RemoteAuthBinding,
   type RemoteAuthResolution,
   type RemoteHeaderInputDefinition,
   type RemoteVariableInputDefinition,
+  type RemovalPlan,
   type ResolveIntentOptions,
   type ResolvedInstallIntent,
   type ValidatedInstallInputMap,

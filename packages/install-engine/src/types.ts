@@ -116,3 +116,79 @@ export interface ResolvedInstallIntent {
   readonly remoteAuth: RemoteAuthResolution;
   readonly requiredEnvReferences: readonly string[];
 }
+
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue =
+  JsonPrimitive | readonly JsonValue[] | { readonly [key: string]: JsonValue };
+
+export type AdapterCapability =
+  | "native-add-stdio"
+  | "native-add-remote"
+  | "native-remove"
+  | "native-list"
+  | "native-list-json"
+  | "native-scope-user"
+  | "native-scope-project"
+  | "native-scope-global"
+  | "env-reference"
+  | "persisted-secret"
+  | "cursor-deeplink";
+
+export interface ClientCommandOperation {
+  readonly type: "client-command";
+  readonly executable: string;
+  readonly args: readonly string[];
+  readonly capability: AdapterCapability;
+}
+
+export interface ConfigWriteOperation {
+  readonly type: "config-write";
+  readonly path: string;
+  readonly mutationKey: string;
+  readonly document: JsonValue;
+}
+
+export interface ConfigRemoveOperation {
+  readonly type: "config-remove";
+  readonly path: string;
+  readonly mutationKey: string;
+}
+
+export interface DeeplinkOperation {
+  readonly type: "deeplink";
+  readonly url: string;
+}
+
+export type InstallOperation =
+  ClientCommandOperation | ConfigWriteOperation | ConfigRemoveOperation | DeeplinkOperation;
+
+export interface InstallPlanBase {
+  readonly schemaVersion: 1;
+  readonly serverSlug: string;
+  readonly client: ClientId;
+  readonly scope: ClientScope;
+  readonly operations: readonly InstallOperation[];
+  readonly previewLines: readonly string[];
+}
+
+export interface InstallPlan extends InstallPlanBase {
+  readonly variantId: string;
+  readonly manifestHash: string;
+  readonly intentHash: string;
+}
+
+export interface RemovalPlan extends InstallPlanBase {
+  readonly variantId?: never;
+  readonly manifestHash?: never;
+  readonly intentHash?: never;
+}
+
+export type Plan = InstallPlan | RemovalPlan;
+
+export interface AdapterSafetyDescriptor {
+  readonly client: ClientId;
+  readonly executableAllowList: readonly string[];
+  readonly configRoots: readonly string[];
+  readonly deeplinkPrefixes: readonly string[];
+  readonly supportedCapabilities: readonly AdapterCapability[];
+}
