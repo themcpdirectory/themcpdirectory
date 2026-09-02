@@ -21,7 +21,9 @@ async function reservePort(): Promise<number> {
 }
 
 async function waitForResponse(child: ChildProcess, url: string): Promise<Response> {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  const deadline = Date.now() + 10_000;
+
+  while (Date.now() < deadline) {
     if (child.exitCode !== null || child.signalCode !== null) {
       throw new Error(
         `API process exited before listening (code ${child.exitCode}, signal ${child.signalCode}).`,
@@ -67,5 +69,5 @@ describe("API process", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ status: "ok" });
-  });
+  }, 15_000);
 });

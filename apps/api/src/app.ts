@@ -6,7 +6,10 @@ import { createErrorHandler } from "./http/errors.js";
 import { attachStructuredLogging } from "./http/logging.js";
 import { attachRateLimit } from "./http/rate-limit.js";
 import { attachRequestId } from "./http/request-id.js";
+import { registerCategoryRoutes } from "./routes/categories.js";
+import { registerClientRoutes } from "./routes/clients.js";
 import { registerInstallRoutes } from "./routes/install.js";
+import { registerPublisherRoutes } from "./routes/publishers.js";
 import { registerResolveRoutes } from "./routes/resolve.js";
 import { registerSearchRoutes } from "./routes/search.js";
 import { registerServerRoutes } from "./routes/servers.js";
@@ -77,6 +80,9 @@ export function createApiApp(deps: ApiDependencies): Hono<ApiEnv> {
   registerSearchRoutes(apiV1, deps);
   registerResolveRoutes(apiV1, deps);
   registerInstallRoutes(apiV1, deps);
+  registerCategoryRoutes(apiV1, deps);
+  registerPublisherRoutes(apiV1, deps);
+  registerClientRoutes(apiV1, deps);
 
   app.route("/api/v1", apiV1);
 

@@ -369,6 +369,8 @@ describe("createPublicApiOpenApiDocument", () => {
           {
             "parameters": [
               "path:slug",
+              "query:cursor",
+              "query:limit",
             ],
             "path": "/api/v1/categories/{slug}",
             "responseSchemaRef": "#/components/schemas/CategoryDetailResponse",
@@ -381,6 +383,8 @@ describe("createPublicApiOpenApiDocument", () => {
           {
             "parameters": [
               "path:id",
+              "query:cursor",
+              "query:limit",
             ],
             "path": "/api/v1/clients/{id}",
             "responseSchemaRef": "#/components/schemas/ClientDetailResponse",
@@ -388,6 +392,8 @@ describe("createPublicApiOpenApiDocument", () => {
           {
             "parameters": [
               "path:slug",
+              "query:cursor",
+              "query:limit",
             ],
             "path": "/api/v1/publishers/{slug}",
             "responseSchemaRef": "#/components/schemas/PublisherDetailResponse",

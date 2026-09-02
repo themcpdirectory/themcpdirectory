@@ -8,6 +8,15 @@ import {
 } from "./shared.js";
 import { serverSummaryServerSchema, supportedClientIdSchema } from "./servers.js";
 
+export const discoveryPageQuerySchema = z
+  .object({
+    cursor: z.string().min(1).max(2048).optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(30),
+  })
+  .strict();
+
+export const clientPathParamsSchema = z.object({ id: supportedClientIdSchema });
+
 const categorySummarySchema = strictObject({
   slug: slugSchema,
   name: z.string().min(1),

@@ -60,9 +60,11 @@ export {
 } from "./public-api/install.js";
 export {
   categoryDetailResponseSchema,
+  clientPathParamsSchema,
   categoriesCollectionResponseSchema,
   clientDetailResponseSchema,
   clientsCollectionResponseSchema,
+  discoveryPageQuerySchema,
   publisherDetailResponseSchema,
   type CategoriesCollectionResponse,
   type CategoryDetailResponse,

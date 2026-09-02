@@ -8,7 +8,9 @@ import {
   categoryDetailResponseSchema,
   categoriesCollectionResponseSchema,
   clientDetailResponseSchema,
+  clientPathParamsSchema,
   clientsCollectionResponseSchema,
+  discoveryPageQuerySchema,
   publisherDetailResponseSchema,
 } from "./discovery.js";
 import { installManifestQuerySchema, installManifestResponseSchema } from "./install.js";
@@ -18,7 +20,6 @@ import {
   serverCollectionQuerySchema,
   serverCollectionResponseSchema,
   serverDetailResponseSchema,
-  supportedClientIdSchema,
 } from "./servers.js";
 import { httpUrlSchema, identifierPathParamsSchema, slugPathParamsSchema } from "./shared.js";
 
@@ -33,8 +34,8 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   const slugPathParams = slugPathParamsSchema.extend({
     slug: slugPathParamsSchema.shape.slug.meta({ param: { in: "path", name: "slug" } }),
   });
-  const clientPathParams = z.object({
-    id: supportedClientIdSchema.meta({ param: { in: "path", name: "id" } }),
+  const clientPathParams = clientPathParamsSchema.extend({
+    id: clientPathParamsSchema.shape.id.meta({ param: { in: "path", name: "id" } }),
   });
   const identifierPathParams = identifierPathParamsSchema.extend({
     identifier: identifierPathParamsSchema.shape.identifier.meta({
@@ -84,7 +85,7 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   registry.registerPath({
     method: "get",
     path: "/api/v1/categories/{slug}",
-    request: { params: slugPathParams },
+    request: { params: slugPathParams, query: discoveryPageQuerySchema },
     responses: {
       200: {
         description: "Category detail",
@@ -107,7 +108,7 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   registry.registerPath({
     method: "get",
     path: "/api/v1/clients/{id}",
-    request: { params: clientPathParams },
+    request: { params: clientPathParams, query: discoveryPageQuerySchema },
     responses: {
       200: {
         description: "Client detail",
@@ -119,7 +120,7 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   registry.registerPath({
     method: "get",
     path: "/api/v1/publishers/{slug}",
-    request: { params: slugPathParams },
+    request: { params: slugPathParams, query: discoveryPageQuerySchema },
     responses: {
       200: {
         description: "Publisher detail",
