@@ -127,7 +127,16 @@ describe("installManifestResponseSchema", () => {
       installManifestResponseExample,
     );
 
-    for (const unsafeField of ["command", "script", "expression", "hook", "postinstall"] as const) {
+    for (const unsafeField of [
+      "callback",
+      "command",
+      "eval",
+      "expression",
+      "hook",
+      "postinstall",
+      "script",
+      "shell",
+    ] as const) {
       expect(() =>
         installManifestResponseSchema.parse({
           ...installManifestResponseExample,
@@ -217,6 +226,91 @@ describe("installManifestResponseSchema", () => {
       },
     });
   });
+
+  it.each(["latest", "next", "beta", "1.x", "1.2.x", "1.2.*", "^1.2.3", "~1.2.3", ">=1.2.3"])(
+    "rejects mutable package version selector %s",
+    (version) => {
+      const sourcePackageVariant = installManifestResponseExample.data.variants[0];
+      if (!sourcePackageVariant || sourcePackageVariant.kind !== "package") {
+        throw new Error("Expected a package variant in the install manifest example");
+      }
+
+      expect(() =>
+        installManifestResponseSchema.parse({
+          ...installManifestResponseExample,
+          data: {
+            ...installManifestResponseExample.data,
+            variants: [{ ...sourcePackageVariant, version }],
+          },
+        }),
+      ).toThrow();
+    },
+  );
+
+  it("validates exact package versions according to their registry", () => {
+    const sourcePackageVariant = installManifestResponseExample.data.variants[0];
+    if (!sourcePackageVariant || sourcePackageVariant.kind !== "package") {
+      throw new Error("Expected a package variant in the install manifest example");
+    }
+
+    expect(
+      installManifestResponseSchema.parse({
+        ...installManifestResponseExample,
+        data: {
+          ...installManifestResponseExample.data,
+          variants: [{ ...sourcePackageVariant, version: "1.2.3-beta.1+build.7" }],
+        },
+      }),
+    ).toBeDefined();
+
+    expect(
+      installManifestResponseSchema.parse({
+        ...installManifestResponseExample,
+        data: {
+          ...installManifestResponseExample.data,
+          variants: [
+            {
+              ...sourcePackageVariant,
+              registryType: "pypi",
+              identifier: "mcp-server-github",
+              version: "1!2.3rc1.post2.dev3+linux.x86_64",
+              runtimeHint: null,
+            },
+          ],
+        },
+      }),
+    ).toBeDefined();
+
+    expect(() =>
+      installManifestResponseSchema.parse({
+        ...installManifestResponseExample,
+        data: {
+          ...installManifestResponseExample.data,
+          variants: [{ ...sourcePackageVariant, version: "1.2.3rc1" }],
+        },
+      }),
+    ).toThrow();
+  });
+
+  it.each(["javascript:alert(1)", "data:text/plain,unsafe", "file:///tmp/mcp"])(
+    "rejects the remote URL scheme in %s",
+    (urlTemplate) => {
+      const sourceRemoteVariant = installManifestResponseExample.data.variants[1];
+      if (!sourceRemoteVariant || sourceRemoteVariant.kind !== "remote") {
+        throw new Error("Expected a remote variant in the install manifest example");
+      }
+
+      expect(() =>
+        installManifestResponseSchema.parse({
+          ...installManifestResponseExample,
+          data: {
+            ...installManifestResponseExample.data,
+            variants: [{ ...sourceRemoteVariant, urlTemplate }],
+          },
+        }),
+      ).toThrow();
+    },
+  );
 });
 
 describe("parseInstallManifestResponse", () => {
@@ -230,11 +324,13 @@ describe("parseInstallManifestResponse", () => {
   });
 
   it.each([
+    ["runtimeArguments", "type", "flag"],
     ["runtimeArguments", "name", 123],
     ["runtimeArguments", "valueHint", 123],
     ["runtimeArguments", "description", true],
     ["runtimeArguments", "required", "yes"],
     ["packageArguments", "name", 123],
+    ["packageArguments", "type", "flag"],
     ["packageArguments", "valueHint", 123],
     ["packageArguments", "description", true],
     ["packageArguments", "required", "yes"],
@@ -276,6 +372,166 @@ describe("parseInstallManifestResponse", () => {
     },
   );
 
+  it.each([
+    ["name", "github_token"],
+    ["description", 123],
+    ["required", "yes"],
+    ["defaultValue", false],
+    ["valueSource", "literal"],
+  ] as const)("rejects malformed known environmentVariables.%s fields", (field, invalidValue) => {
+    const sourcePackageVariant = installManifestResponseExample.data.variants[0];
+    if (!sourcePackageVariant || sourcePackageVariant.kind !== "package") {
+      throw new Error("Expected a package variant in the install manifest example");
+    }
+
+    const sourceEnvironmentVariable = sourcePackageVariant.environmentVariables?.[0];
+    if (!sourceEnvironmentVariable) {
+      throw new Error("Expected an environment variable in the install manifest example");
+    }
+
+    expect(() =>
+      parseInstallManifestResponse({
+        ...installManifestResponseExample,
+        data: {
+          ...installManifestResponseExample.data,
+          variants: [
+            {
+              ...sourcePackageVariant,
+              environmentVariables: [
+                { ...sourceEnvironmentVariable, [field]: invalidValue },
+              ],
+            },
+          ],
+        },
+      }),
+    ).toThrow();
+  });
+
+  it.each([
+    ["id", "not-a-uuid"],
+    ["kind", "remote"],
+    ["registryType", "rubygems"],
+    ["identifier", ""],
+    ["version", "next"],
+    ["runtimeHint", "node"],
+    ["transport", "sse"],
+    ["runtimeArguments", {}],
+    ["packageArguments", {}],
+    ["environmentVariables", {}],
+    [
+      "integrity",
+      {
+        algorithm: "sha512",
+        digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      },
+    ],
+    ["integrity", { algorithm: "sha256", digest: "invalid" }],
+  ] as const)("rejects malformed known package variant field %s", (field, invalidValue) => {
+    const sourcePackageVariant = installManifestResponseExample.data.variants[0];
+    if (!sourcePackageVariant || sourcePackageVariant.kind !== "package") {
+      throw new Error("Expected a package variant in the install manifest example");
+    }
+
+    expect(() =>
+      parseInstallManifestResponse({
+        ...installManifestResponseExample,
+        data: {
+          ...installManifestResponseExample.data,
+          variants: [{ ...sourcePackageVariant, [field]: invalidValue }],
+        },
+      }),
+    ).toThrow();
+  });
+
+  it.each([
+    ["id", "not-a-uuid"],
+    ["kind", "package"],
+    ["transport", "stdio"],
+    ["urlTemplate", "javascript:alert(1)"],
+    ["urlTemplate", "data:text/plain,unsafe"],
+    ["urlTemplate", "file:///tmp/mcp"],
+    ["headers", {}],
+    ["variables", {}],
+  ] as const)("rejects malformed known remote variant field %s", (field, invalidValue) => {
+    const sourceRemoteVariant = installManifestResponseExample.data.variants[1];
+    if (!sourceRemoteVariant || sourceRemoteVariant.kind !== "remote") {
+      throw new Error("Expected a remote variant in the install manifest example");
+    }
+
+    expect(() =>
+      parseInstallManifestResponse({
+        ...installManifestResponseExample,
+        data: {
+          ...installManifestResponseExample.data,
+          variants: [{ ...sourceRemoteVariant, [field]: invalidValue }],
+        },
+      }),
+    ).toThrow();
+  });
+
+  it.each([
+    ["headers", "name", ""],
+    ["headers", "value", ""],
+    ["variables", "name", ""],
+    ["variables", "description", 123],
+    ["variables", "required", "yes"],
+    ["variables", "defaultValue", false],
+  ] as const)(
+    "rejects malformed known remote %s.%s fields",
+    (collection, field, invalidValue) => {
+      const sourceRemoteVariant = installManifestResponseExample.data.variants[1];
+      if (!sourceRemoteVariant || sourceRemoteVariant.kind !== "remote") {
+        throw new Error("Expected a remote variant in the install manifest example");
+      }
+
+      const sourceEntry = sourceRemoteVariant[collection]?.[0];
+      if (!sourceEntry) {
+        throw new Error(`Expected a remote ${collection} entry in the install manifest example`);
+      }
+
+      expect(() =>
+        parseInstallManifestResponse({
+          ...installManifestResponseExample,
+          data: {
+            ...installManifestResponseExample.data,
+            variants: [
+              {
+                ...sourceRemoteVariant,
+                [collection]: [{ ...sourceEntry, [field]: invalidValue }],
+              },
+            ],
+          },
+        }),
+      ).toThrow();
+    },
+  );
+
+  it.each(["command", "shell", "script", "expression", "eval", "callback", "postinstall", "hook"])(
+    "rejects reserved executable key %s while permitting additive fields",
+    (forbiddenKey) => {
+      const sourcePackageVariant = installManifestResponseExample.data.variants[0];
+      if (!sourcePackageVariant || sourcePackageVariant.kind !== "package") {
+        throw new Error("Expected a package variant in the install manifest example");
+      }
+
+      expect(() =>
+        parseInstallManifestResponse({
+          ...installManifestResponseExample,
+          data: {
+            ...installManifestResponseExample.data,
+            variants: [
+              {
+                ...sourcePackageVariant,
+                futureVariantField: "preserved",
+                [forbiddenKey]: "unsafe",
+              },
+            ],
+          },
+        }),
+      ).toThrow();
+    },
+  );
+
   it("keeps additive client fields while validating known install fields", () => {
     const sourcePackageVariant = installManifestResponseExample.data.variants[0];
     if (!sourcePackageVariant || sourcePackageVariant.kind !== "package") {
@@ -290,6 +546,26 @@ describe("parseInstallManifestResponse", () => {
     const sourceRuntimeArgument = sourceRuntimeArguments[0];
     if (!sourceRuntimeArgument) {
       throw new Error("Expected a runtime argument in the install manifest example");
+    }
+
+    const sourcePackageArgument = sourcePackageVariant.packageArguments?.[0];
+    const sourceEnvironmentVariable = sourcePackageVariant.environmentVariables?.[0];
+    const sourceIntegrity = sourcePackageVariant.integrity;
+    const sourceRemoteVariant = installManifestResponseExample.data.variants[1];
+    if (
+      !sourcePackageArgument ||
+      !sourceEnvironmentVariable ||
+      !sourceIntegrity ||
+      !sourceRemoteVariant ||
+      sourceRemoteVariant.kind !== "remote"
+    ) {
+      throw new Error("Expected complete package and remote variants in the install manifest example");
+    }
+
+    const sourceHeader = sourceRemoteVariant.headers?.[0];
+    const sourceRemoteVariable = sourceRemoteVariant.variables?.[0];
+    if (!sourceHeader || !sourceRemoteVariable) {
+      throw new Error("Expected remote header and variable entries in the install manifest example");
     }
 
     const parsed = parseInstallManifestResponse({
@@ -307,8 +583,22 @@ describe("parseInstallManifestResponse", () => {
                 futureArgumentField: "preserved",
               },
             ],
+            packageArguments: [
+              { ...sourcePackageArgument, futurePackageArgumentField: "preserved" },
+            ],
+            environmentVariables: [
+              { ...sourceEnvironmentVariable, futureEnvironmentField: "preserved" },
+            ],
+            integrity: { ...sourceIntegrity, futureIntegrityField: "preserved" },
           },
-          installManifestResponseExample.data.variants[1],
+          {
+            ...sourceRemoteVariant,
+            futureRemoteVariantField: "preserved",
+            headers: [{ ...sourceHeader, futureHeaderField: "preserved" }],
+            variables: [
+              { ...sourceRemoteVariable, futureRemoteVariableField: "preserved" },
+            ],
+          },
         ],
       },
     });
@@ -331,6 +621,33 @@ describe("parseInstallManifestResponse", () => {
 
     expect(
       (packageRuntimeArgument as Record<string, unknown>).futureArgumentField,
+    ).toBe("preserved");
+
+    expect(
+      (packageVariant.packageArguments[0] as Record<string, unknown>)
+        .futurePackageArgumentField,
+    ).toBe("preserved");
+    expect(
+      (packageVariant.environmentVariables[0] as Record<string, unknown>)
+        .futureEnvironmentField,
+    ).toBe("preserved");
+    expect(
+      (packageVariant.integrity as Record<string, unknown>).futureIntegrityField,
+    ).toBe("preserved");
+
+    const remoteVariant = parsed.data.variants.find((variant) => variant.kind === "remote");
+    if (!remoteVariant) {
+      throw new Error("Expected a remote variant in the additive-field test");
+    }
+
+    expect((remoteVariant as Record<string, unknown>).futureRemoteVariantField).toBe(
+      "preserved",
+    );
+    expect((remoteVariant.headers[0] as Record<string, unknown>).futureHeaderField).toBe(
+      "preserved",
+    );
+    expect(
+      (remoteVariant.variables[0] as Record<string, unknown>).futureRemoteVariableField,
     ).toBe("preserved");
   });
 });

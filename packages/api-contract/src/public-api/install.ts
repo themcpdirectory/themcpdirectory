@@ -9,16 +9,31 @@ import {
 } from "./shared.js";
 import { compatibilityStatusSchema, supportedClientIdSchema } from "./servers.js";
 
-const EXACT_IMMUTABLE_PACKAGE_VERSION_PATTERN =
-  /^(?!latest$)(?!.*[\s~^*<>])[0-9A-Za-z][0-9A-Za-z.+-]*$/i;
+const EXACT_NPM_VERSION_PATTERN =
+  /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+const EXACT_PYPI_VERSION_PATTERN =
+  /^(?:[0-9]+!)?[0-9]+(?:\.[0-9]+)*(?:(?:a|b|rc)[0-9]+)?(?:\.post[0-9]+)?(?:\.dev[0-9]+)?(?:\+[a-z0-9]+(?:[._-][a-z0-9]+)*)?$/i;
 
 export const installManifestPackageRegistryTypeSchema = z.enum(["npm", "pypi"]);
 export const installManifestPackageVersionSchema = z
   .string()
-  .regex(EXACT_IMMUTABLE_PACKAGE_VERSION_PATTERN);
+  .refine(
+    (version) =>
+      EXACT_NPM_VERSION_PATTERN.test(version) || EXACT_PYPI_VERSION_PATTERN.test(version),
+    "Package version must be an exact immutable npm or PyPI version",
+  );
 export const installManifestPackageRuntimeHintSchema = z.enum(["npx"]);
 export const installManifestPackageTransportSchema = z.literal("stdio");
 export const installManifestRemoteTransportSchema = z.enum(["streamable-http", "sse"]);
+
+export function isExactPackageVersionForRegistry(
+  registryType: z.infer<typeof installManifestPackageRegistryTypeSchema>,
+  version: string,
+): boolean {
+  return registryType === "npm"
+    ? EXACT_NPM_VERSION_PATTERN.test(version)
+    : EXACT_PYPI_VERSION_PATTERN.test(version);
+}
 
 const argumentSchema = strictObject({
   type: z.enum(["positional", "named"]),
@@ -98,6 +113,19 @@ const installManifestServerSchema = strictObject({
     codex: compatibilityStatusSchema.optional(),
     cursor: compatibilityStatusSchema.optional(),
   }),
+}).superRefine((manifest, context) => {
+  manifest.variants.forEach((variant, index) => {
+    if (
+      variant.kind === "package" &&
+      !isExactPackageVersionForRegistry(variant.registryType, variant.version)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: `Version must be an exact immutable ${variant.registryType} version`,
+        path: ["variants", index, "version"],
+      });
+    }
+  });
 });
 
 export const installManifestResponseSchema = createResourceResponseSchema(

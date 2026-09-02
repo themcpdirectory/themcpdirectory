@@ -12,6 +12,7 @@ import {
   installManifestPackageTransportSchema,
   installManifestPackageVersionSchema,
   installManifestRemoteTransportSchema,
+  isExactPackageVersionForRegistry,
 } from "./install.js";
 import type {
   ResolvedServerResponse,
@@ -230,6 +231,43 @@ const remoteVariantClientSchema = clientObject({
   ),
 });
 
+const forbiddenInstallManifestKeys = new Set([
+  "callback",
+  "command",
+  "eval",
+  "expression",
+  "hook",
+  "postinstall",
+  "script",
+  "shell",
+]);
+
+function findForbiddenInstallManifestPath(
+  value: unknown,
+  path: PropertyKey[] = [],
+  seen = new WeakSet<object>(),
+): PropertyKey[] | undefined {
+  if (!value || typeof value !== "object" || seen.has(value)) {
+    return undefined;
+  }
+
+  seen.add(value);
+
+  for (const [key, child] of Object.entries(value)) {
+    const childPath = [...path, key];
+    if (forbiddenInstallManifestKeys.has(key)) {
+      return childPath;
+    }
+
+    const forbiddenPath = findForbiddenInstallManifestPath(child, childPath, seen);
+    if (forbiddenPath) {
+      return forbiddenPath;
+    }
+  }
+
+  return undefined;
+}
+
 const installManifestClientSchema = clientObject({
   schemaVersion: z.literal(1),
   server: clientObject({
@@ -251,11 +289,33 @@ const installManifestClientSchema = clientObject({
     codex: compatibilityStatusSchema.optional(),
     cursor: compatibilityStatusSchema.optional(),
   }),
+}).superRefine((manifest, context) => {
+  manifest.variants.forEach((variant, index) => {
+    if (
+      variant.kind === "package" &&
+      !isExactPackageVersionForRegistry(variant.registryType, variant.version)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: `Version must be an exact immutable ${variant.registryType} version`,
+        path: ["variants", index, "version"],
+      });
+    }
+  });
 });
 
 const installManifestClientResponseSchema = clientObject({
   data: installManifestClientSchema,
   meta: clientObject({ requestId: requestIdSchema }),
+}).superRefine((manifest, context) => {
+  const forbiddenPath = findForbiddenInstallManifestPath(manifest);
+  if (forbiddenPath) {
+    context.addIssue({
+      code: "custom",
+      message: `Install manifest contains forbidden executable key ${String(forbiddenPath.at(-1))}`,
+      path: forbiddenPath,
+    });
+  }
 });
 
 function getInstallManifestSchemaVersion(input: unknown): number | undefined {

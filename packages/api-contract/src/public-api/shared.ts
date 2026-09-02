@@ -11,7 +11,10 @@ export const slugSchema = z
   .string()
   .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/);
 export const rfc3339UtcSchema = z.string().datetime({ offset: true });
-export const httpUrlSchema = z.string().url();
+export const httpUrlSchema = z.string().url().refine((value) => {
+  const protocol = new URL(value).protocol;
+  return protocol === "http:" || protocol === "https:";
+}, "URL must use the HTTP or HTTPS protocol");
 
 export function strictObject<TShape extends z.ZodRawShape>(shape: TShape) {
   return z.object(shape).strict();
