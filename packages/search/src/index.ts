@@ -13,6 +13,10 @@ import {
   type Database,
 } from "@themcpdirectory/db";
 
+export { InvalidCursorError, createServerSearchCursorCodec } from "./public-api/cursor.js";
+export { createServerSearchFiltersHash } from "./public-api/query-fingerprint.js";
+export type { SearchServersPageInput, ServerSearchCursorPayload } from "./public-api/types.js";
+
 export const SEARCH_RANKING_WEIGHTS = {
   exactSlugBoost: 120,
   exactTitleBoost: 100,

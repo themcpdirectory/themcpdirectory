@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@themcpdirectory/api-contract": "workspace:*",
     "@themcpdirectory/db": "workspace:*",
     "drizzle-orm": "0.45.2"
   },
