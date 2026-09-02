@@ -156,6 +156,42 @@ export async function createPublicApiTestContext(): Promise<PublicApiTestContext
     source: "manual",
     confidence: 1,
   });
+  const categorySecond = await seedServer(db, registrySource.id, {
+    slug: "category-second",
+    title: "Category Second",
+    packageIdentifier: "@acme/category-second",
+  });
+  await db.insert(serverCategories).values({
+    serverId: categorySecond.serverId,
+    categoryId: category.id,
+    source: "manual",
+    confidence: 1,
+  });
+  await db.insert(clientCompatibility).values({
+    serverId: categorySecond.serverId,
+    clientId: "cursor",
+    status: "supported_with_configuration",
+  });
+  const hiddenDiscovery = await seedServer(db, registrySource.id, {
+    slug: "hidden-discovery",
+    title: "Hidden Discovery",
+    packageIdentifier: "@acme/hidden-discovery",
+  });
+  await db
+    .update(servers)
+    .set({ moderationStatus: "hidden" })
+    .where(eq(servers.id, hiddenDiscovery.serverId));
+  await db.insert(serverCategories).values({
+    serverId: hiddenDiscovery.serverId,
+    categoryId: category.id,
+    source: "manual",
+    confidence: 1,
+  });
+  await db.insert(clientCompatibility).values({
+    serverId: hiddenDiscovery.serverId,
+    clientId: "cursor",
+    status: "supported",
+  });
   await db.insert(serverRemotes).values({
     serverVersionId: github.versionId,
     transportType: "streamable-http",

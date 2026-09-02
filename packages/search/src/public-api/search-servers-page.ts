@@ -239,6 +239,23 @@ export async function runSearchServersPageQuery(
           CLIENT_SUPPORTED_STATUSES.map((status) => sql`${status}`),
           sql`, `,
         )})
+        and cc.id = (
+          select effective.id
+          from ${clientCompatibility} effective
+          where effective.server_id = cc.server_id
+            and lower(effective.client_id) = lower(cc.client_id)
+          order by
+            effective.updated_at desc,
+            effective.created_at desc,
+            case effective.status
+              when 'unsupported' then 0
+              when 'supported_with_configuration' then 1
+              when 'unknown' then 2
+              else 3
+            end,
+            effective.id asc
+          limit 1
+        )
     )`);
   }
   if (input.transport) {

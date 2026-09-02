@@ -85,3 +85,13 @@ export {
   type InstallManifestRemoteVariant,
   type InstallManifestVariant,
 } from "./public-api/install-manifest.js";
+
+export { getPublicCategoryBySlug, listPublicCategories } from "./public-api/categories.js";
+
+export { getPublicPublisherBySlug } from "./public-api/publishers.js";
+
+export {
+  getPublicClientById,
+  listPublicClients,
+  loadClientCompatibilityCounts,
+} from "./public-api/clients.js";

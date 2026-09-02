@@ -254,6 +254,10 @@ importers:
         version: 4.1.11(@types/node@20.19.43)(vite@8.2.2(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/client-adapters:
+    dependencies:
+      '@themcpdirectory/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
     devDependencies:
       '@themcpdirectory/eslint-config':
         specifier: workspace:*
@@ -347,6 +351,9 @@ importers:
       '@themcpdirectory/api-contract':
         specifier: workspace:*
         version: link:../api-contract
+      '@themcpdirectory/client-adapters':
+        specifier: workspace:*
+        version: link:../client-adapters
       '@themcpdirectory/db':
         specifier: workspace:*
         version: link:../db
