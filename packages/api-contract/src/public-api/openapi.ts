@@ -18,7 +18,9 @@ import {
   serverCollectionQuerySchema,
   serverCollectionResponseSchema,
   serverDetailResponseSchema,
+  supportedClientIdSchema,
 } from "./servers.js";
+import { slugSchema } from "./shared.js";
 
 extendZodWithOpenApi(z);
 
@@ -26,6 +28,19 @@ type OpenAPIObject = ReturnType<OpenApiGeneratorV31["generateDocument"]>;
 
 export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   const registry = new OpenAPIRegistry();
+
+  const slugPathParams = z.object({
+    slug: slugSchema.meta({ param: { in: "path", name: "slug" } }),
+  });
+  const clientPathParams = z.object({
+    id: supportedClientIdSchema.meta({ param: { in: "path", name: "id" } }),
+  });
+  const identifierPathParams = z.object({
+    identifier: z
+      .string()
+      .min(1)
+      .meta({ param: { in: "path", name: "identifier" } }),
+  });
 
   const serverCollectionResponse = serverCollectionResponseSchema.meta({
     id: "ServerCollectionResponse",
@@ -69,6 +84,7 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   registry.registerPath({
     method: "get",
     path: "/api/v1/categories/{slug}",
+    request: { params: slugPathParams },
     responses: {
       200: {
         description: "Category detail",
@@ -91,6 +107,7 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   registry.registerPath({
     method: "get",
     path: "/api/v1/clients/{id}",
+    request: { params: clientPathParams },
     responses: {
       200: {
         description: "Client detail",
@@ -102,6 +119,7 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   registry.registerPath({
     method: "get",
     path: "/api/v1/publishers/{slug}",
+    request: { params: slugPathParams },
     responses: {
       200: {
         description: "Publisher detail",
@@ -113,6 +131,7 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   registry.registerPath({
     method: "get",
     path: "/api/v1/resolve/{identifier}",
+    request: { params: identifierPathParams },
     responses: {
       200: {
         description: "Resolved server",
@@ -124,7 +143,7 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   registry.registerPath({
     method: "get",
     path: "/api/v1/resolve/{identifier}/install",
-    request: { query: installManifestQuerySchema },
+    request: { params: identifierPathParams, query: installManifestQuerySchema },
     responses: {
       200: {
         description: "Install manifest via resolution",
@@ -160,6 +179,7 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   registry.registerPath({
     method: "get",
     path: "/api/v1/servers/{slug}",
+    request: { params: slugPathParams },
     responses: {
       200: {
         description: "Server detail",
@@ -171,7 +191,7 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   registry.registerPath({
     method: "get",
     path: "/api/v1/servers/{slug}/install",
-    request: { query: installManifestQuerySchema },
+    request: { params: slugPathParams, query: installManifestQuerySchema },
     responses: {
       200: {
         description: "Install manifest",

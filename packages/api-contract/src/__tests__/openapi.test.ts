@@ -12,6 +12,7 @@ type OpenApiParameter = {
   readonly $ref?: string;
   readonly in?: string;
   readonly name?: string;
+  readonly required?: boolean;
 };
 type OpenApiResponse = {
   readonly $ref?: string;
@@ -54,18 +55,54 @@ function getResponseSchemaRef(document: OpenAPIObject, path: string): string | n
   return schema.$ref;
 }
 
-function getQueryParameterNames(document: OpenAPIObject, path: string): string[] {
+function getParameterNames(document: OpenAPIObject, path: string): string[] {
   const paths = document.paths ?? {};
 
   return ((paths[path]?.get?.parameters as OpenApiParameter[] | undefined) ?? []).flatMap(
     (parameter) => {
-    if (isReferenceObject(parameter)) {
-      return [parameter.$ref];
-    }
+      if (isReferenceObject(parameter)) {
+        return [parameter.$ref];
+      }
 
-    return parameter.in === "query" ? [`${parameter.in}:${parameter.name}`] : [];
+      return parameter.in ? [`${parameter.in}:${parameter.name}`] : [];
     },
   );
+}
+
+function getPathParameters(document: OpenAPIObject, path: string): OpenApiParameter[] {
+  const paths = document.paths ?? {};
+
+  return ((paths[path]?.get?.parameters as OpenApiParameter[] | undefined) ?? []).filter(
+    (parameter) => !isReferenceObject(parameter) && parameter.in === "path",
+  );
+}
+
+function findPackageVersionPattern(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const properties = record.properties;
+  if (properties && typeof properties === "object") {
+    const propertyRecord = properties as Record<string, unknown>;
+    if ("registryType" in propertyRecord && "version" in propertyRecord) {
+      const version = propertyRecord.version;
+      if (version && typeof version === "object") {
+        const pattern = (version as Record<string, unknown>).pattern;
+        return typeof pattern === "string" ? pattern : undefined;
+      }
+    }
+  }
+
+  for (const child of Object.values(record)) {
+    const pattern = findPackageVersionPattern(child);
+    if (pattern) {
+      return pattern;
+    }
+  }
+
+  return undefined;
 }
 
 function isReferenceObject(
@@ -84,7 +121,7 @@ function createOpenApiDriftView(document: OpenAPIObject) {
     schemaKeys: Object.keys(document.components?.schemas ?? {}).sort(),
     operations: Object.keys(paths).map((path) => ({
       path,
-      queryParameters: getQueryParameterNames(document, path),
+      parameters: getParameterNames(document, path),
       responseSchemaRef: getResponseSchemaRef(document, path),
     })),
   };
@@ -109,6 +146,42 @@ describe("createPublicApiOpenApiDocument", () => {
       "/api/v1/servers/{slug}",
       "/api/v1/servers/{slug}/install",
     ]);
+  });
+
+  it.each([
+    ["/api/v1/categories/{slug}", "slug"],
+    ["/api/v1/clients/{id}", "id"],
+    ["/api/v1/publishers/{slug}", "slug"],
+    ["/api/v1/resolve/{identifier}", "identifier"],
+    ["/api/v1/resolve/{identifier}/install", "identifier"],
+    ["/api/v1/servers/{slug}", "slug"],
+    ["/api/v1/servers/{slug}/install", "slug"],
+  ])("declares required path parameter %s", (path, parameterName) => {
+    const document = createPublicApiOpenApiDocument("https://api.themcpdirectory.test");
+
+    expect(getPathParameters(document, path)).toEqual([
+      expect.objectContaining({
+        in: "path",
+        name: parameterName,
+        required: true,
+      }),
+    ]);
+  });
+
+  it("documents exact package version restrictions", () => {
+    const document = createPublicApiOpenApiDocument("https://api.themcpdirectory.test");
+    const packageVersionPattern = findPackageVersionPattern(document.components?.schemas);
+
+    expect(packageVersionPattern).toBeDefined();
+
+    const packageVersionRegex = new RegExp(packageVersionPattern ?? "");
+    expect(packageVersionRegex.test("1.2.3")).toBe(true);
+    expect(packageVersionRegex.test("1.2.3beta2")).toBe(true);
+    expect(packageVersionRegex.test("latest")).toBe(false);
+    expect(packageVersionRegex.test("next")).toBe(false);
+    expect(packageVersionRegex.test("1.x")).toBe(false);
+    expect(packageVersionRegex.test("^1.2.3")).toBe(false);
+    expect(packageVersionRegex.test(">=1.2.3")).toBe(false);
   });
 
   it("keeps approved install and discovery examples valid against the runtime schemas", () => {
@@ -238,45 +311,71 @@ describe("createPublicApiOpenApiDocument", () => {
         "openapi": "3.1.0",
         "operations": [
           {
+            "parameters": [],
             "path": "/api/v1/categories",
-            "queryParameters": [],
             "responseSchemaRef": "#/components/schemas/CategoriesCollectionResponse",
           },
           {
+            "parameters": [
+              "path:slug",
+            ],
             "path": "/api/v1/categories/{slug}",
-            "queryParameters": [],
             "responseSchemaRef": "#/components/schemas/CategoryDetailResponse",
           },
           {
+            "parameters": [],
             "path": "/api/v1/clients",
-            "queryParameters": [],
             "responseSchemaRef": "#/components/schemas/ClientsCollectionResponse",
           },
           {
+            "parameters": [
+              "path:id",
+            ],
             "path": "/api/v1/clients/{id}",
-            "queryParameters": [],
             "responseSchemaRef": "#/components/schemas/ClientDetailResponse",
           },
           {
+            "parameters": [
+              "path:slug",
+            ],
             "path": "/api/v1/publishers/{slug}",
-            "queryParameters": [],
             "responseSchemaRef": "#/components/schemas/PublisherDetailResponse",
           },
           {
+            "parameters": [
+              "path:identifier",
+            ],
             "path": "/api/v1/resolve/{identifier}",
-            "queryParameters": [],
             "responseSchemaRef": "#/components/schemas/ResolvedServerResponse",
           },
           {
-            "path": "/api/v1/resolve/{identifier}/install",
-            "queryParameters": [
+            "parameters": [
+              "path:identifier",
               "query:client",
             ],
+            "path": "/api/v1/resolve/{identifier}/install",
             "responseSchemaRef": "#/components/schemas/InstallManifestResponse",
           },
           {
+            "parameters": [
+              "query:q",
+              "query:category",
+              "query:publisher",
+              "query:client",
+              "query:transport",
+              "query:registryType",
+              "query:verified",
+              "query:openSource",
+              "query:status",
+              "query:sort",
+              "query:cursor",
+              "query:limit",
+            ],
             "path": "/api/v1/search",
-            "queryParameters": [
+            "responseSchemaRef": "#/components/schemas/ServerCollectionResponse",
+          },
+          {
+            "parameters": [
               "query:q",
               "query:category",
               "query:publisher",
@@ -290,36 +389,22 @@ describe("createPublicApiOpenApiDocument", () => {
               "query:cursor",
               "query:limit",
             ],
-            "responseSchemaRef": "#/components/schemas/ServerCollectionResponse",
-          },
-          {
             "path": "/api/v1/servers",
-            "queryParameters": [
-              "query:q",
-              "query:category",
-              "query:publisher",
-              "query:client",
-              "query:transport",
-              "query:registryType",
-              "query:verified",
-              "query:openSource",
-              "query:status",
-              "query:sort",
-              "query:cursor",
-              "query:limit",
-            ],
             "responseSchemaRef": "#/components/schemas/ServerCollectionResponse",
           },
           {
+            "parameters": [
+              "path:slug",
+            ],
             "path": "/api/v1/servers/{slug}",
-            "queryParameters": [],
             "responseSchemaRef": "#/components/schemas/ServerDetailResponse",
           },
           {
-            "path": "/api/v1/servers/{slug}/install",
-            "queryParameters": [
+            "parameters": [
+              "path:slug",
               "query:client",
             ],
+            "path": "/api/v1/servers/{slug}/install",
             "responseSchemaRef": "#/components/schemas/InstallManifestResponse",
           },
         ],

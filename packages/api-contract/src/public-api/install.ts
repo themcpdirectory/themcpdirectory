@@ -19,12 +19,15 @@ function isExactPypiPackageVersion(version: string): boolean {
   return validPep440(version) !== null;
 }
 
+const EXACT_PACKAGE_VERSION_OPENAPI_PATTERN =
+  /^(?!.*(?:[<>=~^*]))(?![0-9]+(?:\.[0-9]+)*\.[xX]$)v?[0-9][0-9A-Za-z.!+_-]*$/;
+
 export const installManifestPackageRegistryTypeSchema = z.enum(["npm", "pypi"]);
 export const installManifestPackageVersionSchema = z
   .string()
+  .regex(EXACT_PACKAGE_VERSION_OPENAPI_PATTERN)
   .refine(
-    (version) =>
-      isExactNpmPackageVersion(version) || isExactPypiPackageVersion(version),
+    (version) => isExactNpmPackageVersion(version) || isExactPypiPackageVersion(version),
     "Package version must be an exact immutable npm or PyPI version",
   );
 export const installManifestPackageRuntimeHintSchema = z.enum(["npx"]);

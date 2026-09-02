@@ -5,7 +5,7 @@
   "description": "The open directory for the MCP ecosystem.",
   "packageManager": "pnpm@11.17.0",
   "engines": {
-    "node": ">=24 <25",
+    "node": ">=24.10 <25",
     "pnpm": ">=11"
   },
   "scripts": {
