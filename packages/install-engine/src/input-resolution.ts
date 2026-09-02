@@ -7,9 +7,9 @@ import type {
   ResolvedInstallIntent,
   ValidatedInstallInputMap,
 } from "./types.js";
+import { isSensitiveRemoteHeaderName, parseRemoteHeaderTemplate } from "./remote-header.js";
 
 const ENVIRONMENT_VARIABLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
-const HEADER_PLACEHOLDER_PATTERN = /\{([^{}]+)\}/g;
 
 const READONLY_INPUT_MAP_ERROR_MESSAGE = "Validated install inputs are read-only";
 
@@ -179,21 +179,6 @@ function createRemoteVariableDefinitions(
   }));
 }
 
-function extractHeaderPlaceholders(template: string): readonly string[] {
-  const placeholders: string[] = [];
-
-  for (const match of template.matchAll(HEADER_PLACEHOLDER_PATTERN)) {
-    const placeholder = match[1]?.trim();
-    if (!placeholder || placeholders.includes(placeholder)) {
-      continue;
-    }
-
-    placeholders.push(placeholder);
-  }
-
-  return placeholders;
-}
-
 function createRemoteHeaderDefinitions(
   headers: InstallManifestRemoteVariantV1["headers"],
   usedKeys: Set<string>,
@@ -202,7 +187,10 @@ function createRemoteHeaderDefinitions(
   const seenPlaceholders = new Set<string>();
 
   for (const header of headers) {
-    for (const placeholder of extractHeaderPlaceholders(header.value)) {
+    const sensitive = isSensitiveRemoteHeaderName(header.name);
+    const { placeholders } = parseRemoteHeaderTemplate(header.value);
+
+    for (const placeholder of placeholders) {
       if (seenPlaceholders.has(placeholder)) {
         continue;
       }
@@ -213,9 +201,10 @@ function createRemoteHeaderDefinitions(
         source: "remote-header",
         headerName: header.name,
         placeholder,
+        sensitive,
         description: null,
         required: true,
-        accepts: ["env-reference", "secret-value"],
+        accepts: sensitive ? ["env-reference", "secret-value"] : ["text"],
       });
     }
   }

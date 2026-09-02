@@ -85,6 +85,7 @@ function makeIntent(): Pick<ResolvedInstallIntent, "inputs"> {
       source: "remote-header",
       headerName: "Authorization",
       placeholder: "token",
+      sensitive: true,
       description: null,
       required: true,
       accepts: ["env-reference", "secret-value"],
@@ -114,6 +115,42 @@ function makeValidValues(
 }
 
 describe("createInstallInputDefinitions", () => {
+  it("classifies remote header placeholders by sensitivity and keeps colliding keys stable", () => {
+    const definitions = createInstallInputDefinitions(
+      makeRemoteVariant({
+        headers: [
+          { name: "Authorization", value: "Bearer {token}" },
+          { name: "X-Workspace", value: "{workspaceId}" },
+        ],
+      }),
+    );
+
+    expect(definitions).toMatchObject([
+      {
+        key: "workspaceId",
+        source: "remote-variable",
+        name: "workspaceId",
+        accepts: ["text"],
+      },
+      {
+        key: "token",
+        source: "remote-header",
+        headerName: "Authorization",
+        placeholder: "token",
+        sensitive: true,
+        accepts: ["env-reference", "secret-value"],
+      },
+      {
+        key: "remote-header:workspaceId",
+        source: "remote-header",
+        headerName: "X-Workspace",
+        placeholder: "workspaceId",
+        sensitive: false,
+        accepts: ["text"],
+      },
+    ]);
+  });
+
   it("dedupes duplicate header placeholders and keeps colliding keys stable", () => {
     const definitions = createInstallInputDefinitions(
       makeRemoteVariant({

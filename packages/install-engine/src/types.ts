@@ -57,6 +57,7 @@ export interface RemoteHeaderInputDefinition extends BaseInstallInputDefinition 
   readonly source: "remote-header";
   readonly headerName: string;
   readonly placeholder: string;
+  readonly sensitive: boolean;
 }
 
 export type InstallInputDefinition =

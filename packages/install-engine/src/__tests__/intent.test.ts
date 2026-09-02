@@ -271,6 +271,107 @@ describe("createResolvedInstallIntent", () => {
     expect(serializedIntent).toContain("MCP_AUTH_TOKEN");
   });
 
+  it("treats non-sensitive templated headers as text inputs and excludes them from remote auth", () => {
+    const createResolvedInstallIntent = getCreateResolvedInstallIntent();
+    const intent = createResolvedInstallIntent(
+      makeManifest([
+        makeRemoteVariant({
+          headers: [
+            { name: "Authorization", value: "Bearer {token}" },
+            { name: "X-Workspace", value: "{workspaceId}" },
+          ],
+        }),
+      ]),
+      {
+        client: "cursor",
+        scope: "project",
+        requestedVariantId: REMOTE_VARIANT_ID,
+        inputValues: {
+          workspaceId: { kind: "text", value: "workspace-123" },
+          "remote-header:workspaceId": { kind: "text", value: "workspace-header-123" },
+          token: { kind: "env-reference", envName: "MCP_AUTH_TOKEN" },
+        },
+      },
+    );
+
+    expect(intent).toMatchObject({
+      warnings: [],
+      remoteAuth: {
+        kind: "env-reference",
+        bindings: [{ kind: "env-reference", inputKey: "token", envName: "MCP_AUTH_TOKEN" }],
+      },
+      requiredEnvReferences: ["MCP_AUTH_TOKEN"],
+      inputs: [
+        {
+          key: "workspaceId",
+          source: "remote-variable",
+          accepts: ["text"],
+        },
+        {
+          key: "token",
+          source: "remote-header",
+          headerName: "Authorization",
+          placeholder: "token",
+          sensitive: true,
+          accepts: ["env-reference", "secret-value"],
+        },
+        {
+          key: "remote-header:workspaceId",
+          source: "remote-header",
+          headerName: "X-Workspace",
+          placeholder: "workspaceId",
+          sensitive: false,
+          accepts: ["text"],
+        },
+      ],
+    });
+
+    const serializedIntent = JSON.stringify(intent);
+    expect(serializedIntent).not.toContain("workspace-123");
+    expect(serializedIntent).not.toContain("workspace-header-123");
+    expect(serializedIntent).toContain("MCP_AUTH_TOKEN");
+  });
+
+  it("returns remote auth none for non-sensitive templated headers", () => {
+    const createResolvedInstallIntent = getCreateResolvedInstallIntent();
+    const intent = createResolvedInstallIntent(
+      makeManifest([
+        makeRemoteVariant({ headers: [{ name: "X-Workspace", value: "{workspaceId}" }] }),
+      ]),
+      {
+        client: "cursor",
+        scope: "project",
+        requestedVariantId: REMOTE_VARIANT_ID,
+        inputValues: {
+          workspaceId: { kind: "text", value: "workspace-123" },
+          "remote-header:workspaceId": { kind: "text", value: "workspace-header-123" },
+        },
+      },
+    );
+
+    expect(intent.remoteAuth).toEqual({ kind: "none" });
+    expect(intent.requiredEnvReferences).toEqual([]);
+    expect(intent.inputs).toMatchObject([
+      {
+        key: "workspaceId",
+        source: "remote-variable",
+        accepts: ["text"],
+      },
+      {
+        key: "remote-header:workspaceId",
+        source: "remote-header",
+        headerName: "X-Workspace",
+        placeholder: "workspaceId",
+        sensitive: false,
+        accepts: ["text"],
+      },
+    ]);
+
+    const serializedIntent = JSON.stringify(intent);
+    expect(serializedIntent).not.toContain("workspace-123");
+    expect(serializedIntent).not.toContain("workspace-header-123");
+  });
+
   it("records persisted-secret remote auth without serializing the secret value", () => {
     const createResolvedInstallIntent = getCreateResolvedInstallIntent();
     const intent = createResolvedInstallIntent(makeManifest([makeRemoteVariant()]), {
@@ -497,14 +598,14 @@ describe("createResolvedInstallIntent", () => {
     );
 
     const exactPlaceholderIntent = createResolvedInstallIntent(
-      makeManifest([makeRemoteVariant({ headers: [{ name: "X-API-Key", value: "{apiKey}" }] })]),
+      makeManifest([makeRemoteVariant({ headers: [{ name: "X-API-Key", value: "{PathExt}" }] })]),
       {
         client: "cursor",
         scope: "project",
         requestedVariantId: REMOTE_VARIANT_ID,
         inputValues: {
           workspaceId: { kind: "text", value: "workspace-123" },
-          apiKey: { kind: "env-reference", envName: "REMOTE_API_KEY" },
+          PathExt: { kind: "env-reference", envName: "PATH_EXT" },
         },
       },
     );
@@ -525,8 +626,35 @@ describe("createResolvedInstallIntent", () => {
     });
     expect(exactPlaceholderIntent.remoteAuth).toMatchObject({
       kind: "env-reference",
-      bindings: [{ kind: "env-reference", inputKey: "apiKey", envName: "REMOTE_API_KEY" }],
+      bindings: [{ kind: "env-reference", inputKey: "PathExt", envName: "PATH_EXT" }],
     });
+  });
+
+  it("rejects malformed header placeholder identifiers before input validation without echoing values", () => {
+    const createResolvedInstallIntent = getCreateResolvedInstallIntent();
+
+    for (const headerValue of ["{ token }", "{token extra}", "{1token}", "{token-name}"]) {
+      const error = expectIntentError(
+        () =>
+          createResolvedInstallIntent(
+            makeManifest([
+              makeRemoteVariant({ headers: [{ name: "X-Workspace", value: headerValue }] }),
+            ]),
+            {
+              client: "codex",
+              scope: "user",
+              requestedVariantId: REMOTE_VARIANT_ID,
+              inputValues: {
+                workspaceId: { kind: "text", value: "workspace-123" },
+              },
+            },
+          ),
+        { reason: "UNSAFE_REMOTE_HEADER", headerName: "X-Workspace" },
+      );
+
+      expect(String(error)).toContain("X-Workspace");
+      expect(String(error)).not.toContain(headerValue);
+    }
   });
 
   it("rejects sensitive header templates that include credential fragments or malformed structure", () => {
