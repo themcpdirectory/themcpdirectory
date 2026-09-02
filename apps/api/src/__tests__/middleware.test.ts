@@ -47,7 +47,7 @@ describe("HTTP middleware", () => {
     expect(response.headers.get("x-request-id")).toBe("req_incoming_phase_d");
     expect(response.headers.get("access-control-allow-origin")).toBe("*");
     expect(response.headers.get("access-control-allow-credentials")).toBeNull();
-    expect(response.headers.get("etag")).toMatch(/^"[A-Za-z0-9_-]{43}"$/);
+    expect(response.headers.get("etag")).toMatch(/^W\/"[A-Za-z0-9_-]{43}"$/);
 
     const head = await app.request("/api/v1/probe", { method: "HEAD" });
     expect(head.status).toBe(200);

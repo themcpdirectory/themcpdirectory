@@ -6,6 +6,10 @@ import { createErrorHandler } from "./http/errors.js";
 import { attachStructuredLogging } from "./http/logging.js";
 import { attachRateLimit } from "./http/rate-limit.js";
 import { attachRequestId } from "./http/request-id.js";
+import { registerInstallRoutes } from "./routes/install.js";
+import { registerResolveRoutes } from "./routes/resolve.js";
+import { registerSearchRoutes } from "./routes/search.js";
+import { registerServerRoutes } from "./routes/servers.js";
 
 export type RateLimitBucket = "resource" | "search" | "install";
 
@@ -68,6 +72,11 @@ export function createApiApp(deps: ApiDependencies): Hono<ApiEnv> {
   apiV1.use("/publishers/:slug", withRateLimit("resource"));
   apiV1.use("/clients", withRateLimit("resource"));
   apiV1.use("/clients/:id", withRateLimit("resource"));
+
+  registerServerRoutes(apiV1, deps);
+  registerSearchRoutes(apiV1, deps);
+  registerResolveRoutes(apiV1, deps);
+  registerInstallRoutes(apiV1, deps);
 
   app.route("/api/v1", apiV1);
 

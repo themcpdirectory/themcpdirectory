@@ -3,9 +3,11 @@ export {
   createCollectionResponseSchema,
   createResourceResponseSchema,
   httpUrlSchema,
+  identifierPathParamsSchema,
   requestIdSchema,
   rfc3339UtcSchema,
   slugSchema,
+  slugPathParamsSchema,
   strictObject,
   uuidSchema,
 } from "./public-api/shared.js";

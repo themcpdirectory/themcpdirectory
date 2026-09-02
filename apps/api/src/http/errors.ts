@@ -8,7 +8,6 @@ import {
 } from "@themcpdirectory/domain";
 import { InvalidCursorError } from "@themcpdirectory/search";
 import type { ErrorHandler } from "hono";
-import { ZodError } from "zod";
 import type { ApiEnv, ApiLogger } from "../app.js";
 
 type HttpApiStatus = 400 | 404 | 409 | 410 | 429 | 500;
@@ -37,9 +36,6 @@ export class HttpApiError extends Error {
 
 function toHttpApiError(error: unknown): HttpApiError {
   if (error instanceof HttpApiError) return error;
-  if (error instanceof ZodError) {
-    return new HttpApiError("VALIDATION_ERROR");
-  }
   if (error instanceof InvalidCursorError) {
     return new HttpApiError("CURSOR_INVALID");
   }

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import {
   AmbiguousServerIdentifierError,
   InstallManifestUnavailableError,
@@ -95,5 +96,22 @@ describe("createErrorHandler", () => {
     const response = await app.request("/");
     expect(response.status).toBe(404);
     await expect(response.text()).resolves.not.toContain("private identifier");
+  });
+
+  it("treats server-side response schema failures as internal errors", async () => {
+    const app = new Hono<ApiEnv>();
+    app.use(
+      "*",
+      attachRequestId(() => "req_response_schema_failure"),
+    );
+    app.onError(createErrorHandler({ info() {}, error() {} }));
+    app.get("/", (c) => c.json(z.object({ title: z.string() }).parse({ title: 42 })));
+
+    const response = await app.request("/");
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "INTERNAL_ERROR", requestId: "req_response_schema_failure" },
+    });
   });
 });

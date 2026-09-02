@@ -6,7 +6,9 @@ import {
   createCollectionResponseSchema,
   createResourceResponseSchema,
   errorResponseSchema,
+  identifierPathParamsSchema,
   requestIdSchema,
+  slugPathParamsSchema,
 } from "../index.js";
 
 describe("shared public-api contracts", () => {
@@ -32,6 +34,18 @@ describe("shared public-api contracts", () => {
         meta: { requestId: "req_phase_d_001" },
       }),
     ).toThrow(/unrecognized key/i);
+  });
+
+  it("bounds path parameters and rejects blank identifiers", () => {
+    expect(slugPathParamsSchema.safeParse({ slug: "a".repeat(128) }).success).toBe(true);
+    expect(slugPathParamsSchema.safeParse({ slug: "a".repeat(129) }).success).toBe(false);
+    expect(identifierPathParamsSchema.safeParse({ identifier: "@scope/package" }).success).toBe(
+      true,
+    );
+    expect(identifierPathParamsSchema.safeParse({ identifier: " ".repeat(8) }).success).toBe(false);
+    expect(identifierPathParamsSchema.safeParse({ identifier: "x".repeat(513) }).success).toBe(
+      false,
+    );
   });
 
   it("keeps the approved error envelope shape stable", () => {

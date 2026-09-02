@@ -28,10 +28,13 @@
   },
   "devDependencies": {
     "@themcpdirectory/eslint-config": "workspace:*",
+    "@themcpdirectory/test-utils": "workspace:*",
     "@themcpdirectory/typescript-config": "workspace:*",
     "@themcpdirectory/vitest-config": "workspace:*",
     "@types/node": "^20",
+    "drizzle-orm": "0.45.2",
     "eslint": "9.39.5",
+    "postgres": "3.4.7",
     "typescript": "5.9.3",
     "vitest": "4.1.11"
   }

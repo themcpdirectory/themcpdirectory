@@ -7,7 +7,17 @@ export const requestIdSchema = z
   .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
 
 export const uuidSchema = z.string().uuid();
-export const slugSchema = z.string().regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/);
+export const slugSchema = z
+  .string()
+  .max(128)
+  .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/);
+export const slugPathParamsSchema = z.object({ slug: slugSchema });
+export const identifierPathParamsSchema = z.object({
+  identifier: z
+    .string()
+    .max(512)
+    .refine((value) => value.trim().length > 0),
+});
 export const rfc3339UtcSchema = z.string().datetime({ offset: true });
 const HTTP_URL_PATTERN = /^[hH][tT][tT][pP][sS]?:\/\//;
 export const httpUrlSchema = z

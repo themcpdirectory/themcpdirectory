@@ -20,7 +20,7 @@ import {
   serverDetailResponseSchema,
   supportedClientIdSchema,
 } from "./servers.js";
-import { httpUrlSchema, slugSchema } from "./shared.js";
+import { httpUrlSchema, identifierPathParamsSchema, slugPathParamsSchema } from "./shared.js";
 
 extendZodWithOpenApi(z);
 
@@ -30,17 +30,16 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   const validatedBaseUrl = httpUrlSchema.parse(baseUrl);
   const registry = new OpenAPIRegistry();
 
-  const slugPathParams = z.object({
-    slug: slugSchema.meta({ param: { in: "path", name: "slug" } }),
+  const slugPathParams = slugPathParamsSchema.extend({
+    slug: slugPathParamsSchema.shape.slug.meta({ param: { in: "path", name: "slug" } }),
   });
   const clientPathParams = z.object({
     id: supportedClientIdSchema.meta({ param: { in: "path", name: "id" } }),
   });
-  const identifierPathParams = z.object({
-    identifier: z
-      .string()
-      .min(1)
-      .meta({ param: { in: "path", name: "identifier" } }),
+  const identifierPathParams = identifierPathParamsSchema.extend({
+    identifier: identifierPathParamsSchema.shape.identifier.meta({
+      param: { in: "path", name: "identifier" },
+    }),
   });
 
   const serverCollectionResponse = serverCollectionResponseSchema.meta({
