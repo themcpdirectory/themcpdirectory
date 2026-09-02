@@ -461,6 +461,106 @@ describe("createResolvedInstallIntent", () => {
     expect(String(error)).not.toContain("super-secret-token");
   });
 
+  it("accepts structurally safe sensitive header placeholders", () => {
+    const createResolvedInstallIntent = getCreateResolvedInstallIntent();
+
+    const bearerIntent = createResolvedInstallIntent(
+      makeManifest([
+        makeRemoteVariant({ headers: [{ name: "Authorization", value: "Bearer {token}" }] }),
+      ]),
+      {
+        client: "cursor",
+        scope: "project",
+        requestedVariantId: REMOTE_VARIANT_ID,
+        inputValues: {
+          workspaceId: { kind: "text", value: "workspace-123" },
+          token: { kind: "env-reference", envName: "AUTH_TOKEN" },
+        },
+      },
+    );
+
+    const basicIntent = createResolvedInstallIntent(
+      makeManifest([
+        makeRemoteVariant({
+          headers: [{ name: "Proxy-Authorization", value: "Basic {credential}" }],
+        }),
+      ]),
+      {
+        client: "cursor",
+        scope: "project",
+        requestedVariantId: REMOTE_VARIANT_ID,
+        inputValues: {
+          workspaceId: { kind: "text", value: "workspace-123" },
+          credential: { kind: "env-reference", envName: "BASIC_CREDENTIAL" },
+        },
+      },
+    );
+
+    const exactPlaceholderIntent = createResolvedInstallIntent(
+      makeManifest([makeRemoteVariant({ headers: [{ name: "X-API-Key", value: "{apiKey}" }] })]),
+      {
+        client: "cursor",
+        scope: "project",
+        requestedVariantId: REMOTE_VARIANT_ID,
+        inputValues: {
+          workspaceId: { kind: "text", value: "workspace-123" },
+          apiKey: { kind: "env-reference", envName: "REMOTE_API_KEY" },
+        },
+      },
+    );
+
+    expect(bearerIntent.remoteAuth).toMatchObject({
+      kind: "env-reference",
+      bindings: [{ kind: "env-reference", inputKey: "token", envName: "AUTH_TOKEN" }],
+    });
+    expect(basicIntent.remoteAuth).toMatchObject({
+      kind: "env-reference",
+      bindings: [
+        {
+          kind: "env-reference",
+          inputKey: "credential",
+          envName: "BASIC_CREDENTIAL",
+        },
+      ],
+    });
+    expect(exactPlaceholderIntent.remoteAuth).toMatchObject({
+      kind: "env-reference",
+      bindings: [{ kind: "env-reference", inputKey: "apiKey", envName: "REMOTE_API_KEY" }],
+    });
+  });
+
+  it("rejects sensitive header templates that include credential fragments or malformed structure", () => {
+    const createResolvedInstallIntent = getCreateResolvedInstallIntent();
+
+    for (const headerValue of [
+      "Bearer sk-live-{token}",
+      "{token}-suffix",
+      "Bearer {token} {backup}",
+      "Bearer {token}\nextra",
+    ]) {
+      const error = expectIntentError(
+        () =>
+          createResolvedInstallIntent(
+            makeManifest([
+              makeRemoteVariant({
+                headers: [{ name: "Authorization", value: headerValue }],
+              }),
+            ]),
+            {
+              client: "codex",
+              scope: "user",
+              requestedVariantId: REMOTE_VARIANT_ID,
+              inputValues: {},
+            },
+          ),
+        { reason: "UNSAFE_REMOTE_HEADER", headerName: "Authorization" },
+      );
+
+      expect(String(error)).toContain("Authorization");
+      expect(String(error)).not.toContain(headerValue);
+    }
+  });
+
   it("rejects sensitive defaults before they can enter a serializable intent", () => {
     const createResolvedInstallIntent = getCreateResolvedInstallIntent();
     const error = expectIntentError(

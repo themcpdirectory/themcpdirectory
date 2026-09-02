@@ -246,6 +246,10 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function freezeInstallInputValue(value: InstallInputValue): InstallInputValue {
+  return Object.freeze({ ...value }) as InstallInputValue;
+}
+
 function validateValue(
   definition: InstallInputDefinition,
   rawValue: InstallInputValue,
@@ -267,7 +271,7 @@ function validateValue(
       );
     }
 
-    return { kind: "env-reference", envName: rawValue.envName };
+    return freezeInstallInputValue({ kind: "env-reference", envName: rawValue.envName });
   }
 
   if (rawValue.kind === "text") {
@@ -279,7 +283,7 @@ function validateValue(
       );
     }
 
-    return { kind: "text", value: rawValue.value };
+    return freezeInstallInputValue({ kind: "text", value: rawValue.value });
   }
 
   if (!isNonEmptyString(rawValue.value) || rawValue.allowPersistence !== true) {
@@ -290,11 +294,11 @@ function validateValue(
     );
   }
 
-  return {
+  return freezeInstallInputValue({
     kind: "secret-value",
     value: rawValue.value,
     allowPersistence: true,
-  };
+  });
 }
 
 export function validateInputDefinitions(

@@ -273,4 +273,78 @@ describe("validateInputValues", () => {
     expect(() => mutableView.clear()).toThrow();
     expect(validated.get("config")).toEqual({ kind: "text", value: "/tmp/test-config.json" });
   });
+
+  it("returns frozen validated value copies across all map accessors", () => {
+    const sourceValues = makeValidValues();
+    const validated = validateInputValues(makeIntent(), sourceValues);
+
+    const textValue = validated.get("config");
+    const envValue = [...validated.entries()].find(([key]) => key === "GITHUB_TOKEN")?.[1];
+    const secretValue = [...validated.values()].find((value) => value.kind === "secret-value");
+    const seenKeys: string[] = [];
+
+    validated.forEach((value, key) => {
+      seenKeys.push(key);
+      expect(Object.isFrozen(value)).toBe(true);
+    });
+
+    expect(textValue).toEqual({ kind: "text", value: "/tmp/test-config.json" });
+    expect(envValue).toEqual({ kind: "env-reference", envName: "CI_GITHUB_TOKEN" });
+    expect(secretValue).toEqual({
+      kind: "secret-value",
+      value: "super-secret-token",
+      allowPersistence: true,
+    });
+    expect(textValue).not.toBe(sourceValues.config);
+    expect(envValue).not.toBe(sourceValues.GITHUB_TOKEN);
+    expect(secretValue).not.toBe(sourceValues.token);
+    expect(Object.isFrozen(textValue)).toBe(true);
+    expect(Object.isFrozen(envValue)).toBe(true);
+    expect(Object.isFrozen(secretValue)).toBe(true);
+    expect(seenKeys).toEqual(["config", "repository", "GITHUB_TOKEN", "workspaceId", "token"]);
+  });
+
+  it("does not allow caller mutation of validated values through casted references", () => {
+    const sourceValues = makeValidValues();
+    const validated = validateInputValues(makeIntent(), sourceValues);
+
+    const textValue = validated.get("config");
+    const envValue = [...validated.entries()].find(([key]) => key === "GITHUB_TOKEN")?.[1];
+    const secretValue = [...validated.values()].find((value) => value.kind === "secret-value");
+
+    expect(textValue).toBeDefined();
+    expect(envValue).toBeDefined();
+    expect(secretValue).toBeDefined();
+
+    expect(() => {
+      (textValue as { value: string }).value = "mutated-text";
+    }).toThrow(TypeError);
+    expect(() => {
+      (envValue as { envName: string }).envName = "MUTATED_ENV";
+    }).toThrow(TypeError);
+    expect(() => {
+      (secretValue as { value: string }).value = "mutated-secret";
+    }).toThrow(TypeError);
+
+    expect(validated.get("config")).toEqual({ kind: "text", value: "/tmp/test-config.json" });
+    expect(validated.get("GITHUB_TOKEN")).toEqual({
+      kind: "env-reference",
+      envName: "CI_GITHUB_TOKEN",
+    });
+    expect(validated.get("token")).toEqual({
+      kind: "secret-value",
+      value: "super-secret-token",
+      allowPersistence: true,
+    });
+    expect(sourceValues.config).toEqual({ kind: "text", value: "/tmp/test-config.json" });
+    expect(sourceValues.GITHUB_TOKEN).toEqual({
+      kind: "env-reference",
+      envName: "CI_GITHUB_TOKEN",
+    });
+    expect(sourceValues.token).toEqual({
+      kind: "secret-value",
+      value: "super-secret-token",
+      allowPersistence: true,
+    });
+  });
 });

@@ -19,7 +19,9 @@ const SENSITIVE_INPUT_NAME_PATTERN = /(secret|token|password|auth|key)/i;
 const SENSITIVE_HEADER_NAME_PATTERN =
   /^(authorization|proxy-authorization|cookie|set-cookie|x-api-key|api-key)$/i;
 const SENSITIVE_HEADER_HINT_PATTERN = /(token|key|secret|auth)/i;
-const HEADER_PLACEHOLDER_PATTERN = /\{([^{}]+)\}/g;
+const AUTHORIZATION_HEADER_NAME_PATTERN = /^(authorization|proxy-authorization)$/i;
+const EXACT_HEADER_PLACEHOLDER_PATTERN = /^\{([^{}\r\n]+)\}$/;
+const SCHEMED_AUTH_PLACEHOLDER_PATTERN = /^(Bearer|Basic) \{([^{}\r\n]+)\}$/i;
 
 export type ResolveIntentErrorReason =
   | "INVALID_SCOPE"
@@ -80,23 +82,26 @@ function getRemoteHeaderInputs(
   );
 }
 
-function extractHeaderPlaceholders(template: string): readonly string[] {
-  const placeholders: string[] = [];
-
-  for (const match of template.matchAll(HEADER_PLACEHOLDER_PATTERN)) {
-    const placeholder = match[1]?.trim();
-    if (!placeholder || placeholders.includes(placeholder)) {
-      continue;
-    }
-
-    placeholders.push(placeholder);
-  }
-
-  return placeholders;
-}
-
 function isSensitiveHeaderName(name: string): boolean {
   return SENSITIVE_HEADER_NAME_PATTERN.test(name) || SENSITIVE_HEADER_HINT_PATTERN.test(name);
+}
+
+function isNonEmptyPlaceholderSegment(value: string | undefined): boolean {
+  return value !== undefined && value.trim().length > 0;
+}
+
+function isSafeSensitiveHeaderValue(name: string, value: string): boolean {
+  const exactMatch = value.match(EXACT_HEADER_PLACEHOLDER_PATTERN);
+  if (exactMatch && isNonEmptyPlaceholderSegment(exactMatch[1])) {
+    return true;
+  }
+
+  if (!AUTHORIZATION_HEADER_NAME_PATTERN.test(name)) {
+    return false;
+  }
+
+  const schemedMatch = value.match(SCHEMED_AUTH_PLACEHOLDER_PATTERN);
+  return schemedMatch !== null && isNonEmptyPlaceholderSegment(schemedMatch[2]);
 }
 
 function assertSafeRemoteHeaders(headers: InstallManifestRemoteVariantV1["headers"]): void {
@@ -105,7 +110,7 @@ function assertSafeRemoteHeaders(headers: InstallManifestRemoteVariantV1["header
       continue;
     }
 
-    if (extractHeaderPlaceholders(header.value).length === 0) {
+    if (!isSafeSensitiveHeaderValue(header.name, header.value)) {
       throw new ResolveIntentError(
         "UNSAFE_REMOTE_HEADER",
         `Remote header ${header.name} must use placeholder-based secret references only`,
