@@ -7,7 +7,6 @@ export {
 } from "./registry/synchronize-registry-page.js";
 
 export {
-  AmbiguousServerIdentifierError,
   SEARCH_RANKING_WEIGHTS,
   getCategoryServers,
   getCategories,
@@ -53,3 +52,36 @@ export {
   type GitHubRepository,
   type GitHubRequestOptions,
 } from "./github/github-client.js";
+
+export {
+  getServerDetailBySlug,
+  loadServerDetailRow,
+  projectEnvironmentVariable,
+  projectPublicPackage,
+  projectPublicRemote,
+  type InstallManifestCompatibility,
+  type ServerDetailRow,
+  type ServerPackageRow,
+  type ServerRemoteRow,
+} from "./public-api/server-detail.js";
+
+export {
+  AmbiguousServerIdentifierError,
+  lookupIdentifierMatches,
+  resolveServerIdentifier,
+  type AmbiguousServerMatchSummary,
+  type IdentifierMatchRow,
+} from "./public-api/resolve-server-identifier.js";
+
+export {
+  InstallManifestUnavailableError,
+  ServerNotFoundError,
+  UpstreamDeletedError,
+  buildInstallManifest,
+  filterVariantsForClient,
+  projectPackageVariant,
+  projectRemoteVariant,
+  type InstallManifestPackageVariant,
+  type InstallManifestRemoteVariant,
+  type InstallManifestVariant,
+} from "./public-api/install-manifest.js";

@@ -344,6 +344,9 @@ importers:
 
   packages/domain:
     dependencies:
+      '@themcpdirectory/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
       '@themcpdirectory/db':
         specifier: workspace:*
         version: link:../db

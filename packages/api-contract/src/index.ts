@@ -50,6 +50,7 @@ export {
   UnsupportedManifestVersionError,
 } from "./public-api/client-parsers.js";
 export {
+  isExactPackageVersionForRegistry,
   installManifestQuerySchema,
   installManifestResponseSchema,
   type InstallManifestResponse,

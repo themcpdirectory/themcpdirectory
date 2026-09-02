@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@themcpdirectory/api-contract": "workspace:*",
     "@themcpdirectory/db": "workspace:*",
     "@themcpdirectory/search": "workspace:*",
     "@themcpdirectory/registry-client": "workspace:*",
