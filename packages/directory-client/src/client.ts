@@ -1,20 +1,18 @@
-import type { ClientsCollectionResponse } from "../../api-contract/src/public-api/discovery.js";
-import type { InstallManifestResponse } from "../../api-contract/src/public-api/install.js";
-import type {
-  ResolvedServerResponse,
-  ServerCollectionResponse,
-  ServerDetailResponse,
-  SupportedClientId,
-} from "../../api-contract/src/public-api/servers.js";
-import { DirectoryClientError } from "./errors.js";
 import {
-  UnsupportedManifestVersionError,
   parseClientsCollectionResponse,
   parseInstallManifestResponse,
   parseResolvedServerResponse,
   parseServerCollectionResponse,
   parseServerDetailResponse,
-} from "../../api-contract/src/public-api/client-parsers.js";
+  UnsupportedManifestVersionError,
+  type ClientsCollectionResponse,
+  type InstallManifestResponse,
+  type ResolvedServerResponse,
+  type ServerCollectionResponse,
+  type ServerDetailResponse,
+  type SupportedClientId,
+} from "@themcpdirectory/api-contract";
+import { DirectoryClientError } from "./errors.js";
 
 export interface DirectoryClientOptions {
   readonly baseUrl: string | URL;
@@ -45,42 +43,31 @@ export class DirectoryClient {
     this.#userAgent = options.userAgent;
   }
 
-  async resolveServer(_identifier: string): Promise<ResolvedServerResponse["data"]> {
-    const response = await this.#requestJson(
+  async resolveServer(_identifier: string): Promise<ResolvedServerResponse> {
+    return this.#requestJson(
       `resolve/${encodeURIComponent(_identifier)}`,
       parseResolvedServerResponse,
     );
-    return response.data;
   }
 
-  async resolveInstall(_identifier: string): Promise<InstallManifestResponse["data"]> {
-    const response = await this.#requestJson(
+  async resolveInstall(_identifier: string): Promise<InstallManifestResponse> {
+    return this.#requestJson(
       `resolve/${encodeURIComponent(_identifier)}/install`,
       parseInstallManifestResponse,
     );
-    return response.data;
   }
 
-  async getServer(_slug: string): Promise<ServerDetailResponse["data"]> {
-    const response = await this.#requestJson(
-      `servers/${encodeURIComponent(_slug)}`,
-      parseServerDetailResponse,
-    );
-    return response.data;
+  async getServer(_slug: string): Promise<ServerDetailResponse> {
+    return this.#requestJson(`servers/${encodeURIComponent(_slug)}`, parseServerDetailResponse);
   }
 
-  async searchServers(_params: SearchServersParams): Promise<ServerCollectionResponse["data"]> {
+  async searchServers(_params: SearchServersParams): Promise<ServerCollectionResponse> {
     const query = buildSearchQuery(_params);
-    const response = await this.#requestJson(
-      query ? `search?${query}` : "search",
-      parseServerCollectionResponse,
-    );
-    return response.data;
+    return this.#requestJson(query ? `search?${query}` : "search", parseServerCollectionResponse);
   }
 
-  async listClients(): Promise<ClientsCollectionResponse["data"]> {
-    const response = await this.#requestJson("clients", parseClientsCollectionResponse);
-    return response.data;
+  async listClients(): Promise<ClientsCollectionResponse> {
+    return this.#requestJson("clients", parseClientsCollectionResponse);
   }
 
   async #requestJson<TEnvelope extends { data: unknown }>(
@@ -106,9 +93,8 @@ export class DirectoryClient {
         throw this.#httpErrorFor(path, response.status);
       }
 
-      const payload = await readJsonBody(response);
-
       try {
+        const payload = await readJsonBody(response);
         return parser(payload);
       } catch (error) {
         if (error instanceof UnsupportedManifestVersionError) {
@@ -173,13 +159,26 @@ function normalizeApiRoot(baseUrl: string | URL): string {
   url.hash = "";
   url.search = "";
 
-  if (url.pathname === "/api/v1" || url.pathname === "/api/v1/") {
+  const pathnameSegments = url.pathname.split("/").filter(Boolean);
+  const apiRootSegments = endsWithApiRoot(pathnameSegments)
+    ? pathnameSegments
+    : [...pathnameSegments, "api", "v1"];
+
+  if (apiRootSegments.length === 0) {
     url.pathname = "/api/v1/";
     return url.toString();
   }
 
-  url.pathname = "/api/v1/";
+  url.pathname = `/${apiRootSegments.join("/")}/`;
   return url.toString();
+}
+
+function endsWithApiRoot(pathnameSegments: readonly string[]): boolean {
+  return (
+    pathnameSegments.length >= 2 &&
+    pathnameSegments.at(-2) === "api" &&
+    pathnameSegments.at(-1) === "v1"
+  );
 }
 
 function buildSearchQuery(params: SearchServersParams): string {

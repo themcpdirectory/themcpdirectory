@@ -35,7 +35,9 @@ import {
 
 export class UnsupportedManifestVersionError extends Error {
   constructor(readonly schemaVersion: number) {
-    super(`Unsupported install manifest schema version: ${schemaVersion}`);
+    super(
+      `Unsupported install manifest schema version: ${schemaVersion}. Upgrade the MCP Directory client or CLI to a version that supports this schema version.`,
+    );
     this.name = "UnsupportedManifestVersionError";
   }
 }

@@ -8,6 +8,8 @@ describe("UnsupportedManifestVersionError", () => {
     expect(error).toBeInstanceOf(Error);
     expect(error.name).toBe("UnsupportedManifestVersionError");
     expect(error.schemaVersion).toBe(0);
-    expect(error.message).toBe("Unsupported install manifest schema version: 0");
+    expect(error.message).toBe(
+      "Unsupported install manifest schema version: 0. Upgrade the MCP Directory client or CLI to a version that supports this schema version.",
+    );
   });
 });

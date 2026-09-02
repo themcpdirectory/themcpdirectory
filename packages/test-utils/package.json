@@ -11,6 +11,9 @@
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@themcpdirectory/api-contract": "workspace:*"
+  },
   "devDependencies": {
     "eslint": "9.39.5",
     "@themcpdirectory/eslint-config": "workspace:*",

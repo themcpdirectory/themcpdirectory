@@ -373,6 +373,34 @@ importers:
         specifier: 4.1.11
         version: 4.1.11(@types/node@20.19.43)(vite@8.2.2(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
+  packages/directory-client:
+    dependencies:
+      '@themcpdirectory/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
+    devDependencies:
+      '@themcpdirectory/eslint-config':
+        specifier: workspace:*
+        version: link:../../tooling/eslint
+      '@themcpdirectory/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
+      '@themcpdirectory/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@types/node@20.19.43)(vite@8.2.2(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+
   packages/domain:
     dependencies:
       '@themcpdirectory/api-contract':
@@ -567,6 +595,10 @@ importers:
         version: 4.1.11(@types/node@20.19.43)(vite@8.2.2(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/test-utils:
+    dependencies:
+      '@themcpdirectory/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
     devDependencies:
       '@themcpdirectory/eslint-config':
         specifier: workspace:*

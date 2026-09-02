@@ -1,28 +1,30 @@
-import { createServer } from "node:http";
+import { createServer, type ServerResponse } from "node:http";
+import type { Socket } from "node:net";
 import {
   parseClientsCollectionResponse,
   parseInstallManifestResponse,
   parseResolvedServerResponse,
   parseServerCollectionResponse,
   parseServerDetailResponse,
-} from "../../api-contract/src/public-api/client-parsers.js";
-import type { ClientsCollectionResponse } from "../../api-contract/src/public-api/discovery.js";
-import type { InstallManifestResponse } from "../../api-contract/src/public-api/install.js";
-import type {
-  ResolvedServerResponse,
-  ServerCollectionResponse,
-  ServerDetailResponse,
-} from "../../api-contract/src/public-api/servers.js";
+  type ClientsCollectionResponse,
+  type InstallManifestResponse,
+  type ResolvedServerResponse,
+  type ServerCollectionResponse,
+  type ServerDetailResponse,
+} from "@themcpdirectory/api-contract";
+
+type FixtureRouteKey = "resolveServer" | "resolveInstall" | "search" | "serverDetail" | "clients";
 
 export interface FixtureDirectoryApiServerOptions {
+  readonly apiBasePath?: string;
   readonly resolveServerBody?: unknown;
   readonly resolveInstallBody?: unknown;
   readonly searchBody?: unknown;
   readonly serverDetailBody?: unknown;
   readonly clientsBody?: unknown;
-  readonly statusOverrides?: Partial<
-    Record<"resolveServer" | "resolveInstall" | "search" | "serverDetail" | "clients", number>
-  >;
+  readonly statusOverrides?: Partial<Record<FixtureRouteKey, number>>;
+  readonly rawBodyOverrides?: Partial<Record<FixtureRouteKey, string>>;
+  readonly delayOverridesMs?: Partial<Record<FixtureRouteKey, number>>;
   readonly onRequestPath?: (path: string) => void;
 }
 
@@ -194,6 +196,22 @@ const defaultResolveInstallBody: InstallManifestResponse = parseInstallManifestR
 export async function createFixtureDirectoryApiServer(
   options: FixtureDirectoryApiServerOptions = {},
 ): Promise<FixtureDirectoryApiServer> {
+  const apiBasePath = normalizeApiBasePath(options.apiBasePath);
+  const pendingTimers = new Set<ReturnType<typeof setTimeout>>();
+  const sockets = new Set<Socket>();
+
+  const statusFor = (key: FixtureRouteKey) => options.statusOverrides?.[key] ?? 200;
+  const rawBodyFor = (key: FixtureRouteKey) => options.rawBodyOverrides?.[key];
+  const delayMsFor = (key: FixtureRouteKey) => options.delayOverridesMs?.[key] ?? 0;
+
+  const routeBodies: Record<FixtureRouteKey, unknown> = {
+    resolveServer: options.resolveServerBody ?? defaultResolveServerBody,
+    resolveInstall: options.resolveInstallBody ?? defaultResolveInstallBody,
+    search: options.searchBody ?? defaultSearchBody,
+    serverDetail: options.serverDetailBody ?? defaultServerDetailBody,
+    clients: options.clientsBody ?? defaultClientsBody,
+  };
+
   const server = createServer((request, response) => {
     const requestPath = request.url ?? "/";
     options.onRequestPath?.(requestPath);
@@ -201,37 +219,58 @@ export async function createFixtureDirectoryApiServer(
     const url = new URL(requestPath, "http://127.0.0.1");
     const pathname = url.pathname;
 
-    const statusFor = (
-      key: keyof NonNullable<FixtureDirectoryApiServerOptions["statusOverrides"]>,
-    ) => options.statusOverrides?.[key] ?? 200;
-
-    if (pathname === "/api/v1/resolve/github%2Fserver") {
-      response.writeHead(statusFor("resolveServer"), { "content-type": "application/json" });
-      response.end(JSON.stringify(options.resolveServerBody ?? defaultResolveServerBody));
+    if (pathname.startsWith(`${apiBasePath}/resolve/`) && pathname.endsWith("/install")) {
+      scheduleResponse("resolveInstall", response, pendingTimers, delayMsFor, () => {
+        sendRouteResponse(
+          response,
+          statusFor("resolveInstall"),
+          rawBodyFor("resolveInstall"),
+          routeBodies.resolveInstall,
+        );
+      });
       return;
     }
 
-    if (pathname === "/api/v1/resolve/github%2Fserver/install") {
-      response.writeHead(statusFor("resolveInstall"), { "content-type": "application/json" });
-      response.end(JSON.stringify(options.resolveInstallBody ?? defaultResolveInstallBody));
+    if (pathname.startsWith(`${apiBasePath}/resolve/`)) {
+      scheduleResponse("resolveServer", response, pendingTimers, delayMsFor, () => {
+        sendRouteResponse(
+          response,
+          statusFor("resolveServer"),
+          rawBodyFor("resolveServer"),
+          routeBodies.resolveServer,
+        );
+      });
       return;
     }
 
-    if (pathname === "/api/v1/search") {
-      response.writeHead(statusFor("search"), { "content-type": "application/json" });
-      response.end(JSON.stringify(options.searchBody ?? defaultSearchBody));
+    if (pathname === `${apiBasePath}/search`) {
+      scheduleResponse("search", response, pendingTimers, delayMsFor, () => {
+        sendRouteResponse(response, statusFor("search"), rawBodyFor("search"), routeBodies.search);
+      });
       return;
     }
 
-    if (pathname === "/api/v1/servers/github-server") {
-      response.writeHead(statusFor("serverDetail"), { "content-type": "application/json" });
-      response.end(JSON.stringify(options.serverDetailBody ?? defaultServerDetailBody));
+    if (pathname.startsWith(`${apiBasePath}/servers/`)) {
+      scheduleResponse("serverDetail", response, pendingTimers, delayMsFor, () => {
+        sendRouteResponse(
+          response,
+          statusFor("serverDetail"),
+          rawBodyFor("serverDetail"),
+          routeBodies.serverDetail,
+        );
+      });
       return;
     }
 
-    if (pathname === "/api/v1/clients") {
-      response.writeHead(statusFor("clients"), { "content-type": "application/json" });
-      response.end(JSON.stringify(options.clientsBody ?? defaultClientsBody));
+    if (pathname === `${apiBasePath}/clients`) {
+      scheduleResponse("clients", response, pendingTimers, delayMsFor, () => {
+        sendRouteResponse(
+          response,
+          statusFor("clients"),
+          rawBodyFor("clients"),
+          routeBodies.clients,
+        );
+      });
       return;
     }
 
@@ -241,6 +280,13 @@ export async function createFixtureDirectoryApiServer(
         error: { code: "NOT_FOUND", message: "Not found", requestId: "req_directory_client_404" },
       }),
     );
+  });
+
+  server.on("connection", (socket) => {
+    sockets.add(socket);
+    socket.on("close", () => {
+      sockets.delete(socket);
+    });
   });
 
   await new Promise<void>((resolve) => {
@@ -256,6 +302,15 @@ export async function createFixtureDirectoryApiServer(
     baseUrl: `http://127.0.0.1:${address.port}`,
     close: () =>
       new Promise<void>((resolve, reject) => {
+        for (const timer of pendingTimers) {
+          clearTimeout(timer);
+        }
+        pendingTimers.clear();
+
+        for (const socket of sockets) {
+          socket.destroy();
+        }
+
         server.close((error) => {
           if (error) {
             reject(error);
@@ -265,4 +320,48 @@ export async function createFixtureDirectoryApiServer(
         });
       }),
   };
+}
+
+function normalizeApiBasePath(pathname: string | undefined): string {
+  if (!pathname || pathname === "/") {
+    return "/api/v1";
+  }
+
+  const trimmedPathname = pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+  return trimmedPathname.startsWith("/") ? trimmedPathname : `/${trimmedPathname}`;
+}
+
+function scheduleResponse(
+  route: FixtureRouteKey,
+  response: ServerResponse,
+  pendingTimers: Set<ReturnType<typeof setTimeout>>,
+  delayMsFor: (route: FixtureRouteKey) => number,
+  send: () => void,
+): void {
+  const delayMs = delayMsFor(route);
+  if (delayMs <= 0) {
+    send();
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    pendingTimers.delete(timer);
+    send();
+  }, delayMs);
+
+  pendingTimers.add(timer);
+}
+
+function sendRouteResponse(
+  response: ServerResponse,
+  status: number,
+  rawBody: string | undefined,
+  body: unknown,
+): void {
+  if (response.destroyed || response.writableEnded) {
+    return;
+  }
+
+  response.writeHead(status, { "content-type": "application/json" });
+  response.end(rawBody ?? JSON.stringify(body));
 }
