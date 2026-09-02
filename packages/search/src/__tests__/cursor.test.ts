@@ -17,14 +17,16 @@ function createSignedCursor(payload: unknown): string {
 
 describe("createServerSearchFiltersHash", () => {
   it("is stable across omitted defaults and ignores pagination state", () => {
-    expect(createServerSearchFiltersHash({ q: "github", limit: 30 })).toBe(
+    expect(createServerSearchFiltersHash({ q: "github", sort: "recent", limit: 30 })).toBe(
       createServerSearchFiltersHash({ q: "github", sort: "recent", limit: 100 }),
     );
   });
 
   it("changes when a result-shaping filter changes", () => {
-    expect(createServerSearchFiltersHash({ q: "github", verified: true })).not.toBe(
-      createServerSearchFiltersHash({ q: "github", verified: false }),
+    expect(
+      createServerSearchFiltersHash({ q: "github", verified: true, sort: "recent", limit: 30 }),
+    ).not.toBe(
+      createServerSearchFiltersHash({ q: "github", verified: false, sort: "recent", limit: 30 }),
     );
   });
 });
@@ -65,7 +67,7 @@ describe("createServerSearchCursorCodec", () => {
 
   it("rejects a tampered body and an invalid signed payload", () => {
     const codec = createServerSearchCursorCodec(secret);
-    const filtersHash = createServerSearchFiltersHash({ sort: "recent" });
+    const filtersHash = createServerSearchFiltersHash({ sort: "recent", limit: 30 });
     const validCursor = codec.encode({
       version: 1,
       sort: "recent",
@@ -84,7 +86,7 @@ describe("createServerSearchCursorCodec", () => {
 
   it("rejects a non-canonical encoding of a valid signature", () => {
     const codec = createServerSearchCursorCodec(secret);
-    const filtersHash = createServerSearchFiltersHash({ sort: "recent" });
+    const filtersHash = createServerSearchFiltersHash({ sort: "recent", limit: 30 });
     const cursor = codec.encode({
       version: 1,
       sort: "recent",
@@ -107,7 +109,7 @@ describe("createServerSearchCursorCodec", () => {
 
   it("rejects a validly signed cursor with an unsupported version", () => {
     const codec = createServerSearchCursorCodec(secret);
-    const filtersHash = createServerSearchFiltersHash({ sort: "recent" });
+    const filtersHash = createServerSearchFiltersHash({ sort: "recent", limit: 30 });
 
     expect(() =>
       codec.decode(

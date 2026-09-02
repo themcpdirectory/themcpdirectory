@@ -1,19 +1,12 @@
-import type { PublicServerSort, SupportedClientId } from "@themcpdirectory/api-contract";
+import type {
+  PublicServerSort,
+  PublicServerSummary,
+  serverCollectionQuerySchema,
+} from "@themcpdirectory/api-contract";
+import type { z } from "zod";
+import type { createServerSearchCursorCodec } from "./cursor.js";
 
-export interface SearchServersPageInput {
-  readonly q?: string;
-  readonly category?: string;
-  readonly publisher?: string;
-  readonly client?: SupportedClientId;
-  readonly transport?: string;
-  readonly registryType?: string;
-  readonly verified?: boolean;
-  readonly openSource?: boolean;
-  readonly status?: "active" | "deprecated" | "deleted_upstream" | "unavailable";
-  readonly sort?: PublicServerSort;
-  readonly cursor?: string;
-  readonly limit?: number;
-}
+export type SearchServersPageInput = z.infer<typeof serverCollectionQuerySchema>;
 
 export interface ServerSearchCursorPayload {
   readonly version: 1;
@@ -22,4 +15,34 @@ export interface ServerSearchCursorPayload {
   readonly secondary: string | number | null;
   readonly serverId: string;
   readonly filtersHash: string;
+}
+
+export interface SearchServersPageOptions {
+  readonly cursorCodec: ReturnType<typeof createServerSearchCursorCodec>;
+}
+
+export interface SearchServersPageRow {
+  readonly id: string;
+  readonly slug: string;
+  readonly title: string;
+  readonly shortDescription: string;
+  readonly currentVersion: string | null;
+  readonly listingStatus: "active" | "deprecated" | "deleted_upstream" | "unavailable";
+  readonly repositoryUrl: string | null;
+  readonly publisherSlug: string | null;
+  readonly publisherDisplayName: string | null;
+  readonly publisherVerified: boolean;
+  readonly officialRegistry: boolean;
+  readonly sourceAvailable: boolean | null;
+  readonly openSource: boolean | null;
+  readonly firstSeenAt: string;
+  readonly sortUpdatedAt: string | null;
+  readonly repositoryStars: number | null;
+  readonly relevanceScore: number | null;
+  readonly nameSortKey: string;
+}
+
+export interface SearchServersPageResult {
+  readonly items: readonly PublicServerSummary[];
+  readonly nextCursor: string | null;
 }

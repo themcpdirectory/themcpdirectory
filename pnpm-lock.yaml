@@ -479,6 +479,9 @@ importers:
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(pg@8.23.0)(postgres@3.4.7)
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
     devDependencies:
       '@themcpdirectory/eslint-config':
         specifier: workspace:*

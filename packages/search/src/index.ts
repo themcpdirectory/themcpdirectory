@@ -15,7 +15,20 @@ import {
 
 export { InvalidCursorError, createServerSearchCursorCodec } from "./public-api/cursor.js";
 export { createServerSearchFiltersHash } from "./public-api/query-fingerprint.js";
-export type { SearchServersPageInput, ServerSearchCursorPayload } from "./public-api/types.js";
+export {
+  buildCursorPredicate,
+  buildPrimarySortValue,
+  runSearchServersPageQuery,
+  searchServersPage,
+} from "./public-api/search-servers-page.js";
+export type { PublicServerSummary } from "./public-api/search-servers-page.js";
+export type {
+  SearchServersPageInput,
+  SearchServersPageOptions,
+  SearchServersPageResult,
+  SearchServersPageRow,
+  ServerSearchCursorPayload,
+} from "./public-api/types.js";
 
 export const SEARCH_RANKING_WEIGHTS = {
   exactSlugBoost: 120,
