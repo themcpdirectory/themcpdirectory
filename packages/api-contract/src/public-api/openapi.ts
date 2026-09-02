@@ -20,13 +20,14 @@ import {
   serverDetailResponseSchema,
   supportedClientIdSchema,
 } from "./servers.js";
-import { slugSchema } from "./shared.js";
+import { httpUrlSchema, slugSchema } from "./shared.js";
 
 extendZodWithOpenApi(z);
 
 type OpenAPIObject = ReturnType<OpenApiGeneratorV31["generateDocument"]>;
 
 export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
+  const validatedBaseUrl = httpUrlSchema.parse(baseUrl);
   const registry = new OpenAPIRegistry();
 
   const slugPathParams = z.object({
@@ -204,6 +205,6 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   return generator.generateDocument({
     openapi: "3.1.0",
     info: { title: "The MCP Directory Public API", version: "1.0.0" },
-    servers: [{ url: baseUrl }],
+    servers: [{ url: validatedBaseUrl }],
   });
 }

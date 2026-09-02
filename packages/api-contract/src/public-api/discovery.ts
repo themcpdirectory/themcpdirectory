@@ -17,6 +17,7 @@ const categorySummarySchema = strictObject({
 
 export const categoriesCollectionResponseSchema =
   createCollectionResponseSchema(categorySummarySchema);
+export type CategoriesCollectionResponse = z.infer<typeof categoriesCollectionResponseSchema>;
 export type PublicCategorySummary = z.infer<
   typeof categoriesCollectionResponseSchema
 >["data"][number];
@@ -32,6 +33,7 @@ export const categoryDetailResponseSchema = createResourceResponseSchema(
     nextCursor: z.string().nullable(),
   }),
 );
+export type CategoryDetailResponse = z.infer<typeof categoryDetailResponseSchema>;
 export type PublicCategoryDetail = z.infer<typeof categoryDetailResponseSchema>["data"];
 
 export const publisherDetailResponseSchema = createResourceResponseSchema(
@@ -46,6 +48,7 @@ export const publisherDetailResponseSchema = createResourceResponseSchema(
     nextCursor: z.string().nullable(),
   }),
 );
+export type PublisherDetailResponse = z.infer<typeof publisherDetailResponseSchema>;
 export type PublicPublisherDetail = z.infer<typeof publisherDetailResponseSchema>["data"];
 
 const clientSummarySchema = strictObject({
@@ -63,6 +66,7 @@ const clientSummarySchema = strictObject({
 });
 
 export const clientsCollectionResponseSchema = createCollectionResponseSchema(clientSummarySchema);
+export type ClientsCollectionResponse = z.infer<typeof clientsCollectionResponseSchema>;
 export type PublicClientSummary = z.infer<typeof clientsCollectionResponseSchema>["data"][number];
 
 export const clientDetailResponseSchema = createResourceResponseSchema(
@@ -72,4 +76,5 @@ export const clientDetailResponseSchema = createResourceResponseSchema(
     nextCursor: z.string().nullable(),
   }),
 );
+export type ClientDetailResponse = z.infer<typeof clientDetailResponseSchema>;
 export type PublicClientDetail = z.infer<typeof clientDetailResponseSchema>["data"];

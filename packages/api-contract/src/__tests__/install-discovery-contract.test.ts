@@ -7,7 +7,12 @@ import {
   clientsCollectionResponseSchema,
   installManifestQuerySchema,
   installManifestResponseSchema,
+  parseCategoriesCollectionResponse,
+  parseCategoryDetailResponse,
+  parseClientDetailResponse,
+  parseClientsCollectionResponse,
   parseInstallManifestResponse,
+  parsePublisherDetailResponse,
   publisherDetailResponseSchema,
 } from "../index.js";
 
@@ -555,6 +560,40 @@ describe("parseInstallManifestResponse", () => {
     },
   );
 
+  it.each([
+    "Command",
+    "shellCommand",
+    "scripts",
+    "preinstall",
+    "executable",
+    "executablePath",
+    "executableUrl",
+    "exec",
+    "execPath",
+    "cmd",
+    "run",
+    "run_command",
+    "entrypoint",
+    "bin",
+    "powerShell",
+    "bash",
+  ])("rejects executable-key alias %s", (forbiddenKey) => {
+    const sourcePackageVariant = installManifestResponseExample.data.variants[0];
+    if (!sourcePackageVariant || sourcePackageVariant.kind !== "package") {
+      throw new Error("Expected a package variant in the install manifest example");
+    }
+
+    expect(() =>
+      parseInstallManifestResponse({
+        ...installManifestResponseExample,
+        data: {
+          ...installManifestResponseExample.data,
+          variants: [{ ...sourcePackageVariant, [forbiddenKey]: "unsafe" }],
+        },
+      }),
+    ).toThrow();
+  });
+
   it.each(["command", "shell", "script", "expression", "eval", "callback", "postinstall", "hook"])(
     "rejects nested reserved executable key %s",
     (forbiddenKey) => {
@@ -701,6 +740,99 @@ describe("parseInstallManifestResponse", () => {
 });
 
 describe("discovery response schemas", () => {
+  it("uses tolerant client parsers for every discovery response", () => {
+    const parsedCategories = parseCategoriesCollectionResponse({
+      data: [
+        {
+          slug: "developer-tools",
+          name: "Developer Tools",
+          description: null,
+          serverCount: 12,
+          futureCategoryField: "preserved",
+        },
+      ],
+      meta: { requestId: "req_phase_d_028", nextCursor: null },
+    });
+    const parsedCategory = parseCategoryDetailResponse({
+      data: {
+        category: {
+          slug: "developer-tools",
+          name: "Developer Tools",
+          description: null,
+        },
+        servers: [{ ...serverSummaryExample, futureServerField: "preserved" }],
+        nextCursor: null,
+        futureCategoryDetailField: "preserved",
+      },
+      meta: { requestId: "req_phase_d_029" },
+    });
+    const parsedPublisher = parsePublisherDetailResponse({
+      data: {
+        publisher: {
+          slug: "github",
+          name: "GitHub",
+          verified: true,
+          websiteUrl: "https://github.com",
+          futurePublisherField: "preserved",
+        },
+        servers: [serverSummaryExample],
+        nextCursor: null,
+      },
+      meta: { requestId: "req_phase_d_030" },
+    });
+    const capabilities = {
+      deeplink: true,
+      stdio: true,
+      streamableHttp: true,
+      headers: true,
+      environmentVariables: true,
+      remoteVariables: true,
+    };
+    const parsedClients = parseClientsCollectionResponse({
+      data: [
+        {
+          id: "cursor",
+          name: "Cursor",
+          capabilities: { ...capabilities, futureCapabilityField: "preserved" },
+          serverCount: 12,
+        },
+      ],
+      meta: { requestId: "req_phase_d_031", nextCursor: null },
+    });
+    const parsedClient = parseClientDetailResponse({
+      data: {
+        client: { id: "cursor", name: "Cursor", capabilities },
+        servers: [serverSummaryExample],
+        nextCursor: null,
+        futureClientDetailField: "preserved",
+      },
+      meta: { requestId: "req_phase_d_032" },
+    });
+
+    expect((parsedCategories.data[0] as Record<string, unknown>).futureCategoryField).toBe(
+      "preserved",
+    );
+    expect((parsedCategory.data as Record<string, unknown>).futureCategoryDetailField).toBe(
+      "preserved",
+    );
+    expect((parsedPublisher.data.publisher as Record<string, unknown>).futurePublisherField).toBe(
+      "preserved",
+    );
+    expect(
+      (parsedClients.data[0]?.capabilities as Record<string, unknown>).futureCapabilityField,
+    ).toBe("preserved");
+    expect((parsedClient.data as Record<string, unknown>).futureClientDetailField).toBe(
+      "preserved",
+    );
+
+    expect(() =>
+      parseClientsCollectionResponse({
+        data: [{ id: "cursor", name: "Cursor", capabilities, serverCount: -1 }],
+        meta: { requestId: "req_phase_d_033", nextCursor: null },
+      }),
+    ).toThrow();
+  });
+
   it("validate the approved category, publisher, and client shapes", () => {
     expect(
       categoriesCollectionResponseSchema.parse({

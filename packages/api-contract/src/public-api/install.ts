@@ -19,17 +19,53 @@ function isExactPypiPackageVersion(version: string): boolean {
   return validPep440(version) !== null;
 }
 
-const EXACT_PACKAGE_VERSION_OPENAPI_PATTERN =
-  /^(?!.*(?:[<>=~^*]))(?![0-9]+(?:\.[0-9]+)*\.[xX]$)v?[0-9][0-9A-Za-z.!+_-]*$/;
+function createBoundedUnsignedIntegerPattern(maximum: string): string {
+  const alternatives = [`[1-9]\\d{0,${maximum.length - 2}}`];
+
+  for (let index = 0; index < maximum.length; index += 1) {
+    const maximumDigit = Number(maximum[index]);
+    const minimumDigit = index === 0 ? 1 : 0;
+    if (maximumDigit <= minimumDigit) {
+      continue;
+    }
+
+    const prefix = maximum.slice(0, index);
+    const upperDigit = maximumDigit - 1;
+    const digitPattern =
+      minimumDigit === upperDigit ? `${upperDigit}` : `[${minimumDigit}-${upperDigit}]`;
+    const remainingDigits = maximum.length - index - 1;
+    alternatives.push(
+      `${prefix}${digitPattern}${remainingDigits === 0 ? "" : `\\d{${remainingDigits}}`}`,
+    );
+  }
+
+  alternatives.push(maximum);
+  return `(?:0|${alternatives.join("|")})`;
+}
+
+const npmNumericIdentifierPattern = createBoundedUnsignedIntegerPattern(
+  String(Number.MAX_SAFE_INTEGER),
+);
+const npmPrereleaseNumericIdentifierPattern = "(?:0|[1-9]\\d*)";
+const EXACT_NPM_PACKAGE_VERSION_PATTERN = new RegExp(
+  `^${npmNumericIdentifierPattern}\\.${npmNumericIdentifierPattern}\\.${npmNumericIdentifierPattern}(?:-(?:${npmPrereleaseNumericIdentifierPattern}|\\d*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:${npmPrereleaseNumericIdentifierPattern}|\\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$`,
+);
+const EXACT_PYPI_PACKAGE_VERSION_PATTERN =
+  /^[vV]?(?:(?:[0-9]+!)?[0-9]+(?:\.[0-9]+)*(?:[-_.]?(?:[aA]|[bB]|[cC]|[rR][cC]|[aA][lL][pP][hH][aA]|[bB][eE][tT][aA]|[pP][rR][eE]|[pP][rR][eE][vV][iI][eE][wW])[-_.]?[0-9]*)?(?:(?:-[0-9]+)|(?:[-_.]?(?:[pP][oO][sS][tT]|[rR][eE][vV]|[rR])[-_.]?[0-9]*))?(?:[-_.]?[dD][eE][vV][-_.]?[0-9]*)?)(?:\+[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*)?$/;
 
 export const installManifestPackageRegistryTypeSchema = z.enum(["npm", "pypi"]);
-export const installManifestPackageVersionSchema = z
+export const installManifestNpmPackageVersionSchema = z
   .string()
-  .regex(EXACT_PACKAGE_VERSION_OPENAPI_PATTERN)
-  .refine(
-    (version) => isExactNpmPackageVersion(version) || isExactPypiPackageVersion(version),
-    "Package version must be an exact immutable npm or PyPI version",
-  );
+  .regex(EXACT_NPM_PACKAGE_VERSION_PATTERN)
+  .refine(isExactNpmPackageVersion, "Package version must be an exact immutable npm version");
+export const installManifestPypiPackageVersionSchema = z
+  .string()
+  .regex(EXACT_PYPI_PACKAGE_VERSION_PATTERN)
+  .refine(isExactPypiPackageVersion, "Package version must be an exact immutable PyPI version");
+export const installManifestPackageVersionSchema = z.union([
+  installManifestNpmPackageVersionSchema,
+  installManifestPypiPackageVersionSchema,
+]);
 export const installManifestPackageRuntimeHintSchema = z.enum(["npx"]);
 export const installManifestPackageTransportSchema = z.literal("stdio");
 export const installManifestRemoteTransportSchema = z.enum(["streamable-http", "sse"]);
@@ -75,6 +111,42 @@ export const installManifestQuerySchema = strictObject({
   client: supportedClientIdSchema.optional(),
 });
 
+const packageVariantShape = {
+  id: uuidSchema,
+  kind: z.literal("package"),
+  identifier: z.string().min(1),
+  runtimeHint: installManifestPackageRuntimeHintSchema.nullable(),
+  transport: installManifestPackageTransportSchema,
+  runtimeArguments: z.array(argumentSchema),
+  packageArguments: z.array(argumentSchema),
+  environmentVariables: z.array(environmentVariableSchema),
+  integrity: strictObject({
+    algorithm: z.literal("sha256"),
+    digest: z.string().regex(/^[a-f0-9]{64}$/i),
+  }).nullable(),
+};
+
+const npmPackageVariantSchema = strictObject({
+  ...packageVariantShape,
+  registryType: z.literal("npm"),
+  version: installManifestNpmPackageVersionSchema,
+});
+
+const pypiPackageVariantSchema = strictObject({
+  ...packageVariantShape,
+  registryType: z.literal("pypi"),
+  version: installManifestPypiPackageVersionSchema,
+});
+
+const remoteVariantSchema = strictObject({
+  id: uuidSchema,
+  kind: z.literal("remote"),
+  transport: installManifestRemoteTransportSchema,
+  urlTemplate: httpUrlSchema,
+  headers: z.array(headerSchema),
+  variables: z.array(remoteVariableSchema),
+});
+
 const installManifestServerSchema = strictObject({
   schemaVersion: z.literal(1),
   server: strictObject({
@@ -89,51 +161,13 @@ const installManifestServerSchema = strictObject({
     observedAt: rfc3339UtcSchema,
   }),
   variants: z.array(
-    z.discriminatedUnion("kind", [
-      strictObject({
-        id: uuidSchema,
-        kind: z.literal("package"),
-        registryType: installManifestPackageRegistryTypeSchema,
-        identifier: z.string().min(1),
-        version: installManifestPackageVersionSchema,
-        runtimeHint: installManifestPackageRuntimeHintSchema.nullable(),
-        transport: installManifestPackageTransportSchema,
-        runtimeArguments: z.array(argumentSchema),
-        packageArguments: z.array(argumentSchema),
-        environmentVariables: z.array(environmentVariableSchema),
-        integrity: strictObject({
-          algorithm: z.literal("sha256"),
-          digest: z.string().regex(/^[a-f0-9]{64}$/i),
-        }).nullable(),
-      }),
-      strictObject({
-        id: uuidSchema,
-        kind: z.literal("remote"),
-        transport: installManifestRemoteTransportSchema,
-        urlTemplate: httpUrlSchema,
-        headers: z.array(headerSchema),
-        variables: z.array(remoteVariableSchema),
-      }),
-    ]),
+    z.union([npmPackageVariantSchema, pypiPackageVariantSchema, remoteVariantSchema]),
   ),
   compatibility: strictObject({
     "claude-code": compatibilityStatusSchema.optional(),
     codex: compatibilityStatusSchema.optional(),
     cursor: compatibilityStatusSchema.optional(),
   }),
-}).superRefine((manifest, context) => {
-  manifest.variants.forEach((variant, index) => {
-    if (
-      variant.kind === "package" &&
-      !isExactPackageVersionForRegistry(variant.registryType, variant.version)
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: `Version must be an exact immutable ${variant.registryType} version`,
-        path: ["variants", index, "version"],
-      });
-    }
-  });
 });
 
 export const installManifestResponseSchema = createResourceResponseSchema(

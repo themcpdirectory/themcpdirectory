@@ -1,18 +1,23 @@
 import { z } from "zod";
+import type {
+  CategoriesCollectionResponse,
+  CategoryDetailResponse,
+  ClientDetailResponse,
+  ClientsCollectionResponse,
+  PublisherDetailResponse,
+} from "./discovery.js";
 import {
   compatibilityStatusSchema,
   listingStatusSchema,
+  supportedClientIdSchema,
 } from "./servers.js";
-import type {
-  InstallManifestResponse,
-} from "./install.js";
+import type { InstallManifestResponse } from "./install.js";
 import {
-  installManifestPackageRegistryTypeSchema,
+  installManifestNpmPackageVersionSchema,
   installManifestPackageRuntimeHintSchema,
   installManifestPackageTransportSchema,
-  installManifestPackageVersionSchema,
+  installManifestPypiPackageVersionSchema,
   installManifestRemoteTransportSchema,
-  isExactPackageVersionForRegistry,
 } from "./install.js";
 import type {
   ResolvedServerResponse,
@@ -182,6 +187,81 @@ const resolveServerIdentifierClientResponseSchema = clientObject({
   meta: clientObject({ requestId: requestIdSchema }),
 });
 
+const categorySummaryClientSchema = clientObject({
+  slug: slugSchema,
+  name: z.string().min(1),
+  description: z.string().nullable(),
+  serverCount: z.number().int().nonnegative(),
+});
+
+const categoriesCollectionClientResponseSchema = clientObject({
+  data: z.array(categorySummaryClientSchema),
+  meta: clientObject({
+    requestId: requestIdSchema,
+    nextCursor: z.string().nullable(),
+  }),
+});
+
+const categoryDetailClientResponseSchema = clientObject({
+  data: clientObject({
+    category: clientObject({
+      slug: slugSchema,
+      name: z.string().min(1),
+      description: z.string().nullable(),
+    }),
+    servers: z.array(serverSummaryClientSchema),
+    nextCursor: z.string().nullable(),
+  }),
+  meta: clientObject({ requestId: requestIdSchema }),
+});
+
+const publisherDetailClientResponseSchema = clientObject({
+  data: clientObject({
+    publisher: clientObject({
+      slug: slugSchema,
+      name: z.string().min(1),
+      verified: z.boolean(),
+      websiteUrl: httpUrlSchema.nullable(),
+    }),
+    servers: z.array(serverSummaryClientSchema),
+    nextCursor: z.string().nullable(),
+  }),
+  meta: clientObject({ requestId: requestIdSchema }),
+});
+
+const clientCapabilitiesClientSchema = clientObject({
+  deeplink: z.boolean(),
+  stdio: z.boolean(),
+  streamableHttp: z.boolean(),
+  headers: z.boolean(),
+  environmentVariables: z.boolean(),
+  remoteVariables: z.boolean(),
+});
+
+const clientSummaryClientSchema = clientObject({
+  id: supportedClientIdSchema,
+  name: z.string().min(1),
+  capabilities: clientCapabilitiesClientSchema,
+  serverCount: z.number().int().nonnegative(),
+});
+
+const clientsCollectionClientResponseSchema = clientObject({
+  data: z.array(clientSummaryClientSchema),
+  meta: clientObject({
+    requestId: requestIdSchema,
+    nextCursor: z.string().nullable(),
+  }),
+});
+
+const clientDetailClientResponseSchema = clientObject({
+  data: clientObject({
+    client: clientSummaryClientSchema.omit({ serverCount: true }),
+    servers: z.array(serverSummaryClientSchema),
+    nextCursor: z.string().nullable(),
+  }),
+  meta: clientObject({ requestId: requestIdSchema }),
+});
+
 const installManifestArgumentClientSchema = clientObject({
   type: z.enum(["positional", "named"]),
   name: z.string().min(1).nullable().optional(),
@@ -190,12 +270,10 @@ const installManifestArgumentClientSchema = clientObject({
   required: z.boolean().optional(),
 });
 
-const packageVariantClientSchema = clientObject({
+const packageVariantClientShape = {
   id: uuidSchema,
   kind: z.literal("package"),
-  registryType: installManifestPackageRegistryTypeSchema,
   identifier: z.string().min(1),
-  version: installManifestPackageVersionSchema,
   runtimeHint: installManifestPackageRuntimeHintSchema.nullable(),
   transport: installManifestPackageTransportSchema,
   runtimeArguments: z.array(installManifestArgumentClientSchema),
@@ -213,6 +291,18 @@ const packageVariantClientSchema = clientObject({
     algorithm: z.literal("sha256"),
     digest: z.string().regex(/^[a-f0-9]{64}$/i),
   }).nullable(),
+};
+
+const npmPackageVariantClientSchema = clientObject({
+  ...packageVariantClientShape,
+  registryType: z.literal("npm"),
+  version: installManifestNpmPackageVersionSchema,
+});
+
+const pypiPackageVariantClientSchema = clientObject({
+  ...packageVariantClientShape,
+  registryType: z.literal("pypi"),
+  version: installManifestPypiPackageVersionSchema,
 });
 
 const remoteVariantClientSchema = clientObject({
@@ -232,15 +322,47 @@ const remoteVariantClientSchema = clientObject({
 });
 
 const forbiddenInstallManifestKeys = new Set([
+  "bash",
+  "bin",
   "callback",
+  "cmd",
   "command",
+  "entrypoint",
   "eval",
+  "exec",
+  "executable",
+  "executablepath",
+  "executableurl",
   "expression",
   "hook",
   "postinstall",
+  "powershell",
+  "preinstall",
+  "run",
   "script",
+  "scripts",
   "shell",
+  "shellcommand",
 ]);
+
+function normalizeInstallManifestKey(key: string): string {
+  return key.toLowerCase().replaceAll(/[-_\s]/g, "");
+}
+
+function getInstallManifestKeyTokens(key: string): string[] {
+  return key
+    .replaceAll(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+function isForbiddenInstallManifestKey(key: string): boolean {
+  return (
+    forbiddenInstallManifestKeys.has(normalizeInstallManifestKey(key)) ||
+    getInstallManifestKeyTokens(key).some((token) => forbiddenInstallManifestKeys.has(token))
+  );
+}
 
 function findForbiddenInstallManifestPath(
   value: unknown,
@@ -255,7 +377,7 @@ function findForbiddenInstallManifestPath(
 
   for (const [key, child] of Object.entries(value)) {
     const childPath = [...path, key];
-    if (forbiddenInstallManifestKeys.has(key)) {
+    if (isForbiddenInstallManifestKey(key)) {
       return childPath;
     }
 
@@ -282,26 +404,17 @@ const installManifestClientSchema = clientObject({
     observedAt: rfc3339UtcSchema,
   }),
   variants: z.array(
-    z.discriminatedUnion("kind", [packageVariantClientSchema, remoteVariantClientSchema]),
+    z.union([
+      npmPackageVariantClientSchema,
+      pypiPackageVariantClientSchema,
+      remoteVariantClientSchema,
+    ]),
   ),
   compatibility: clientObject({
     "claude-code": compatibilityStatusSchema.optional(),
     codex: compatibilityStatusSchema.optional(),
     cursor: compatibilityStatusSchema.optional(),
   }),
-}).superRefine((manifest, context) => {
-  manifest.variants.forEach((variant, index) => {
-    if (
-      variant.kind === "package" &&
-      !isExactPackageVersionForRegistry(variant.registryType, variant.version)
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: `Version must be an exact immutable ${variant.registryType} version`,
-        path: ["variants", index, "version"],
-      });
-    }
-  });
 });
 
 const installManifestClientResponseSchema = clientObject({
@@ -332,9 +445,7 @@ function getInstallManifestSchemaVersion(input: unknown): number | undefined {
   return typeof schemaVersion === "number" ? schemaVersion : undefined;
 }
 
-export function parseServerCollectionResponse(
-  input: unknown,
-): ServerCollectionResponse {
+export function parseServerCollectionResponse(input: unknown): ServerCollectionResponse {
   return serverCollectionClientResponseSchema.parse(input) as ServerCollectionResponse;
 }
 
@@ -342,15 +453,31 @@ export function parseServerDetailResponse(input: unknown): ServerDetailResponse 
   return serverDetailClientResponseSchema.parse(input) as ServerDetailResponse;
 }
 
-export function parseResolvedServerResponse(
-  input: unknown,
-): ResolvedServerResponse {
+export function parseResolvedServerResponse(input: unknown): ResolvedServerResponse {
   return resolveServerIdentifierClientResponseSchema.parse(input) as ResolvedServerResponse;
 }
 
-export function parseInstallManifestResponse(
-  input: unknown,
-): InstallManifestResponse {
+export function parseCategoriesCollectionResponse(input: unknown): CategoriesCollectionResponse {
+  return categoriesCollectionClientResponseSchema.parse(input) as CategoriesCollectionResponse;
+}
+
+export function parseCategoryDetailResponse(input: unknown): CategoryDetailResponse {
+  return categoryDetailClientResponseSchema.parse(input) as CategoryDetailResponse;
+}
+
+export function parsePublisherDetailResponse(input: unknown): PublisherDetailResponse {
+  return publisherDetailClientResponseSchema.parse(input) as PublisherDetailResponse;
+}
+
+export function parseClientsCollectionResponse(input: unknown): ClientsCollectionResponse {
+  return clientsCollectionClientResponseSchema.parse(input) as ClientsCollectionResponse;
+}
+
+export function parseClientDetailResponse(input: unknown): ClientDetailResponse {
+  return clientDetailClientResponseSchema.parse(input) as ClientDetailResponse;
+}
+
+export function parseInstallManifestResponse(input: unknown): InstallManifestResponse {
   const schemaVersion = getInstallManifestSchemaVersion(input);
 
   if (schemaVersion !== undefined && schemaVersion !== 1) {

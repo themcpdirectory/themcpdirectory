@@ -77,9 +77,12 @@ function getPathParameters(document: OpenAPIObject, path: string): OpenApiParame
   );
 }
 
-function findPackageVersionPattern(value: unknown): string | undefined {
+function findPackageVersionPatterns(
+  value: unknown,
+  patterns: Partial<Record<"npm" | "pypi", string>> = {},
+): Partial<Record<"npm" | "pypi", string>> {
   if (!value || typeof value !== "object") {
-    return undefined;
+    return patterns;
   }
 
   const record = value as Record<string, unknown>;
@@ -87,22 +90,48 @@ function findPackageVersionPattern(value: unknown): string | undefined {
   if (properties && typeof properties === "object") {
     const propertyRecord = properties as Record<string, unknown>;
     if ("registryType" in propertyRecord && "version" in propertyRecord) {
+      const registryType = propertyRecord.registryType;
       const version = propertyRecord.version;
-      if (version && typeof version === "object") {
+      if (
+        registryType &&
+        typeof registryType === "object" &&
+        version &&
+        typeof version === "object"
+      ) {
+        const registryTypeRecord = registryType as Record<string, unknown>;
+        const registry: unknown =
+          registryTypeRecord.const ??
+          (Array.isArray(registryTypeRecord.enum) ? registryTypeRecord.enum[0] : undefined);
         const pattern = (version as Record<string, unknown>).pattern;
-        return typeof pattern === "string" ? pattern : undefined;
+        if ((registry === "npm" || registry === "pypi") && typeof pattern === "string") {
+          patterns[registry] = pattern;
+        }
       }
     }
   }
 
   for (const child of Object.values(record)) {
-    const pattern = findPackageVersionPattern(child);
-    if (pattern) {
-      return pattern;
-    }
+    findPackageVersionPatterns(child, patterns);
   }
 
-  return undefined;
+  return patterns;
+}
+
+function findHttpUrlSchemas(value: unknown, schemas: Record<string, unknown>[] = []) {
+  if (!value || typeof value !== "object") {
+    return schemas;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.pattern === "string" && record.pattern.includes("[hH][tT][tT][pP]")) {
+    schemas.push(record);
+  }
+
+  for (const child of Object.values(record)) {
+    findHttpUrlSchemas(child, schemas);
+  }
+
+  return schemas;
 }
 
 function isReferenceObject(
@@ -170,18 +199,40 @@ describe("createPublicApiOpenApiDocument", () => {
 
   it("documents exact package version restrictions", () => {
     const document = createPublicApiOpenApiDocument("https://api.themcpdirectory.test");
-    const packageVersionPattern = findPackageVersionPattern(document.components?.schemas);
+    const packageVersionPatterns = findPackageVersionPatterns(document.components?.schemas);
 
-    expect(packageVersionPattern).toBeDefined();
+    expect(packageVersionPatterns).toEqual({
+      npm: expect.any(String),
+      pypi: expect.any(String),
+    });
 
-    const packageVersionRegex = new RegExp(packageVersionPattern ?? "");
-    expect(packageVersionRegex.test("1.2.3")).toBe(true);
-    expect(packageVersionRegex.test("1.2.3beta2")).toBe(true);
-    expect(packageVersionRegex.test("latest")).toBe(false);
-    expect(packageVersionRegex.test("next")).toBe(false);
-    expect(packageVersionRegex.test("1.x")).toBe(false);
-    expect(packageVersionRegex.test("^1.2.3")).toBe(false);
-    expect(packageVersionRegex.test(">=1.2.3")).toBe(false);
+    const npmVersionRegex = new RegExp(packageVersionPatterns.npm ?? "");
+    expect(npmVersionRegex.test("1.2.3")).toBe(true);
+    expect(npmVersionRegex.test("1.2.3-beta.1+build.7")).toBe(true);
+    expect(npmVersionRegex.test("1.2.3-9007199254740992")).toBe(true);
+    expect(npmVersionRegex.test("9007199254740991.0.0")).toBe(true);
+    expect(npmVersionRegex.test("1.2")).toBe(false);
+    expect(npmVersionRegex.test("1.x")).toBe(false);
+    expect(npmVersionRegex.test("^1.2.3")).toBe(false);
+    expect(npmVersionRegex.test("9007199254740992.0.0")).toBe(false);
+
+    const pypiVersionRegex = new RegExp(packageVersionPatterns.pypi ?? "");
+    expect(pypiVersionRegex.test("1.2.3beta2")).toBe(true);
+    expect(pypiVersionRegex.test("1!2.3rc1.post2.dev3+linux.x86_64")).toBe(true);
+    expect(pypiVersionRegex.test("1.2.3....")).toBe(false);
+    expect(pypiVersionRegex.test("latest")).toBe(false);
+    expect(pypiVersionRegex.test(">=1.2.3")).toBe(false);
+  });
+
+  it("documents and validates HTTP(S)-only URLs", () => {
+    const document = createPublicApiOpenApiDocument("https://api.themcpdirectory.test");
+    const httpUrlSchemas = findHttpUrlSchemas(document.components?.schemas);
+
+    expect(httpUrlSchemas.length).toBeGreaterThan(0);
+    expect(httpUrlSchemas.every((schema) => schema.format === "uri")).toBe(true);
+    expect(() => createPublicApiOpenApiDocument("file:///tmp/openapi")).toThrow(
+      "URL must use the HTTP or HTTPS protocol",
+    );
   });
 
   it("keeps approved install and discovery examples valid against the runtime schemas", () => {
