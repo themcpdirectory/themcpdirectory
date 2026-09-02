@@ -16,9 +16,15 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
+    "@hono/zod-validator": "0.9.1",
+    "@themcpdirectory/api-contract": "workspace:*",
     "@themcpdirectory/config": "workspace:*",
+    "@themcpdirectory/db": "workspace:*",
+    "@themcpdirectory/domain": "workspace:*",
+    "@themcpdirectory/search": "workspace:*",
     "hono": "4.13.5",
-    "tsx": "4.23.13"
+    "tsx": "4.23.13",
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@themcpdirectory/eslint-config": "workspace:*",

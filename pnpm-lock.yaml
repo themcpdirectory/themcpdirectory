@@ -20,15 +20,33 @@ importers:
       '@hono/node-server':
         specifier: ^2.1.1
         version: 2.1.1(hono@4.13.5)
+      '@hono/zod-validator':
+        specifier: 0.9.1
+        version: 0.9.1(hono@4.13.5)(zod@4.5.4)
+      '@themcpdirectory/api-contract':
+        specifier: workspace:*
+        version: link:../../packages/api-contract
       '@themcpdirectory/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@themcpdirectory/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@themcpdirectory/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@themcpdirectory/search':
+        specifier: workspace:*
+        version: link:../../packages/search
       hono:
         specifier: 4.13.5
         version: 4.13.5
       tsx:
         specifier: 4.23.13
         version: 4.23.13
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
     devDependencies:
       '@themcpdirectory/eslint-config':
         specifier: workspace:*
@@ -1250,6 +1268,12 @@ packages:
     engines: {node: '>=20'}
     peerDependencies:
       hono: ^4
+
+  '@hono/zod-validator@0.9.1':
+    resolution: {integrity: sha512-iiv6w0qrIc0arfvCtUqBWsvl4fXjzaTcQcCJTTtCnkawF9HHGE+KjEl0ox3gQJ6rKZEgE3mLExlQCF72M+mNuw==}
+    peerDependencies:
+      hono: '>=4.11.2'
+      zod: ^3.25.0 || ^4.0.0
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -4223,6 +4247,11 @@ snapshots:
   '@hono/node-server@2.1.1(hono@4.13.5)':
     dependencies:
       hono: 4.13.5
+
+  '@hono/zod-validator@0.9.1(hono@4.13.5)(zod@4.5.4)':
+    dependencies:
+      hono: 4.13.5
+      zod: 4.5.4
 
   '@humanfs/core@0.19.2':
     dependencies:

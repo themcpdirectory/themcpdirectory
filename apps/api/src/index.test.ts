@@ -58,6 +58,7 @@ describe("API process", () => {
         API_PORT: String(port),
         DATABASE_URL: "postgresql://user:pass@localhost:5432/test",
         MCP_REGISTRY_BASE_URL: "https://registry.modelcontextprotocol.io",
+        API_CURSOR_SIGNING_SECRET: "phase-d-secret-phase-d-secret-phase-d-secret",
       },
       stdio: "pipe",
     });

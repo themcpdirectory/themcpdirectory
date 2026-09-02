@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { loadEnv } from "./env.js";
+import { loadApiEnv, loadEnv } from "./env.js";
 
 const BASE_ENV = {
   DATABASE_URL: "postgresql://user:pass@localhost:5432/db",
   MCP_REGISTRY_BASE_URL: "https://registry.modelcontextprotocol.io",
+  API_CURSOR_SIGNING_SECRET: "phase-d-secret-phase-d-secret-phase-d-secret",
 };
 
 describe("loadEnv", () => {
@@ -23,6 +24,45 @@ describe("loadEnv", () => {
     expect(env.API_PORT).toBe(3001);
   });
 
+  it("parses Phase D API defaults", () => {
+    const env = loadApiEnv(BASE_ENV);
+    expect(env.API_BASE_URL).toBe("http://127.0.0.1:3001");
+    expect(env.API_CORS_ALLOWED_ORIGINS).toEqual(["*"]);
+    expect(env.API_RATE_LIMIT_WINDOW_SECONDS).toBe(60);
+    expect(env.API_RATE_LIMIT_MAX_READS).toBe(120);
+  });
+
+  it("parses and trims an explicit CORS allowlist", () => {
+    const env = loadApiEnv({
+      ...BASE_ENV,
+      API_CORS_ALLOWED_ORIGINS: "https://one.example, https://two.example ",
+    });
+    expect(env.API_CORS_ALLOWED_ORIGINS).toEqual(["https://one.example", "https://two.example"]);
+  });
+
+  it("requires a sufficiently long cursor signing secret", () => {
+    expect(() => loadApiEnv({ ...BASE_ENV, API_CURSOR_SIGNING_SECRET: "too-short" })).toThrow();
+  });
+
+  it.each([
+    "",
+    "*,https://one.example",
+    "not-an-origin",
+    "ftp://files.example",
+    "https://one.example/path",
+    "https://one.example?query=value",
+  ])("rejects an invalid CORS allowlist: %s", (value) => {
+    expect(() => loadApiEnv({ ...BASE_ENV, API_CORS_ALLOWED_ORIGINS: value })).toThrow();
+  });
+
+  it("keeps API-only settings optional for workers, migrations, and seeds", () => {
+    const env = loadEnv({
+      DATABASE_URL: BASE_ENV.DATABASE_URL,
+      MCP_REGISTRY_BASE_URL: BASE_ENV.MCP_REGISTRY_BASE_URL,
+    });
+    expect(env.DATABASE_URL).toBe(BASE_ENV.DATABASE_URL);
+  });
+
   it("coerces WEB_PORT string to number", () => {
     const env = loadEnv({ ...BASE_ENV, WEB_PORT: "8080" });
     expect(env.WEB_PORT).toBe(8080);
@@ -39,11 +79,21 @@ describe("loadEnv", () => {
   });
 
   it("throws when DATABASE_URL is missing", () => {
-    expect(() => loadEnv({ MCP_REGISTRY_BASE_URL: BASE_ENV.MCP_REGISTRY_BASE_URL })).toThrow();
+    expect(() =>
+      loadEnv({
+        MCP_REGISTRY_BASE_URL: BASE_ENV.MCP_REGISTRY_BASE_URL,
+        API_CURSOR_SIGNING_SECRET: BASE_ENV.API_CURSOR_SIGNING_SECRET,
+      }),
+    ).toThrow();
   });
 
   it("throws when MCP_REGISTRY_BASE_URL is missing", () => {
-    expect(() => loadEnv({ DATABASE_URL: BASE_ENV.DATABASE_URL })).toThrow();
+    expect(() =>
+      loadEnv({
+        DATABASE_URL: BASE_ENV.DATABASE_URL,
+        API_CURSOR_SIGNING_SECRET: BASE_ENV.API_CURSOR_SIGNING_SECRET,
+      }),
+    ).toThrow();
   });
 
   it("throws when DATABASE_URL is not a URL", () => {
