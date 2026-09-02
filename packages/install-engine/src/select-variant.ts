@@ -10,7 +10,6 @@ import { UnsupportedVariantError, type UnsupportedVariantReason } from "./errors
 
 const SUPPORTED_REMOTE_TRANSPORTS = new Set<InstallManifestRemoteVariantV1["transport"]>([
   "streamable-http",
-  "sse",
 ]);
 
 function throwVariantError(
@@ -23,7 +22,12 @@ function throwVariantError(
 }
 
 function assertClientCompatible(manifest: InstallManifestV1, client: ClientId): void {
-  if (manifest.compatibility[client] === "unsupported") {
+  const compatibilityStatus = manifest.compatibility[client];
+
+  if (
+    compatibilityStatus !== "supported" &&
+    compatibilityStatus !== "supported_with_configuration"
+  ) {
     throwVariantError(
       "CLIENT_INCOMPATIBLE",
       client,
