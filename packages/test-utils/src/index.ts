@@ -28,3 +28,9 @@ export function postgresAdminCandidates(
     (value): value is string => value !== null,
   );
 }
+
+export { createFixtureDirectoryApiServer } from "./directory-api-server.js";
+export type {
+  FixtureDirectoryApiServer,
+  FixtureDirectoryApiServerOptions,
+} from "./directory-api-server.js";
