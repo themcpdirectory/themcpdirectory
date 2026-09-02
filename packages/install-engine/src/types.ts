@@ -162,6 +162,8 @@ export interface DeeplinkOperation {
 export type InstallOperation =
   ClientCommandOperation | ConfigWriteOperation | ConfigRemoveOperation | DeeplinkOperation;
 
+export type RemovalOperation = ClientCommandOperation | ConfigRemoveOperation;
+
 export interface InstallPlanBase {
   readonly schemaVersion: 1;
   readonly serverSlug: string;
@@ -177,7 +179,13 @@ export interface InstallPlan extends InstallPlanBase {
   readonly intentHash: string;
 }
 
-export interface RemovalPlan extends InstallPlanBase {
+export interface RemovalPlan {
+  readonly schemaVersion: 1;
+  readonly serverSlug: string;
+  readonly client: ClientId;
+  readonly scope: ClientScope;
+  readonly operations: readonly RemovalOperation[];
+  readonly previewLines: readonly string[];
   readonly variantId?: never;
   readonly manifestHash?: never;
   readonly intentHash?: never;
@@ -185,10 +193,14 @@ export interface RemovalPlan extends InstallPlanBase {
 
 export type Plan = InstallPlan | RemovalPlan;
 
+export interface CursorInstallDeeplinkDescriptor {
+  readonly kind: "cursor-install";
+}
+
 export interface AdapterSafetyDescriptor {
   readonly client: ClientId;
   readonly executableAllowList: readonly string[];
   readonly configRoots: readonly string[];
-  readonly deeplinkPrefixes: readonly string[];
+  readonly deeplink?: CursorInstallDeeplinkDescriptor;
   readonly supportedCapabilities: readonly AdapterCapability[];
 }

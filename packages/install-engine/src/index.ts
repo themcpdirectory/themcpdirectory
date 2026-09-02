@@ -10,12 +10,18 @@ export {
   ResolveIntentError,
   type ResolveIntentErrorReason,
 } from "./intent.js";
-export { hashInstallManifest, hashResolvedInstallIntent, serializeInstallPlan } from "./hash.js";
+export {
+  hashInstallManifest,
+  hashResolvedInstallIntent,
+  serializeInstallPlan,
+  serializeRemovalPlan,
+} from "./hash.js";
 export { assertExactPinnedVersion, parseSemVer, type ParsedSemVer } from "./semver.js";
 export { selectInstallVariant } from "./select-variant.js";
 export {
   PlanValidationError,
   validateInstallPlan,
+  validateRemovalPlan,
   type PlanValidationErrorCode,
   type PlanValidationErrorReason,
 } from "./validate-plan.js";
@@ -27,6 +33,7 @@ export {
   type ClientScope,
   type ConfigRemoveOperation,
   type ConfigWriteOperation,
+  type CursorInstallDeeplinkDescriptor,
   type DeeplinkOperation,
   type EnvironmentVariableInputDefinition,
   type InstallInputDefinition,
@@ -46,6 +53,7 @@ export {
   type RemoteAuthBinding,
   type RemoteAuthResolution,
   type RemoteHeaderInputDefinition,
+  type RemovalOperation,
   type RemoteVariableInputDefinition,
   type RemovalPlan,
   type ResolveIntentOptions,

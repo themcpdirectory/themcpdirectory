@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { InstallManifestV1 } from "@themcpdirectory/api-contract";
-import type { InstallPlan, JsonValue, ResolvedInstallIntent } from "./types.js";
+import type { InstallPlan, JsonValue, RemovalPlan, ResolvedInstallIntent } from "./types.js";
 
 function compareOrdinal(left: string, right: string): number {
   if (left < right) {
@@ -29,11 +29,18 @@ function canonicalizeJsonArray(
   const items: JsonValue[] = [];
 
   for (let index = 0; index < value.length; index += 1) {
-    if (!(index in value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (descriptor === undefined) {
       throw canonicalError(`Canonical JSON does not support sparse arrays at ${path.join(".")}`);
     }
 
-    items.push(canonicalizeJsonValue(value[index], [...path, String(index)], stack));
+    if ("get" in descriptor || "set" in descriptor) {
+      throw canonicalError(
+        `Canonical JSON does not support accessor properties at ${[...path, String(index)].join(".")}`,
+      );
+    }
+
+    items.push(canonicalizeJsonValue(descriptor.value, [...path, String(index)], stack));
   }
 
   return items;
@@ -55,9 +62,23 @@ function canonicalizeJsonObject(
     );
   }
 
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const [key, descriptor] of Object.entries(descriptors)) {
+    if ("get" in descriptor || "set" in descriptor) {
+      throw canonicalError(
+        `Canonical JSON does not support accessor properties at ${[...path, key].join(".") || "<root>"}`,
+      );
+    }
+  }
+
   const out: Record<string, JsonValue> = {};
   for (const key of Object.keys(value).sort(compareOrdinal)) {
-    out[key] = canonicalizeJsonValue(value[key], [...path, key], stack);
+    const descriptor = descriptors[key];
+    if (descriptor?.enumerable !== true || !("value" in descriptor)) {
+      continue;
+    }
+
+    out[key] = canonicalizeJsonValue(descriptor.value, [...path, key], stack);
   }
 
   return out;
@@ -83,7 +104,7 @@ export function canonicalizeJsonValue(
         );
       }
 
-      return value;
+      return Object.is(value, -0) ? 0 : value;
     }
     case "undefined":
       throw canonicalError(`Canonical JSON does not support undefined at ${path.join(".")}`);
@@ -133,5 +154,9 @@ export function hashResolvedInstallIntent(intent: ResolvedInstallIntent): string
 }
 
 export function serializeInstallPlan(plan: InstallPlan): string {
+  return serializeCanonicalJson(plan);
+}
+
+export function serializeRemovalPlan(plan: RemovalPlan): string {
   return serializeCanonicalJson(plan);
 }

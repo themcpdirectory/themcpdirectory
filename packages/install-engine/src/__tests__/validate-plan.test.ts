@@ -7,7 +7,9 @@ import type { ResolvedInstallIntent } from "../index.js";
 type HashInstallManifest = (manifest: InstallManifestV1) => string;
 type HashResolvedInstallIntent = (intent: ResolvedInstallIntent) => string;
 type SerializeInstallPlan = (plan: unknown) => string;
+type SerializeRemovalPlan = (plan: unknown) => string;
 type ValidateInstallPlan = (plan: unknown, descriptor: unknown) => unknown;
+type ValidateRemovalPlan = (plan: unknown, descriptor: unknown) => unknown;
 
 type PackageVariant = Extract<InstallManifestV1["variants"][number], { kind: "package" }>;
 
@@ -45,6 +47,16 @@ function getSerializeInstallPlan(): SerializeInstallPlan {
   return candidate as SerializeInstallPlan;
 }
 
+function getSerializeRemovalPlan(): SerializeRemovalPlan {
+  const candidate = Reflect.get(installEngine, "serializeRemovalPlan");
+  expect(typeof candidate).toBe("function");
+  if (typeof candidate !== "function") {
+    throw new Error("Expected serializeRemovalPlan to be exported");
+  }
+
+  return candidate as SerializeRemovalPlan;
+}
+
 function getValidateInstallPlan(): ValidateInstallPlan {
   const candidate = Reflect.get(installEngine, "validateInstallPlan");
   expect(typeof candidate).toBe("function");
@@ -53,6 +65,16 @@ function getValidateInstallPlan(): ValidateInstallPlan {
   }
 
   return candidate as ValidateInstallPlan;
+}
+
+function getValidateRemovalPlan(): ValidateRemovalPlan {
+  const candidate = Reflect.get(installEngine, "validateRemovalPlan");
+  expect(typeof candidate).toBe("function");
+  if (typeof candidate !== "function") {
+    throw new Error("Expected validateRemovalPlan to be exported");
+  }
+
+  return candidate as ValidateRemovalPlan;
 }
 
 function makePackageVariant(overrides: Partial<PackageVariant> = {}): PackageVariant {
@@ -159,7 +181,7 @@ function makeDescriptor(
     client: string;
     executableAllowList: readonly string[];
     configRoots: readonly string[];
-    deeplinkPrefixes: readonly string[];
+    deeplink: { kind: "cursor-install" } | undefined;
     supportedCapabilities: readonly string[];
   }> = {},
 ) {
@@ -167,7 +189,7 @@ function makeDescriptor(
     client: "codex",
     executableAllowList: ["codex", "/usr/local/bin/codex"],
     configRoots: ["/Users/test/.codex", "C:\\Users\\test\\.codex"],
-    deeplinkPrefixes: ["cursor://anysphere.cursor-deeplink/mcp/install?"],
+    deeplink: undefined,
     supportedCapabilities: [
       "native-add-stdio",
       "native-add-remote",
@@ -266,6 +288,33 @@ function makeInstallPlan(
     intentHash: INTENT_HASH,
     operations: [makeClientCommandOperation()],
     previewLines: ["Install GitHub into Codex user scope."],
+    ...overrides,
+  };
+}
+
+function makeRemovalPlan(
+  overrides: Partial<{
+    schemaVersion: number;
+    serverSlug: string;
+    client: string;
+    scope: string;
+    operations: readonly unknown[];
+    previewLines: readonly string[];
+  }> = {},
+) {
+  return {
+    schemaVersion: 1,
+    serverSlug: "github",
+    client: "codex",
+    scope: "user",
+    operations: [
+      makeClientCommandOperation({
+        args: ["mcp", "remove", "github"],
+        capability: "native-remove",
+      }),
+      makeConfigRemoveOperation(),
+    ],
+    previewLines: ["Remove GitHub from Codex user scope."],
     ...overrides,
   };
 }
@@ -512,6 +561,66 @@ describe("install plan hashing and validation", () => {
     }
   });
 
+  it("rejects accessor-backed config documents without invoking getters and preserves JSON semantics", () => {
+    const serializeInstallPlan = getSerializeInstallPlan();
+    const getterCalls: string[] = [];
+    const accessorDocument = Object.create(null) as Record<string, unknown>;
+    Object.defineProperty(accessorDocument, "token", {
+      enumerable: true,
+      get() {
+        getterCalls.push("token");
+        return "secret";
+      },
+    });
+
+    expect(() =>
+      serializeInstallPlan(
+        makeInstallPlan({
+          operations: [makeConfigWriteOperation({ document: accessorDocument })],
+        }),
+      ),
+    ).toThrow(/accessor/i);
+    expect(getterCalls).toEqual([]);
+
+    const shared = { nested: true };
+    const serialized = serializeInstallPlan(
+      makeInstallPlan({
+        operations: [
+          makeConfigWriteOperation({
+            document: {
+              zero: -0,
+              second: shared,
+              "\uE000": 2,
+              first: shared,
+              "\uD800\uDC00": 1,
+            },
+          }),
+        ],
+      }),
+    );
+
+    expect(serialized).toContain(
+      '{"document":{"first":{"nested":true},"second":{"nested":true},"zero":0,"𐀀":1,"":2}',
+    );
+    expect(serialized).toBe(
+      serializeInstallPlan(
+        makeInstallPlan({
+          operations: [
+            makeConfigWriteOperation({
+              document: {
+                second: shared,
+                first: shared,
+                "\uD800\uDC00": 1,
+                zero: -0,
+                "\uE000": 2,
+              },
+            }),
+          ],
+        }),
+      ),
+    );
+  });
+
   it("returns a deeply frozen validated install plan copy", () => {
     const validateInstallPlan = getValidateInstallPlan();
     const plan = makeInstallPlan({
@@ -636,6 +745,48 @@ describe("install plan hashing and validation", () => {
     );
   });
 
+  it("rejects unsafe descriptor executables but allows absolute executable paths containing spaces", () => {
+    const validateInstallPlan = getValidateInstallPlan();
+    const macCursorExecutable = "/Applications/Cursor App/Cursor.app/Contents/MacOS/Cursor";
+
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan(),
+          makeDescriptor({ executableAllowList: ["codex --help"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_DESCRIPTOR" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan(),
+          makeDescriptor({ executableAllowList: ["/tmp/codex;rm -rf /"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_DESCRIPTOR" },
+    );
+
+    const validated = validateInstallPlan(
+      makeInstallPlan({
+        client: "cursor",
+        operations: [
+          makeClientCommandOperation({
+            executable: macCursorExecutable,
+            capability: "native-add-stdio",
+          }),
+        ],
+      }),
+      makeDescriptor({
+        client: "cursor",
+        executableAllowList: [macCursorExecutable],
+        configRoots: ["/Users/test/.cursor"],
+        supportedCapabilities: ["native-add-stdio"],
+      }),
+    ) as { readonly operations: readonly [{ readonly executable: string }] };
+
+    expect(validated.operations[0]!.executable).toBe(macCursorExecutable);
+  });
+
   it("rejects config mutations outside approved roots on posix and windows semantics", () => {
     const validateInstallPlan = getValidateInstallPlan();
 
@@ -687,6 +838,84 @@ describe("install plan hashing and validation", () => {
     );
   });
 
+  it("requires absolute descriptor roots and absolute config paths in one path style", () => {
+    const validateInstallPlan = getValidateInstallPlan();
+
+    expectPlanValidationError(
+      () => validateInstallPlan(makeInstallPlan(), makeDescriptor({ configRoots: [".codex"] })),
+      { name: "PlanValidationError", code: "INVALID_DESCRIPTOR" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan(),
+          makeDescriptor({ configRoots: ["C:\\Users/test\\.codex"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_DESCRIPTOR" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan({ operations: [makeConfigWriteOperation({ path: "./mcp.json" })] }),
+          makeDescriptor({ configRoots: ["/Users/test/.codex"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_PATH" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan({
+            operations: [makeConfigWriteOperation({ path: "C:\\Users\\test/.codex\\mcp.json" })],
+          }),
+          makeDescriptor({ configRoots: ["C:\\Users\\test\\.codex"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_PATH" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan({
+            operations: [makeConfigWriteOperation({ path: "\\\\server\\share\\cursor\\mcp.json" })],
+          }),
+          makeDescriptor({ configRoots: ["C:\\Users\\test\\.codex"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_PATH" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan({
+            operations: [
+              makeConfigWriteOperation({
+                path: "\\\\?\\C:\\Users\\test\\.codex\\mcp.json",
+              }),
+            ],
+          }),
+          makeDescriptor({ configRoots: ["C:\\Users\\test\\.codex"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_PATH" },
+    );
+
+    const windowsValidated = validateInstallPlan(
+      makeInstallPlan({
+        operations: [makeConfigWriteOperation({ path: "C:\\Users\\TEST\\.codex\\mcp.json" })],
+      }),
+      makeDescriptor({ configRoots: ["C:\\Users\\test\\.codex"] }),
+    ) as { readonly operations: readonly [{ readonly path: string }] };
+    expect(windowsValidated.operations[0]!.path).toBe("C:\\Users\\TEST\\.codex\\mcp.json");
+
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan({
+            operations: [makeConfigWriteOperation({ path: "/users/test/.codex/mcp.json" })],
+          }),
+          makeDescriptor({ configRoots: ["/Users/test/.codex"] }),
+        ),
+      { name: "PlanValidationError", code: "PATH_OUTSIDE_ROOT" },
+    );
+  });
+
   it("rejects config documents that are not plain json values", () => {
     const validateInstallPlan = getValidateInstallPlan();
 
@@ -723,9 +952,24 @@ describe("install plan hashing and validation", () => {
       executableAllowList: [],
       configRoots: ["/Users/test/.cursor"],
       supportedCapabilities: ["cursor-deeplink"],
-      deeplinkPrefixes: ["cursor://anysphere.cursor-deeplink/mcp/install?"],
+      deeplink: { kind: "cursor-install" },
     });
 
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan({
+            client: "cursor",
+            operations: [
+              makeDeeplinkOperation({
+                url: "https://anysphere.cursor-deeplink/mcp/install?payload=ZXhhbXBsZQ==",
+              }),
+            ],
+          }),
+          descriptor,
+        ),
+      { name: "PlanValidationError", code: "INVALID_DEEPLINK" },
+    );
     expectPlanValidationError(
       () =>
         validateInstallPlan(
@@ -770,6 +1014,179 @@ describe("install plan hashing and validation", () => {
           descriptor,
         ),
       { name: "PlanValidationError", code: "INVALID_DEEPLINK" },
+    );
+
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan({
+            client: "cursor",
+            operations: [
+              makeDeeplinkOperation({
+                url: "cursor://anysphere.cursor-deeplink/mcp/install?payload=ZXhhbXBsZQ==&extra=1",
+              }),
+            ],
+          }),
+          descriptor,
+        ),
+      { name: "PlanValidationError", code: "INVALID_DEEPLINK" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan({
+            client: "cursor",
+            operations: [
+              makeDeeplinkOperation({
+                url: "cursor://anysphere.cursor-deeplink:443/mcp/install?payload=ZXhhbXBsZQ==",
+              }),
+            ],
+          }),
+          descriptor,
+        ),
+      { name: "PlanValidationError", code: "INVALID_DEEPLINK" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan({
+            client: "cursor",
+            operations: [
+              makeDeeplinkOperation({
+                url: "cursor://reader@anysphere.cursor-deeplink/mcp/install?payload=ZXhhbXBsZQ==",
+              }),
+            ],
+          }),
+          descriptor,
+        ),
+      { name: "PlanValidationError", code: "INVALID_DEEPLINK" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan({
+            client: "cursor",
+            operations: [
+              makeDeeplinkOperation({ url: "cursor://anysphere.cursor-deeplink/mcp/install" }),
+            ],
+          }),
+          descriptor,
+        ),
+      { name: "PlanValidationError", code: "INVALID_DEEPLINK" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan({
+            client: "cursor",
+            operations: [
+              makeDeeplinkOperation({
+                url: "cursor://anysphere.cursor-deeplink/mcp/install?install=ZXhhbXBsZQ==",
+              }),
+            ],
+          }),
+          descriptor,
+        ),
+      { name: "PlanValidationError", code: "INVALID_DEEPLINK" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateInstallPlan(
+          makeInstallPlan({
+            client: "cursor",
+            operations: [makeDeeplinkOperation()],
+          }),
+          makeDescriptor({
+            client: "codex",
+            executableAllowList: ["codex"],
+            configRoots: ["/Users/test/.codex"],
+            supportedCapabilities: ["cursor-deeplink"],
+            deeplink: { kind: "cursor-install" },
+          }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_DESCRIPTOR" },
+    );
+  });
+
+  it("serializes and validates removal plans separately from install plans", () => {
+    const serializeRemovalPlan = getSerializeRemovalPlan();
+    const validateRemovalPlan = getValidateRemovalPlan();
+
+    const plan = makeRemovalPlan({
+      client: "codex",
+      operations: [
+        makeClientCommandOperation({ args: ["mcp", "list"], capability: "native-list" }),
+        makeClientCommandOperation({
+          args: ["mcp", "remove", "github"],
+          capability: "native-remove",
+        }),
+        makeConfigRemoveOperation(),
+      ],
+    });
+
+    expect(serializeRemovalPlan(plan)).toBe(
+      '{"client":"codex","operations":[{"args":["mcp","list"],"capability":"native-list","executable":"codex","type":"client-command"},{"args":["mcp","remove","github"],"capability":"native-remove","executable":"codex","type":"client-command"},{"mutationKey":"mcpServers.github","path":"/Users/test/.codex/mcp.json","type":"config-remove"}],"previewLines":["Remove GitHub from Codex user scope."],"schemaVersion":1,"scope":"user","serverSlug":"github"}',
+    );
+
+    const validated = validateRemovalPlan(
+      plan,
+      makeDescriptor({
+        supportedCapabilities: ["native-remove", "native-list"],
+      }),
+    ) as {
+      readonly operations: readonly [
+        { readonly capability: string },
+        { readonly capability: string },
+        { readonly path: string },
+      ];
+    };
+
+    expect(validated).not.toBe(plan);
+    expect(Object.isFrozen(validated)).toBe(true);
+    expect(validated.operations[0]!.capability).toBe("native-list");
+    expect(validated.operations[1]!.capability).toBe("native-remove");
+    expect(validated.operations[2]!.path).toBe("/Users/test/.codex/mcp.json");
+
+    expectPlanValidationError(
+      () =>
+        validateRemovalPlan(
+          {
+            ...makeRemovalPlan(),
+            variantId: VARIANT_ID,
+            manifestHash: MANIFEST_HASH,
+            intentHash: INTENT_HASH,
+          },
+          makeDescriptor({ supportedCapabilities: ["native-remove"] }),
+        ),
+      { name: "PlanValidationError", code: "UNKNOWN_PLAN_FIELD" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateRemovalPlan(
+          makeRemovalPlan({
+            operations: [makeClientCommandOperation({ capability: "native-add-stdio" })],
+          }),
+          makeDescriptor({ supportedCapabilities: ["native-add-stdio", "native-remove"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_REMOVE_CAPABILITY" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateRemovalPlan(
+          makeRemovalPlan({
+            operations: [makeConfigRemoveOperation({ path: "./mcp.json" })],
+          }),
+          makeDescriptor({ supportedCapabilities: ["native-remove"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_PATH" },
+    );
+    expectPlanValidationError(
+      () =>
+        validateRemovalPlan(
+          makeRemovalPlan({ operations: [makeConfigWriteOperation()] }),
+          makeDescriptor({ supportedCapabilities: ["native-remove"] }),
+        ),
+      { name: "PlanValidationError", code: "INVALID_REMOVE_OPERATION" },
     );
   });
 });
