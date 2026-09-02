@@ -5,31 +5,57 @@ import type {
   ClientScope,
   InstallInputDefinition,
   InstallInputValue,
+  InstallManifestPackageVariantV1,
+  InstallManifestRemoteVariantV1,
+  InstallManifestVariantV1,
+  RemoteAuthBinding,
   RemoteAuthResolution,
   ResolveIntentOptions,
   ResolvedInstallIntent,
 } from "./types.js";
 
 const CLIENT_SCOPES = new Set<ClientScope>(["user", "project", "global"]);
+const SENSITIVE_INPUT_NAME_PATTERN = /(secret|token|password|auth|key)/i;
+const SENSITIVE_HEADER_NAME_PATTERN =
+  /^(authorization|proxy-authorization|cookie|set-cookie|x-api-key|api-key)$/i;
+const SENSITIVE_HEADER_HINT_PATTERN = /(token|key|secret|auth)/i;
+const HEADER_PLACEHOLDER_PATTERN = /\{([^{}]+)\}/g;
 
 export type ResolveIntentErrorReason =
-  "INVALID_SCOPE" | "NONINTERACTIVE_PERSISTED_SECRET" | "UNSUPPORTED_REMOTE_AUTH";
+  | "INVALID_SCOPE"
+  | "NONINTERACTIVE_PERSISTED_SECRET"
+  | "UNSUPPORTED_REMOTE_AUTH"
+  | "UNSAFE_REMOTE_HEADER"
+  | "UNSAFE_INPUT_DEFAULT";
 
 export class ResolveIntentError extends Error {
   readonly reason: ResolveIntentErrorReason;
   readonly inputKey?: string;
+  readonly inputName?: string;
+  readonly headerName?: string;
   readonly scope?: string;
 
   constructor(
     reason: ResolveIntentErrorReason,
     message: string,
-    options?: { readonly inputKey?: string; readonly scope?: string },
+    options?: {
+      readonly inputKey?: string;
+      readonly inputName?: string;
+      readonly headerName?: string;
+      readonly scope?: string;
+    },
   ) {
     super(message);
     this.name = "ResolveIntentError";
     this.reason = reason;
     if (options?.inputKey !== undefined) {
       this.inputKey = options.inputKey;
+    }
+    if (options?.inputName !== undefined) {
+      this.inputName = options.inputName;
+    }
+    if (options?.headerName !== undefined) {
+      this.headerName = options.headerName;
     }
     if (options?.scope !== undefined) {
       this.scope = options.scope;
@@ -54,16 +80,89 @@ function getRemoteHeaderInputs(
   );
 }
 
-function collectRequiredEnvReferences(values: Iterable<InstallInputValue>): readonly string[] {
-  const requiredEnvReferences = new Set<string>();
+function extractHeaderPlaceholders(template: string): readonly string[] {
+  const placeholders: string[] = [];
 
-  for (const value of values) {
-    if (value.kind === "env-reference") {
-      requiredEnvReferences.add(value.envName);
+  for (const match of template.matchAll(HEADER_PLACEHOLDER_PATTERN)) {
+    const placeholder = match[1]?.trim();
+    if (!placeholder || placeholders.includes(placeholder)) {
+      continue;
+    }
+
+    placeholders.push(placeholder);
+  }
+
+  return placeholders;
+}
+
+function isSensitiveHeaderName(name: string): boolean {
+  return SENSITIVE_HEADER_NAME_PATTERN.test(name) || SENSITIVE_HEADER_HINT_PATTERN.test(name);
+}
+
+function assertSafeRemoteHeaders(headers: InstallManifestRemoteVariantV1["headers"]): void {
+  for (const header of headers) {
+    if (!isSensitiveHeaderName(header.name)) {
+      continue;
+    }
+
+    if (extractHeaderPlaceholders(header.value).length === 0) {
+      throw new ResolveIntentError(
+        "UNSAFE_REMOTE_HEADER",
+        `Remote header ${header.name} must use placeholder-based secret references only`,
+        { headerName: header.name },
+      );
+    }
+  }
+}
+
+function assertSafeVariableDefaults(
+  variables:
+    | InstallManifestPackageVariantV1["environmentVariables"]
+    | InstallManifestRemoteVariantV1["variables"],
+): void {
+  for (const variable of variables) {
+    if (variable.defaultValue === null || !SENSITIVE_INPUT_NAME_PATTERN.test(variable.name)) {
+      continue;
+    }
+
+    throw new ResolveIntentError(
+      "UNSAFE_INPUT_DEFAULT",
+      `Input default for ${variable.name} cannot be serialized into an install intent`,
+      { inputName: variable.name },
+    );
+  }
+}
+
+function assertSafeSerializableVariant(variant: InstallManifestVariantV1): void {
+  if (variant.kind === "package") {
+    assertSafeVariableDefaults(variant.environmentVariables);
+    return;
+  }
+
+  assertSafeVariableDefaults(variant.variables);
+  assertSafeRemoteHeaders(variant.headers);
+}
+
+function collectRequiredEnvReferences(
+  inputs: readonly InstallInputDefinition[],
+  validatedInputs: ReadonlyMap<string, InstallInputValue>,
+): readonly string[] {
+  const seenEnvNames = new Set<string>();
+  const requiredEnvReferences: string[] = [];
+
+  for (const input of inputs) {
+    const value = validatedInputs.get(input.key);
+    if (value?.kind === "env-reference") {
+      if (seenEnvNames.has(value.envName)) {
+        continue;
+      }
+
+      seenEnvNames.add(value.envName);
+      requiredEnvReferences.push(value.envName);
     }
   }
 
-  return [...requiredEnvReferences];
+  return requiredEnvReferences;
 }
 
 function resolveRemoteAuth(
@@ -82,9 +181,12 @@ function resolveRemoteAuth(
     );
   }
 
-  const envReferenceInputKeys: string[] = [];
-  const envNames: string[] = [];
-  const persistedSecretInputKeys: string[] = [];
+  const bindings: RemoteAuthBinding[] = [];
+  const envBindings: Extract<RemoteAuthBinding, { readonly kind: "env-reference" }>[] = [];
+  const persistedSecretBindings: Extract<
+    RemoteAuthBinding,
+    { readonly kind: "persisted-secret" }
+  >[] = [];
 
   for (const input of remoteInputs) {
     const value = validatedInputs.get(input.key);
@@ -93,18 +195,25 @@ function resolveRemoteAuth(
     }
 
     if (value.kind === "env-reference") {
-      envReferenceInputKeys.push(input.key);
-      envNames.push(value.envName);
+      const binding = {
+        kind: "env-reference",
+        inputKey: input.key,
+        envName: value.envName,
+      } as const;
+      envBindings.push(binding);
+      bindings.push(binding);
       continue;
     }
 
     if (value.kind === "secret-value") {
-      persistedSecretInputKeys.push(input.key);
+      const binding = { kind: "persisted-secret", inputKey: input.key } as const;
+      persistedSecretBindings.push(binding);
+      bindings.push(binding);
     }
   }
 
-  if (persistedSecretInputKeys.length > 0) {
-    const inputKey = persistedSecretInputKeys[0];
+  if (persistedSecretBindings.length > 0) {
+    const inputKey = persistedSecretBindings[0]?.inputKey;
     if (options.noninteractive === true) {
       throw new ResolveIntentError(
         "NONINTERACTIVE_PERSISTED_SECRET",
@@ -113,24 +222,36 @@ function resolveRemoteAuth(
       );
     }
 
+    const warningInputKeys = persistedSecretBindings.map((binding) => binding.inputKey);
+
+    if (envBindings.length === 0) {
+      return {
+        remoteAuth: {
+          kind: "persisted-secret",
+          bindings: persistedSecretBindings,
+          requiresInteractiveConsent: true,
+        },
+        warnings: [
+          `Remote auth requires persisted secret input for ${warningInputKeys.join(", ")}.`,
+        ],
+      };
+    }
+
     return {
       remoteAuth: {
-        kind: "persisted-secret",
-        inputKeys: persistedSecretInputKeys,
+        kind: "mixed",
+        bindings,
         requiresInteractiveConsent: true,
       },
-      warnings: [
-        `Remote auth requires persisted secret input for ${persistedSecretInputKeys.join(", ")}.`,
-      ],
+      warnings: [`Remote auth requires persisted secret input for ${warningInputKeys.join(", ")}.`],
     };
   }
 
-  if (envReferenceInputKeys.length > 0) {
+  if (envBindings.length > 0) {
     return {
       remoteAuth: {
         kind: "env-reference",
-        inputKeys: envReferenceInputKeys,
-        envNames,
+        bindings: envBindings,
       },
       warnings: [],
     };
@@ -152,16 +273,20 @@ export function createResolvedInstallIntent(
   assertClientScope(options.scope);
 
   const variant = selectInstallVariant(manifest, options.client, options.requestedVariantId);
+  if (variant.kind === "remote" && options.remoteAuthPreference === "client-oauth") {
+    throw new ResolveIntentError(
+      "UNSUPPORTED_REMOTE_AUTH",
+      "Phase D install manifests do not declare explicit remote OAuth support",
+    );
+  }
+
+  assertSafeSerializableVariant(variant);
+
   const inputs = createInstallInputDefinitions(variant);
   const remoteHeaderInputs = variant.kind === "remote" ? getRemoteHeaderInputs(inputs) : [];
-  const skipRequiredKeys =
-    remoteHeaderInputs.length > 0 && options.remoteAuthPreference === "client-oauth"
-      ? remoteHeaderInputs.map((input) => input.key)
-      : [];
   const validatedInputs = validateInputDefinitions(
     inputs,
     getValidationInputValues(options.inputValues),
-    skipRequiredKeys.length === 0 ? undefined : { skipRequiredKeys },
   );
   const { remoteAuth, warnings } =
     variant.kind === "remote"
@@ -181,6 +306,6 @@ export function createResolvedInstallIntent(
     warnings,
     inputs,
     remoteAuth,
-    requiredEnvReferences: collectRequiredEnvReferences(validatedInputs.values()),
+    requiredEnvReferences: collectRequiredEnvReferences(inputs, validatedInputs),
   };
 }

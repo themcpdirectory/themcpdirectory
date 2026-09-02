@@ -8,8 +8,10 @@ import type {
   ValidatedInstallInputMap,
 } from "./types.js";
 
-const ENVIRONMENT_VARIABLE_NAME_PATTERN = /^[A-Z][A-Z0-9_]*$/;
+const ENVIRONMENT_VARIABLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const HEADER_PLACEHOLDER_PATTERN = /\{([^{}]+)\}/g;
+
+const READONLY_INPUT_MAP_ERROR_MESSAGE = "Validated install inputs are read-only";
 
 export type InstallInputValidationErrorReason =
   | "UNKNOWN_INPUT"
@@ -28,6 +30,75 @@ export class InstallInputValidationError extends Error {
     this.reason = reason;
     this.inputKey = inputKey;
   }
+}
+
+class ReadonlyValidatedInstallInputMap implements ValidatedInstallInputMap {
+  readonly #map: ReadonlyMap<string, InstallInputValue>;
+
+  constructor(entries: ReadonlyMap<string, InstallInputValue>) {
+    this.#map = new Map(entries);
+  }
+
+  get size(): number {
+    return this.#map.size;
+  }
+
+  get(key: string): InstallInputValue | undefined {
+    return this.#map.get(key);
+  }
+
+  has(key: string): boolean {
+    return this.#map.has(key);
+  }
+
+  forEach(
+    callbackfn: (
+      value: InstallInputValue,
+      key: string,
+      map: ReadonlyMap<string, InstallInputValue>,
+    ) => void,
+    thisArg?: unknown,
+  ): void {
+    this.#map.forEach((value, key) => callbackfn.call(thisArg, value, key, this), thisArg);
+  }
+
+  entries(): MapIterator<[string, InstallInputValue]> {
+    return this.#map.entries();
+  }
+
+  keys(): MapIterator<string> {
+    return this.#map.keys();
+  }
+
+  values(): MapIterator<InstallInputValue> {
+    return this.#map.values();
+  }
+
+  [Symbol.iterator](): MapIterator<[string, InstallInputValue]> {
+    return this.entries();
+  }
+
+  get [Symbol.toStringTag](): string {
+    return "ReadonlyMap";
+  }
+
+  set(): never {
+    throw new TypeError(READONLY_INPUT_MAP_ERROR_MESSAGE);
+  }
+
+  delete(): never {
+    throw new TypeError(READONLY_INPUT_MAP_ERROR_MESSAGE);
+  }
+
+  clear(): never {
+    throw new TypeError(READONLY_INPUT_MAP_ERROR_MESSAGE);
+  }
+}
+
+function createReadonlyValidatedInstallInputMap(
+  entries: ReadonlyMap<string, InstallInputValue>,
+): ValidatedInstallInputMap {
+  return new ReadonlyValidatedInstallInputMap(entries);
 }
 
 function createUniqueKey(
@@ -90,7 +161,6 @@ function createEnvironmentVariableDefinitions(
     name: variable.name,
     description: variable.description,
     required: variable.required,
-    defaultValue: variable.defaultValue,
     accepts: ["env-reference"],
   }));
 }
@@ -105,7 +175,6 @@ function createRemoteVariableDefinitions(
     name: variable.name,
     description: variable.description,
     required: variable.required,
-    defaultValue: variable.defaultValue,
     accepts: ["text"],
   }));
 }
@@ -143,7 +212,6 @@ function createRemoteHeaderDefinitions(
         key: createUniqueKey(placeholder, "remote-header", usedKeys),
         source: "remote-header",
         headerName: header.name,
-        template: header.value,
         placeholder,
         description: null,
         required: true,
@@ -265,7 +333,7 @@ export function validateInputDefinitions(
     }
   }
 
-  return validatedValues;
+  return createReadonlyValidatedInstallInputMap(validatedValues);
 }
 
 export function validateInputValues(

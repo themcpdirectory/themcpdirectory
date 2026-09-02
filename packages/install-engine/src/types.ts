@@ -46,19 +46,16 @@ export interface PackageArgumentInputDefinition extends BaseInstallInputDefiniti
 export interface EnvironmentVariableInputDefinition extends BaseInstallInputDefinition {
   readonly source: "environment-variable";
   readonly name: string;
-  readonly defaultValue: string | null;
 }
 
 export interface RemoteVariableInputDefinition extends BaseInstallInputDefinition {
   readonly source: "remote-variable";
   readonly name: string;
-  readonly defaultValue: string | null;
 }
 
 export interface RemoteHeaderInputDefinition extends BaseInstallInputDefinition {
   readonly source: "remote-header";
   readonly headerName: string;
-  readonly template: string;
   readonly placeholder: string;
 }
 
@@ -69,16 +66,28 @@ export type InstallInputDefinition =
   | RemoteVariableInputDefinition
   | RemoteHeaderInputDefinition;
 
+export type RemoteAuthBinding =
+  | { readonly kind: "env-reference"; readonly inputKey: string; readonly envName: string }
+  | { readonly kind: "persisted-secret"; readonly inputKey: string };
+
 export type RemoteAuthResolution =
   | { readonly kind: "none" }
+  | { readonly kind: "client-oauth"; readonly followUpMessage: string }
   | {
       readonly kind: "env-reference";
-      readonly inputKeys: readonly string[];
-      readonly envNames: readonly string[];
+      readonly bindings: readonly Extract<RemoteAuthBinding, { readonly kind: "env-reference" }>[];
     }
   | {
       readonly kind: "persisted-secret";
-      readonly inputKeys: readonly string[];
+      readonly bindings: readonly Extract<
+        RemoteAuthBinding,
+        { readonly kind: "persisted-secret" }
+      >[];
+      readonly requiresInteractiveConsent: true;
+    }
+  | {
+      readonly kind: "mixed";
+      readonly bindings: readonly RemoteAuthBinding[];
       readonly requiresInteractiveConsent: true;
     };
 

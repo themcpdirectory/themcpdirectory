@@ -177,6 +177,55 @@ describe("createResolvedInstallIntent", () => {
     expect(serializedIntent).not.toContain("octo/example");
   });
 
+  it("derives required env references in input-definition order instead of input record order", () => {
+    const createResolvedInstallIntent = getCreateResolvedInstallIntent();
+    const manifest = makeManifest([
+      makePackageVariant({
+        environmentVariables: [
+          {
+            name: "SECOND_TOKEN",
+            description: "Second token.",
+            required: true,
+            defaultValue: null,
+            valueSource: "environment",
+          },
+          {
+            name: "FIRST_TOKEN",
+            description: "First token.",
+            required: true,
+            defaultValue: null,
+            valueSource: "environment",
+          },
+        ],
+      }),
+    ]);
+
+    const forward = createResolvedInstallIntent(manifest, {
+      client: "codex",
+      scope: "user",
+      requestedVariantId: PACKAGE_VARIANT_ID,
+      inputValues: {
+        FIRST_TOKEN: { kind: "env-reference", envName: "FIRST_ENV" },
+        config: { kind: "text", value: "/tmp/test-config.json" },
+        SECOND_TOKEN: { kind: "env-reference", envName: "SECOND_ENV" },
+      },
+    });
+
+    const reverse = createResolvedInstallIntent(manifest, {
+      client: "codex",
+      scope: "user",
+      requestedVariantId: PACKAGE_VARIANT_ID,
+      inputValues: {
+        SECOND_TOKEN: { kind: "env-reference", envName: "SECOND_ENV" },
+        config: { kind: "text", value: "/tmp/test-config.json" },
+        FIRST_TOKEN: { kind: "env-reference", envName: "FIRST_ENV" },
+      },
+    });
+
+    expect(forward.requiredEnvReferences).toEqual(["SECOND_ENV", "FIRST_ENV"]);
+    expect(reverse.requiredEnvReferences).toEqual(["SECOND_ENV", "FIRST_ENV"]);
+  });
+
   it("normalizes remote variables and header placeholders while preferring env references for auth", () => {
     const createResolvedInstallIntent = getCreateResolvedInstallIntent();
     const intent = createResolvedInstallIntent(makeManifest([makeRemoteVariant()]), {
@@ -195,8 +244,7 @@ describe("createResolvedInstallIntent", () => {
       warnings: [],
       remoteAuth: {
         kind: "env-reference",
-        inputKeys: ["token"],
-        envNames: ["MCP_AUTH_TOKEN"],
+        bindings: [{ kind: "env-reference", inputKey: "token", envName: "MCP_AUTH_TOKEN" }],
       },
       requiredEnvReferences: ["MCP_AUTH_TOKEN"],
       inputs: [
@@ -243,12 +291,85 @@ describe("createResolvedInstallIntent", () => {
       warnings: [expect.stringContaining("token")],
       remoteAuth: {
         kind: "persisted-secret",
-        inputKeys: ["token"],
+        bindings: [{ kind: "persisted-secret", inputKey: "token" }],
         requiresInteractiveConsent: true,
       },
       requiredEnvReferences: [],
     });
 
+    expect(JSON.stringify(intent)).not.toContain("super-secret-token");
+  });
+
+  it("dedupes required env references across remote auth bindings", () => {
+    const createResolvedInstallIntent = getCreateResolvedInstallIntent();
+    const intent = createResolvedInstallIntent(
+      makeManifest([
+        makeRemoteVariant({
+          headers: [
+            { name: "Authorization", value: "Bearer {token}" },
+            { name: "X-API-Key", value: "{apiKey}" },
+          ],
+        }),
+      ]),
+      {
+        client: "cursor",
+        scope: "project",
+        requestedVariantId: REMOTE_VARIANT_ID,
+        inputValues: {
+          workspaceId: { kind: "text", value: "workspace-123" },
+          apiKey: { kind: "env-reference", envName: "SHARED_ENV" },
+          token: { kind: "env-reference", envName: "SHARED_ENV" },
+        },
+      },
+    );
+
+    expect(intent.requiredEnvReferences).toEqual(["SHARED_ENV"]);
+    expect(intent.remoteAuth).toMatchObject({
+      kind: "env-reference",
+      bindings: [
+        { kind: "env-reference", inputKey: "token", envName: "SHARED_ENV" },
+        { kind: "env-reference", inputKey: "apiKey", envName: "SHARED_ENV" },
+      ],
+    });
+  });
+
+  it("models mixed env-reference and persisted-secret remote auth without dropping either side", () => {
+    const createResolvedInstallIntent = getCreateResolvedInstallIntent();
+    const intent = createResolvedInstallIntent(
+      makeManifest([
+        makeRemoteVariant({
+          headers: [
+            { name: "Authorization", value: "Bearer {token}" },
+            { name: "X-API-Key", value: "{apiKey}" },
+          ],
+        }),
+      ]),
+      {
+        client: "cursor",
+        scope: "project",
+        requestedVariantId: REMOTE_VARIANT_ID,
+        inputValues: {
+          workspaceId: { kind: "text", value: "workspace-123" },
+          apiKey: {
+            kind: "secret-value",
+            value: "super-secret-token",
+            allowPersistence: true,
+          },
+          token: { kind: "env-reference", envName: "MCP_AUTH_TOKEN" },
+        },
+      },
+    );
+
+    expect(intent.remoteAuth).toMatchObject({
+      kind: "mixed",
+      bindings: [
+        { kind: "env-reference", inputKey: "token", envName: "MCP_AUTH_TOKEN" },
+        { kind: "persisted-secret", inputKey: "apiKey" },
+      ],
+      requiresInteractiveConsent: true,
+    });
+    expect(intent.requiredEnvReferences).toEqual(["MCP_AUTH_TOKEN"]);
+    expect(intent.warnings).toEqual(["Remote auth requires persisted secret input for apiKey."]);
     expect(JSON.stringify(intent)).not.toContain("super-secret-token");
   });
 
@@ -294,6 +415,84 @@ describe("createResolvedInstallIntent", () => {
         }),
       { reason: "UNSUPPORTED_REMOTE_AUTH" },
     );
+  });
+
+  it("rejects client-oauth preference even when a remote variant has no headers", () => {
+    const createResolvedInstallIntent = getCreateResolvedInstallIntent();
+
+    expectIntentError(
+      () =>
+        createResolvedInstallIntent(makeManifest([makeRemoteVariant({ headers: [] })]), {
+          client: "codex",
+          scope: "user",
+          requestedVariantId: REMOTE_VARIANT_ID,
+          remoteAuthPreference: "client-oauth",
+          inputValues: {
+            workspaceId: { kind: "text", value: "workspace-123" },
+          },
+        }),
+      { reason: "UNSUPPORTED_REMOTE_AUTH" },
+    );
+  });
+
+  it("rejects literal sensitive header values without echoing them", () => {
+    const createResolvedInstallIntent = getCreateResolvedInstallIntent();
+    const error = expectIntentError(
+      () =>
+        createResolvedInstallIntent(
+          makeManifest([
+            makeRemoteVariant({
+              headers: [{ name: "Authorization", value: "Bearer super-secret-token" }],
+            }),
+          ]),
+          {
+            client: "codex",
+            scope: "user",
+            requestedVariantId: REMOTE_VARIANT_ID,
+            inputValues: {
+              workspaceId: { kind: "text", value: "workspace-123" },
+            },
+          },
+        ),
+      { reason: "UNSAFE_REMOTE_HEADER", headerName: "Authorization" },
+    );
+
+    expect(String(error)).toContain("Authorization");
+    expect(String(error)).not.toContain("super-secret-token");
+  });
+
+  it("rejects sensitive defaults before they can enter a serializable intent", () => {
+    const createResolvedInstallIntent = getCreateResolvedInstallIntent();
+    const error = expectIntentError(
+      () =>
+        createResolvedInstallIntent(
+          makeManifest([
+            makePackageVariant({
+              environmentVariables: [
+                {
+                  name: "API_TOKEN",
+                  description: "Injected token.",
+                  required: false,
+                  defaultValue: "super-secret-token",
+                  valueSource: "environment",
+                },
+              ],
+            }),
+          ]),
+          {
+            client: "codex",
+            scope: "user",
+            requestedVariantId: PACKAGE_VARIANT_ID,
+            inputValues: {
+              config: { kind: "text", value: "/tmp/test-config.json" },
+            },
+          },
+        ),
+      { reason: "UNSAFE_INPUT_DEFAULT", inputName: "API_TOKEN" },
+    );
+
+    expect(String(error)).toContain("API_TOKEN");
+    expect(String(error)).not.toContain("super-secret-token");
   });
 
   it("rejects scopes outside the Phase E client scope union", () => {

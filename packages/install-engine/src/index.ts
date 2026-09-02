@@ -24,6 +24,7 @@ export {
   type InstallManifestVariantV1,
   type PackageArgumentInputDefinition,
   type PackageRuntimeArgumentInputDefinition,
+  type RemoteAuthBinding,
   type RemoteAuthResolution,
   type RemoteHeaderInputDefinition,
   type RemoteVariableInputDefinition,
