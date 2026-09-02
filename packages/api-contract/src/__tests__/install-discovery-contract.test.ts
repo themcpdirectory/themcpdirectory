@@ -292,6 +292,37 @@ describe("installManifestResponseSchema", () => {
     ).toThrow();
   });
 
+  it.each([
+    "v1.2.3",
+    "1.2.3-alpha.1",
+    "1.2.3beta2",
+    "1.2.3-post2",
+    "1.2.3-1",
+  ])("accepts the exact PyPI version %s", (version) => {
+    const sourcePackageVariant = installManifestResponseExample.data.variants[0];
+    if (!sourcePackageVariant || sourcePackageVariant.kind !== "package") {
+      throw new Error("Expected a package variant in the install manifest example");
+    }
+
+    expect(
+      installManifestResponseSchema.parse({
+        ...installManifestResponseExample,
+        data: {
+          ...installManifestResponseExample.data,
+          variants: [
+            {
+              ...sourcePackageVariant,
+              registryType: "pypi",
+              identifier: "mcp-server-github",
+              version,
+              runtimeHint: null,
+            },
+          ],
+        },
+      }),
+    ).toBeDefined();
+  });
+
   it.each(["javascript:alert(1)", "data:text/plain,unsafe", "file:///tmp/mcp"])(
     "rejects the remote URL scheme in %s",
     (urlTemplate) => {
@@ -524,6 +555,33 @@ describe("parseInstallManifestResponse", () => {
                 ...sourcePackageVariant,
                 futureVariantField: "preserved",
                 [forbiddenKey]: "unsafe",
+              },
+            ],
+          },
+        }),
+      ).toThrow();
+    },
+  );
+
+  it.each(["command", "shell", "script", "expression", "eval", "callback", "postinstall", "hook"])(
+    "rejects nested reserved executable key %s",
+    (forbiddenKey) => {
+      const sourceRemoteVariant = installManifestResponseExample.data.variants[1];
+      if (!sourceRemoteVariant || sourceRemoteVariant.kind !== "remote") {
+        throw new Error("Expected a remote variant in the install manifest example");
+      }
+
+      expect(() =>
+        parseInstallManifestResponse({
+          ...installManifestResponseExample,
+          data: {
+            ...installManifestResponseExample.data,
+            variants: [
+              {
+                ...sourceRemoteVariant,
+                futureConfiguration: {
+                  nested: { [forbiddenKey]: "unsafe" },
+                },
               },
             ],
           },

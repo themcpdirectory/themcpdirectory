@@ -1,3 +1,5 @@
+import { valid as validPep440 } from "@renovatebot/pep440";
+import { valid as validSemver } from "semver";
 import { z } from "zod";
 import {
   createResourceResponseSchema,
@@ -9,17 +11,20 @@ import {
 } from "./shared.js";
 import { compatibilityStatusSchema, supportedClientIdSchema } from "./servers.js";
 
-const EXACT_NPM_VERSION_PATTERN =
-  /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
-const EXACT_PYPI_VERSION_PATTERN =
-  /^(?:[0-9]+!)?[0-9]+(?:\.[0-9]+)*(?:(?:a|b|rc)[0-9]+)?(?:\.post[0-9]+)?(?:\.dev[0-9]+)?(?:\+[a-z0-9]+(?:[._-][a-z0-9]+)*)?$/i;
+function isExactNpmPackageVersion(version: string): boolean {
+  return validSemver(version) !== null && version.trim() === version && /^\d/.test(version);
+}
+
+function isExactPypiPackageVersion(version: string): boolean {
+  return validPep440(version) !== null;
+}
 
 export const installManifestPackageRegistryTypeSchema = z.enum(["npm", "pypi"]);
 export const installManifestPackageVersionSchema = z
   .string()
   .refine(
     (version) =>
-      EXACT_NPM_VERSION_PATTERN.test(version) || EXACT_PYPI_VERSION_PATTERN.test(version),
+      isExactNpmPackageVersion(version) || isExactPypiPackageVersion(version),
     "Package version must be an exact immutable npm or PyPI version",
   );
 export const installManifestPackageRuntimeHintSchema = z.enum(["npx"]);
@@ -31,8 +36,8 @@ export function isExactPackageVersionForRegistry(
   version: string,
 ): boolean {
   return registryType === "npm"
-    ? EXACT_NPM_VERSION_PATTERN.test(version)
-    : EXACT_PYPI_VERSION_PATTERN.test(version);
+    ? isExactNpmPackageVersion(version)
+    : isExactPypiPackageVersion(version);
 }
 
 const argumentSchema = strictObject({

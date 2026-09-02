@@ -13,13 +13,16 @@
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "9.1.0",
+    "@renovatebot/pep440": "5.0.0",
+    "semver": "7.8.5",
     "zod": "4.5.4"
   },
   "devDependencies": {
-    "eslint": "9.39.5",
     "@themcpdirectory/eslint-config": "workspace:*",
     "@themcpdirectory/typescript-config": "workspace:*",
     "@types/node": "^20",
+    "@types/semver": "7.7.1",
+    "eslint": "9.39.5",
     "typescript": "5.9.3",
     "vitest": "4.1.11"
   }
