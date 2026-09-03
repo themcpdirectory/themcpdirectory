@@ -51,6 +51,30 @@ const installManifestResponseExample = {
       registryName: "Model Context Protocol Registry",
       observedAt: "2026-09-01T12:00:00Z",
     },
+    trustProfile: {
+      officialRegistry: true,
+      publisherVerified: true,
+      sourceAvailable: true,
+      openSource: true,
+      signals: [
+        {
+          key: "official_registry",
+          status: "positive",
+          summary: "Listed in the Official MCP Registry",
+          checkedAt: "2026-09-01T12:00:00Z",
+        },
+      ],
+    },
+    latestHealth: {
+      schemaVersion: 1,
+      outcome: "healthy",
+      checkedAt: "2026-09-01T12:00:00Z",
+      durationMs: 120,
+      httpStatus: 200,
+      finalOrigin: "https://api.example.com",
+      redirectCount: 0,
+    },
+    installAvailability: "available",
     variants: [
       {
         id: "8f6c5ae7-c883-4c12-b4c1-f528d6a3c4e5",
@@ -117,20 +141,25 @@ const installManifestResponseExample = {
 };
 
 describe("installManifestQuerySchema", () => {
-  it("accepts only approved client identifiers", () => {
+  it("accepts approved client identifiers", () => {
     expect(installManifestQuerySchema.parse({ client: "cursor" })).toEqual({
       client: "cursor",
     });
 
-    expect(() => installManifestQuerySchema.parse({ client: "vscode" })).toThrow();
+    expect(installManifestQuerySchema.parse({ client: "vscode" })).toEqual({
+      client: "vscode",
+    });
   });
 });
 
 describe("installManifestResponseSchema", () => {
   it("keeps install manifests declarative and strict on server surfaces", () => {
-    expect(installManifestResponseSchema.parse(installManifestResponseExample)).toEqual(
-      installManifestResponseExample,
-    );
+    const parsed = installManifestResponseSchema.parse(installManifestResponseExample);
+
+    expect(parsed).toEqual(installManifestResponseExample);
+    expect(parsed.data.latestHealth?.outcome).toBe("healthy");
+    expect(parsed.data.installAvailability).toBe("available");
+    expect(parsed.data.trustProfile?.signals[0]?.status).toBe("positive");
 
     for (const unsafeField of [
       "callback",

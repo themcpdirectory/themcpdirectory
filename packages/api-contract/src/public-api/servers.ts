@@ -1,5 +1,9 @@
 import { z } from "zod";
 import {
+  HealthCheckOutcomeSchema,
+  RemoteHealthObservationV1Schema,
+} from "./health.js";
+import {
   createCollectionResponseSchema,
   createResourceResponseSchema,
   httpUrlSchema,
@@ -8,6 +12,7 @@ import {
   strictObject,
   uuidSchema,
 } from "./shared.js";
+import { legacyTrustProfileServerSchema } from "./trust.js";
 
 export const supportedClientIdSchema = z.enum(["claude-code", "codex", "cursor", "vscode"]);
 export type SupportedClientId = z.infer<typeof supportedClientIdSchema>;
@@ -25,6 +30,12 @@ export const compatibilityStatusSchema = z.enum([
   "unsupported",
   "unknown",
 ]);
+
+export const installAvailabilityValues = [
+  "available",
+  "install_unavailable",
+  "upstream_deleted",
+] as const;
 
 export const serverSortSchema = z.enum(["relevance", "recent", "updated", "popular", "name"]);
 export type PublicServerSort = z.infer<typeof serverSortSchema>;
@@ -110,6 +121,9 @@ export const serverSummaryServerSchema = strictObject({
   repository: repositorySummaryServerSchema.nullable(),
   listingStatus: listingStatusSchema,
   signals: serverSignalsServerSchema,
+  publisherVerified: z.boolean().optional(),
+  latestHealthOutcome: HealthCheckOutcomeSchema.nullable().optional(),
+  installAvailability: z.enum(installAvailabilityValues).optional(),
 });
 
 export const serverCollectionResponseSchema =
@@ -160,20 +174,6 @@ const serverRemoteDetailSchema = strictObject({
   ),
 });
 
-const trustSignalSchema = strictObject({
-  key: z.string().min(1),
-  status: z.enum(["positive", "neutral", "warning", "negative", "unknown"]),
-  summary: z.string().nullable(),
-  checkedAt: rfc3339UtcSchema.nullable(),
-});
-
-const trustProfileServerSchema = strictObject({
-  officialRegistry: z.boolean(),
-  publisherVerified: z.boolean(),
-  sourceAvailable: z.boolean().nullable(),
-  openSource: z.boolean().nullable(),
-  signals: z.array(trustSignalSchema),
-});
 export type PublicTrustProfile = {
   readonly officialRegistry: boolean;
   readonly publisherVerified: boolean;
@@ -220,7 +220,9 @@ const serverDetailServerSchema = strictObject({
     cursor: compatibilityStatusSchema.optional(),
     vscode: compatibilityStatusSchema.optional(),
   }),
-  trustProfile: trustProfileServerSchema,
+  trustProfile: legacyTrustProfileServerSchema,
+  latestHealth: RemoteHealthObservationV1Schema.optional(),
+  installAvailability: z.enum(installAvailabilityValues).optional(),
   timestamps: serverTimestampsSchema,
 });
 

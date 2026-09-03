@@ -7,12 +7,17 @@ import type {
   PublisherDetailResponse,
 } from "./discovery.js";
 import {
+  HealthCheckOutcomeSchema,
+  RemoteHealthObservationV1ClientSchema,
+} from "./health.js";
+import {
   compatibilityStatusSchema,
   listingStatusSchema,
   supportedClientIdSchema,
 } from "./servers.js";
 import type { InstallManifestResponse } from "./install.js";
 import {
+  InstallAvailabilitySchema,
   installManifestNpmPackageVersionSchema,
   installManifestPackageRuntimeHintSchema,
   installManifestPackageTransportSchema,
@@ -32,6 +37,7 @@ import {
   slugSchema,
   uuidSchema,
 } from "./shared.js";
+import { legacyTrustProfileClientSchema } from "./trust.js";
 
 export class UnsupportedManifestVersionError extends Error {
   constructor(readonly schemaVersion: number) {
@@ -65,6 +71,9 @@ const serverSummaryClientSchema = clientObject({
   repository: clientObject({ url: httpUrlSchema }).nullable(),
   listingStatus: listingStatusSchema,
   signals: serverSignalsClientSchema,
+  publisherVerified: z.boolean().optional(),
+  latestHealthOutcome: HealthCheckOutcomeSchema.nullable().optional(),
+  installAvailability: InstallAvailabilitySchema.optional(),
 });
 
 const serverCollectionClientResponseSchema = clientObject({
@@ -152,20 +161,9 @@ const serverDetailClientResponseSchema = clientObject({
       cursor: compatibilityStatusSchema.optional(),
       vscode: compatibilityStatusSchema.optional(),
     }),
-    trustProfile: clientObject({
-      officialRegistry: z.boolean(),
-      publisherVerified: z.boolean(),
-      sourceAvailable: z.boolean().nullable(),
-      openSource: z.boolean().nullable(),
-      signals: z.array(
-        clientObject({
-          key: z.string().min(1),
-          status: z.enum(["positive", "neutral", "warning", "negative", "unknown"]),
-          summary: z.string().nullable(),
-          checkedAt: rfc3339UtcSchema.nullable(),
-        }),
-      ),
-    }),
+    trustProfile: legacyTrustProfileClientSchema,
+    latestHealth: RemoteHealthObservationV1ClientSchema.optional(),
+    installAvailability: InstallAvailabilitySchema.optional(),
     timestamps: clientObject({
       firstSeenAt: rfc3339UtcSchema,
       lastSeenAt: rfc3339UtcSchema,
@@ -406,6 +404,9 @@ const installManifestClientSchema = clientObject({
     registryName: z.string().min(1),
     observedAt: rfc3339UtcSchema,
   }),
+  trustProfile: legacyTrustProfileClientSchema.optional(),
+  latestHealth: RemoteHealthObservationV1ClientSchema.optional(),
+  installAvailability: InstallAvailabilitySchema.optional(),
   variants: z.array(
     z.union([
       npmPackageVariantClientSchema,

@@ -48,12 +48,14 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   });
   const serverDetailResponse = serverDetailResponseSchema.meta({
     id: "ServerDetailResponse",
+    description: "Server detail with additive trust, health, and install availability fields.",
   });
   const resolvedServerResponse = resolveServerIdentifierResponseSchema.meta({
     id: "ResolvedServerResponse",
   });
   const installManifestResponse = installManifestResponseSchema.meta({
     id: "InstallManifestResponse",
+    description: "Install manifest with optional trust, health, and availability metadata.",
   });
   const categoriesCollectionResponse = categoriesCollectionResponseSchema.meta({
     id: "CategoriesCollectionResponse",

@@ -2,6 +2,9 @@ import { valid as validPep440 } from "@renovatebot/pep440";
 import { valid as validSemver } from "semver";
 import { z } from "zod";
 import {
+  RemoteHealthObservationV1Schema,
+} from "./health.js";
+import {
   createResourceResponseSchema,
   httpUrlSchema,
   rfc3339UtcSchema,
@@ -9,7 +12,14 @@ import {
   strictObject,
   uuidSchema,
 } from "./shared.js";
-import { compatibilityStatusSchema, supportedClientIdSchema } from "./servers.js";
+import {
+  compatibilityStatusSchema,
+  installAvailabilityValues,
+  supportedClientIdSchema,
+} from "./servers.js";
+import { legacyTrustProfileServerSchema } from "./trust.js";
+
+export const InstallAvailabilitySchema = z.enum(installAvailabilityValues);
 
 function isExactNpmPackageVersion(version: string): boolean {
   return validSemver(version) !== null && version.trim() === version && /^\d/.test(version);
@@ -160,6 +170,9 @@ const installManifestServerSchema = strictObject({
     registryName: z.string().min(1),
     observedAt: rfc3339UtcSchema,
   }),
+  trustProfile: legacyTrustProfileServerSchema.optional(),
+  latestHealth: RemoteHealthObservationV1Schema.optional(),
+  installAvailability: InstallAvailabilitySchema.optional(),
   variants: z.array(
     z.union([npmPackageVariantSchema, pypiPackageVariantSchema, remoteVariantSchema]),
   ),

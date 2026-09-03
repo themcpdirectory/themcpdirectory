@@ -13,7 +13,13 @@ export {
 } from "./public-api/shared.js";
 export { apiErrorCodeSchema, errorResponseSchema, type ApiErrorCode } from "./public-api/errors.js";
 export {
+  HealthCheckOutcomeSchema,
+  RemoteHealthObservationV1ClientSchema,
+  RemoteHealthObservationV1Schema,
+} from "./public-api/health.js";
+export {
   compatibilityStatusSchema,
+  installAvailabilityValues,
   listingStatusSchema,
   resolveServerIdentifierResponseSchema,
   searchCollectionQuerySchema,
@@ -52,12 +58,19 @@ export {
   UnsupportedManifestVersionError,
 } from "./public-api/client-parsers.js";
 export {
+  InstallAvailabilitySchema,
   isExactPackageVersionForRegistry,
   installManifestQuerySchema,
   installManifestResponseSchema,
   type InstallManifestResponse,
   type InstallManifestV1,
 } from "./public-api/install.js";
+export {
+  TrustProfileV1ClientSchema,
+  TrustProfileV1Schema,
+  TrustSignalKeySchema,
+  TrustSignalStateSchema,
+} from "./public-api/trust.js";
 export {
   categoryDetailResponseSchema,
   clientPathParamsSchema,

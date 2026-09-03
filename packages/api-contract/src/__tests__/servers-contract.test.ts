@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  HealthCheckOutcomeSchema,
+  InstallAvailabilitySchema,
+  RemoteHealthObservationV1ClientSchema,
   parseResolvedServerResponse,
   parseServerCollectionResponse,
   serverCollectionQuerySchema,
+  TrustProfileV1ClientSchema,
+  TrustProfileV1Schema,
+  TrustSignalStateSchema,
   supportedClientIdSchema,
 } from "../index.js";
 
@@ -70,13 +76,77 @@ describe("parseServerCollectionResponse", () => {
             sourceAvailable: true,
             openSource: true,
           },
+          publisherVerified: true,
+          latestHealthOutcome: "healthy",
+          installAvailability: "available",
           futureField: "preserved",
         },
       ],
       meta: { requestId: "req_phase_d_010", nextCursor: null },
     });
 
+    expect(parsed.data[0]?.publisherVerified).toBe(true);
+    expect(parsed.data[0]?.latestHealthOutcome).toBe("healthy");
+    expect(parsed.data[0]?.installAvailability).toBe("available");
     expect((parsed.data[0] as Record<string, unknown>).futureField).toBe("preserved");
+  });
+});
+
+describe("phase F trust and health contracts", () => {
+  it("locks canonical trust and health vocabularies without aggregate scores", () => {
+    expect(TrustSignalStateSchema.options).toEqual([
+      "positive",
+      "neutral",
+      "warning",
+      "negative",
+      "unknown",
+    ]);
+    expect(HealthCheckOutcomeSchema.options).toContain("response_too_large");
+    expect(InstallAvailabilitySchema.options).toEqual([
+      "available",
+      "install_unavailable",
+      "upstream_deleted",
+    ]);
+
+    expect(
+      TrustProfileV1Schema.safeParse({
+        schemaVersion: 1,
+        signals: [],
+        aggregateScore: 98,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("keeps standalone client trust and health parsing additive", () => {
+    const trust = TrustProfileV1ClientSchema.parse({
+      schemaVersion: 1,
+      signals: [
+        {
+          key: "official_registry",
+          state: "positive",
+          label: "Listed in the Official MCP Registry",
+          observedAt: "2026-09-01T18:00:00.000Z",
+          source: "registry",
+          reason: null,
+          futureSignalField: { safe: true },
+        },
+      ],
+      futureProfileField: { safe: true },
+    }) as Record<string, unknown>;
+
+    const health = RemoteHealthObservationV1ClientSchema.parse({
+      schemaVersion: 1,
+      outcome: "healthy",
+      checkedAt: "2026-09-01T18:00:00.000Z",
+      durationMs: 120,
+      httpStatus: 200,
+      finalOrigin: "https://api.example.com",
+      redirectCount: 0,
+      futureHealthField: { safe: true },
+    }) as Record<string, unknown>;
+
+    expect(trust.futureProfileField).toEqual({ safe: true });
+    expect(health.futureHealthField).toEqual({ safe: true });
   });
 });
 

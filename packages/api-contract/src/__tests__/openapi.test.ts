@@ -38,6 +38,9 @@ const serverSummaryExample = {
     sourceAvailable: true,
     openSource: true,
   },
+  publisherVerified: true,
+  latestHealthOutcome: "healthy",
+  installAvailability: "available",
 };
 
 function getResponseSchemaRef(document: OpenAPIObject, path: string): string | null {
@@ -250,6 +253,30 @@ describe("createPublicApiOpenApiDocument", () => {
           registryName: "Model Context Protocol Registry",
           observedAt: "2026-09-01T12:00:00Z",
         },
+        trustProfile: {
+          officialRegistry: true,
+          publisherVerified: true,
+          sourceAvailable: true,
+          openSource: true,
+          signals: [
+            {
+              key: "official_registry",
+              status: "positive",
+              summary: "Listed in the Official MCP Registry",
+              checkedAt: "2026-09-01T12:00:00Z",
+            },
+          ],
+        },
+        latestHealth: {
+          schemaVersion: 1,
+          outcome: "healthy",
+          checkedAt: "2026-09-01T12:00:00Z",
+          durationMs: 120,
+          httpStatus: 200,
+          finalOrigin: "https://api.example.com",
+          redirectCount: 0,
+        },
+        installAvailability: "available",
         variants: [
           {
             id: "8f6c5ae7-c883-4c12-b4c1-f528d6a3c4e5",
@@ -330,11 +357,15 @@ describe("createPublicApiOpenApiDocument", () => {
     });
 
     const document = createPublicApiOpenApiDocument("https://api.themcpdirectory.test");
+    const serializedSchemas = JSON.stringify(document.components?.schemas ?? {});
 
     expect(installExample.data.schemaVersion).toBe(1);
     expect(categoryExample.data.category.slug).toBe("developer-tools");
     expect(publisherExample.data.publisher.websiteUrl).toBe("https://github.com");
     expect(clientExample.data.client.id).toBe("cursor");
+    expect(serializedSchemas).toContain("installAvailability");
+    expect(serializedSchemas).toContain("latestHealth");
+    expect(serializedSchemas).toContain("latestHealthOutcome");
 
     expect(getResponseSchemaRef(document, "/api/v1/servers/{slug}/install")).toBe(
       "#/components/schemas/InstallManifestResponse",
