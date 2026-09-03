@@ -36,6 +36,7 @@ const CLAUDE_EXEC_OPTIONS = Object.freeze({
 const EMPTY_HELP_TEXT: ClaudeCapabilityProbeResult["helpText"] = Object.freeze({
   root: "",
   add: "",
+  addJson: "",
   list: "",
   remove: "",
 });
@@ -73,7 +74,7 @@ export class ClaudeCodeAdapterError extends Error {
 
 export interface ClaudeCapabilityProbeResult {
   readonly detection: ClientDetection;
-  readonly helpText: Readonly<Record<"root" | "add" | "list" | "remove", string>>;
+  readonly helpText: Readonly<Record<"root" | "add" | "addJson" | "list" | "remove", string>>;
 }
 
 interface ClaudeListEntry {
@@ -185,7 +186,11 @@ function deriveCapabilities(helpText: ClaudeCapabilityProbeResult["helpText"]): 
       capabilities.push("native-scope-user");
     }
   }
-  if (canAdd && (hasFlag(helpText.add, "--env") || canAddJson)) {
+  if (
+    canAdd &&
+    (hasFlag(helpText.add, "--env") ||
+      (canAddJson && /claude\s+mcp\s+add-json(?:\s|$)/iu.test(helpText.addJson)))
+  ) {
     capabilities.push("env-reference");
   }
 
@@ -217,14 +222,15 @@ export async function probeClaudeCodeCapabilities(
     };
   }
 
-  const [versionText, root, add, list, remove] = await Promise.all([
+  const [versionText, root, add, addJson, list, remove] = await Promise.all([
     runProbe(runtime, executable, ["--version"]),
     runProbe(runtime, executable, ["mcp", "--help"]),
     runProbe(runtime, executable, ["mcp", "add", "--help"]),
+    runProbe(runtime, executable, ["mcp", "add-json", "--help"]),
     runProbe(runtime, executable, ["mcp", "list", "--help"]),
     runProbe(runtime, executable, ["mcp", "remove", "--help"]),
   ]);
-  const helpText = Object.freeze({ root, add, list, remove });
+  const helpText = Object.freeze({ root, add, addJson, list, remove });
   const version = parseVersion(versionText);
 
   return {
@@ -279,6 +285,30 @@ function mapScopeToAddArgs(
 
   requireCapability(probe, "native-scope-user");
   return ["--scope", "user"];
+}
+
+function mapScopeToAddJsonArgs(
+  probe: ClaudeCapabilityProbeResult,
+  scope: ClientScope,
+): readonly string[] {
+  if (!hasFlag(probe.helpText.addJson, "--scope")) {
+    throw new ClaudeCodeAdapterError(
+      "CLAUDE_CODE_UNSUPPORTED_CAPABILITY",
+      "Installed Claude Code CLI does not prove support for add-json --scope",
+      { capability: "native-add-remote" },
+    );
+  }
+
+  const scopeValue = scope === "global" ? "local" : scope;
+  if (!new RegExp(`\\b${scopeValue}\\b`, "u").test(probe.helpText.addJson)) {
+    throw new ClaudeCodeAdapterError(
+      "CLAUDE_CODE_UNSUPPORTED_CAPABILITY",
+      `Installed Claude Code CLI does not prove support for add-json --scope ${scopeValue}`,
+      { capability: "native-add-remote" },
+    );
+  }
+
+  return ["--scope", scopeValue];
 }
 
 function normalizeScopeLabel(value: string): ClientScope | undefined {
@@ -610,7 +640,19 @@ function buildRemoteAddOperationArgs(
   }
 
   if (shouldUseJson) {
+    if (
+      !hasCommand(probe.helpText.root, "add-json") ||
+      !/claude\s+mcp\s+add-json(?:\s|$)/iu.test(probe.helpText.addJson)
+    ) {
+      throw new ClaudeCodeAdapterError(
+        "CLAUDE_CODE_UNSUPPORTED_CAPABILITY",
+        "Installed Claude Code CLI does not prove support for add-json command syntax",
+        { capability: "native-add-remote" },
+      );
+    }
+
     requireCapability(probe, "env-reference");
+    const scopeArgs = mapScopeToAddJsonArgs(probe, scope);
     const headers: Record<string, string> = {};
     for (const pair of headerPairs) {
       headers[pair.name] = pair.expanded.value;
@@ -627,6 +669,14 @@ function buildRemoteAddOperationArgs(
       usedJson: true,
       url,
     };
+  }
+
+  if (headerPairs.length > 0 && !hasFlag(probe.helpText.add, "--header")) {
+    throw new ClaudeCodeAdapterError(
+      "CLAUDE_CODE_UNSUPPORTED_CAPABILITY",
+      "Installed Claude Code CLI does not prove support for add --header",
+      { capability: "native-add-remote" },
+    );
   }
 
   const headerArgs = headerPairs.flatMap((pair) => ["--header", `${pair.name}: ${pair.expanded.value}`]);
@@ -769,7 +819,11 @@ function parseClaudeDetail(stdout: string, fallbackName: string, fallbackScope: 
       metadata.transport = transport;
       continue;
     }
-    if (key === "status" || key === "issue" || key === "auth" || key === "authentication") {
+    if (key === "auth" || key === "authentication") {
+      metadata.authConfigured = !/\b(?:none|disabled|false|no)\b/iu.test(value);
+      continue;
+    }
+    if (key === "status" || key === "issue") {
       metadata[key] = value;
     }
   }
@@ -781,15 +835,18 @@ async function inspectDetails(
   runtime: AdapterRuntime,
   executable: string,
   listEntry: ClaudeListEntry,
-  fallbackScope: ClientScope,
-): Promise<InstalledMcpServer> {
+): Promise<InstalledMcpServer | null> {
   const detailResult = await runtime.execFile(executable, ["mcp", "get", listEntry.name], CLAUDE_EXEC_OPTIONS);
   if (detailResult.exitCode !== 0) {
+    if (!listEntry.scope) {
+      return null;
+    }
+
     return {
       name: listEntry.name,
       slug: listEntry.name,
       client: "claude-code",
-      scope: listEntry.scope ?? fallbackScope,
+      scope: listEntry.scope,
       transport: "streamable-http",
       managedBy: "external",
       adapterMetadata: {
@@ -799,7 +856,7 @@ async function inspectDetails(
     };
   }
 
-  const detail = parseClaudeDetail(detailResult.stdout, listEntry.name, listEntry.scope ?? fallbackScope);
+  const detail = parseClaudeDetail(detailResult.stdout, listEntry.name, listEntry.scope ?? "global");
   return {
     name: detail.name,
     slug: detail.name,
@@ -977,10 +1034,12 @@ export function createClaudeCodeAdapter(runtime: AdapterRuntime): McpClientAdapt
 
       const listEntries = parseClaudeListEntries(commandResult.stdout);
       const inspectedEntries = await Promise.all(
-        listEntries.map((entry) => inspectDetails(runtime, executable, entry, scope)),
+        listEntries.map((entry) => inspectDetails(runtime, executable, entry)),
       );
 
-      return inspectedEntries.filter((entry) => normalizeScopeMatch(scope, entry.scope));
+      return inspectedEntries
+        .filter((entry): entry is InstalledMcpServer => entry !== null)
+        .filter((entry) => normalizeScopeMatch(scope, entry.scope));
     },
     async planInstall(options) {
       requireClaudeCodeIntent(options);

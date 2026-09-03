@@ -27,6 +27,7 @@ const EXEC_OPTIONS = {
 function makeProbeResults(
   overrides: {
     readonly addHelp?: string;
+    readonly addJsonHelp?: string;
     readonly listHelp?: string;
     readonly removeHelp?: string;
   } = {},
@@ -39,6 +40,13 @@ function makeProbeResults(
       stdout:
         overrides.addHelp ??
         "Usage: claude mcp add [OPTIONS] <NAME> [-- <COMMAND>...]\n--transport <http|sse>\n--scope <local|project|user>\n--env <KEY=VALUE>\n",
+      stderr: "",
+    },
+    {
+      exitCode: 0,
+      stdout:
+        overrides.addJsonHelp ??
+        "Usage: claude mcp add-json [OPTIONS] <NAME> <JSON>\n--scope <local|project|user>\n",
       stderr: "",
     },
     {
@@ -217,6 +225,7 @@ describe("probeClaudeCodeCapabilities", () => {
       { executable: CLAUDE_PATH, args: ["--version"], options: EXEC_OPTIONS },
       { executable: CLAUDE_PATH, args: ["mcp", "--help"], options: EXEC_OPTIONS },
       { executable: CLAUDE_PATH, args: ["mcp", "add", "--help"], options: EXEC_OPTIONS },
+      { executable: CLAUDE_PATH, args: ["mcp", "add-json", "--help"], options: EXEC_OPTIONS },
       { executable: CLAUDE_PATH, args: ["mcp", "list", "--help"], options: EXEC_OPTIONS },
       { executable: CLAUDE_PATH, args: ["mcp", "remove", "--help"], options: EXEC_OPTIONS },
     ]);
@@ -327,6 +336,63 @@ describe("createClaudeCodeAdapter", () => {
       expect(plan.operations[0].args[3]).toContain("\"Authorization\":\"Bearer ${GITHUB_TOKEN}\"");
       expect(plan.operations[0].args[3]).not.toContain("supersecret");
     }
+  });
+
+  it("classifies auth detail without copying credential-bearing text", async () => {
+    const fake = createClaudeRuntime([
+      ...makeProbeResults(),
+      { exitCode: 0, stdout: "github project connected\n", stderr: "" },
+      {
+        exitCode: 0,
+        stdout:
+          "Name: github\nScope: project\nTransport: stdio\nAuthentication: Bearer supersecret-token\n",
+        stderr: "",
+      },
+    ]);
+    const adapter = createClaudeCodeAdapter(fake.runtime);
+
+    const installed = await adapter.inspect("project");
+
+    expect(installed).toHaveLength(1);
+    expect(installed[0]?.adapterMetadata).toMatchObject({ authConfigured: true });
+    expect(installed[0]?.adapterMetadata).not.toHaveProperty("authentication");
+    expect(JSON.stringify(installed[0]?.adapterMetadata)).not.toContain("supersecret-token");
+  });
+
+  it("rejects env-reference remote planning when add-json syntax is not proven by help", async () => {
+    const fake = createClaudeRuntime([
+      ...makeProbeResults({ addJsonHelp: "Usage: claude mcp unsupported-json [OPTIONS]\n" }),
+      ...makeProbeResults({ addJsonHelp: "Usage: claude mcp unsupported-json [OPTIONS]\n" }),
+    ]);
+    const adapter = createClaudeCodeAdapter(fake.runtime);
+    const inputs = new Map([
+      ["workspace", { kind: "text", value: "acme" } as const],
+      ["token", { kind: "env-reference", envName: "GITHUB_TOKEN" } as const],
+    ]) satisfies ValidatedInstallInputMap;
+
+    await expect(
+      adapter.planInstall({
+        intent: makeRemoteIntent("env-reference"),
+        inputs,
+        noninteractive: true,
+        manifestHash: MANIFEST_HASH,
+        intentHash: INTENT_HASH,
+      }),
+    ).rejects.toMatchObject({
+      code: "CLAUDE_CODE_UNSUPPORTED_CAPABILITY",
+      message: "Installed Claude Code CLI does not prove support for add-json command syntax",
+    });
+  });
+
+  it("omits unresolved entries when list has no scope and detail lookup fails", async () => {
+    const fake = createClaudeRuntime([
+      ...makeProbeResults(),
+      { exitCode: 0, stdout: "github connected\n", stderr: "" },
+      { exitCode: 1, stdout: "", stderr: "not found" },
+    ]);
+    const adapter = createClaudeCodeAdapter(fake.runtime);
+
+    await expect(adapter.inspect("project")).resolves.toEqual([]);
   });
 
   it("rejects persisted-secret auth combinations without leaking secret text", async () => {
