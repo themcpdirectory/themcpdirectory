@@ -16,6 +16,14 @@ export {
   AdapterRegistryError,
   type AdapterRegistryErrorCode,
 } from "./registry.js";
+export {
+  CodexAdapterError,
+  createCodexAdapter,
+  detectCodex,
+  probeCodexCapabilities,
+  type CodexAdapterErrorCode,
+  type CodexCapabilityProbeResult,
+} from "./codex.js";
 export type {
   AdapterRegistry,
   AdapterRollbackResult,

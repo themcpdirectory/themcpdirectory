@@ -93,6 +93,8 @@ export interface PlanInstallOptions {
   readonly intent: ResolvedInstallIntent;
   readonly inputs: ValidatedInstallInputMap;
   readonly noninteractive: boolean;
+  readonly manifestHash: string;
+  readonly intentHash: string;
 }
 
 export interface PlanRemoveOptions {
