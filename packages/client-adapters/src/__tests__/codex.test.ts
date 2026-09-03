@@ -331,7 +331,10 @@ describe("createCodexAdapter", () => {
     });
 
     expect(plan).toMatchObject({
-      previewLines: ["Add GitHub to Codex user configuration.", "Configure a remote MCP endpoint."],
+      previewLines: [
+        "Add GitHub to Codex user configuration.",
+        "Configure remote URL https://example.com/mcp/acme%20team.",
+      ],
       operations: [
         {
           type: "client-command",

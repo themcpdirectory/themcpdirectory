@@ -42,6 +42,7 @@ const EMPTY_HELP_TEXT: CodexCapabilityProbeResult["helpText"] = Object.freeze({
 
 const SAFE_NPX_RUNTIME_OPTIONS = new Set(["registry"]);
 const SENSITIVE_INPUT_PATTERN = /(?:api[_-]?key|auth|credential|password|secret|token)/iu;
+const SAFE_SERVER_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/u;
 
 export type CodexAdapterErrorCode =
   | "CODEX_NOT_INSTALLED"
@@ -262,6 +263,12 @@ function requireUserScope(scope: ClientScope): void {
       "CODEX_UNSUPPORTED_CAPABILITY",
       `Codex CLI does not prove support for ${scope} scope`,
     );
+  }
+}
+
+function requireServerSlug(slug: string): void {
+  if (!SAFE_SERVER_SLUG_PATTERN.test(slug)) {
+    throw new CodexAdapterError("CODEX_INVALID_INPUT", "Codex requires a valid server slug");
   }
 }
 
@@ -522,7 +529,7 @@ function buildInstallPlan(
       url,
       ...(bearerTokenEnvName ? ["--bearer-token-env-var", bearerTokenEnvName] : []),
     ];
-    effect = "Configure a remote MCP endpoint.";
+    effect = `Configure remote URL ${url}.`;
   }
 
   return {
@@ -810,6 +817,7 @@ export function createCodexAdapter(runtime: AdapterRuntime): McpClientAdapter {
     async planRemove(options: PlanRemoveOptions): Promise<RemovalPlan> {
       const scope = options.scope ?? "user";
       requireUserScope(scope);
+      requireServerSlug(options.slug);
       const result = await probe();
       const executable = requireInstalled(result);
       requireCapability(result, "native-remove");
