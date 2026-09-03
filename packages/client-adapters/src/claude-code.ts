@@ -153,7 +153,9 @@ function hasFlag(helpText: string, flag: string): boolean {
   return new RegExp(`(?:^|[\\s([|])${escapedFlag}(?:[=\\s<>|\\])]|$)`, "mu").test(helpText);
 }
 
-function deriveCapabilities(helpText: ClaudeCapabilityProbeResult["helpText"]): AdapterCapability[] {
+function deriveCapabilities(
+  helpText: ClaudeCapabilityProbeResult["helpText"],
+): AdapterCapability[] {
   const capabilities: AdapterCapability[] = [];
   const canAdd = hasCommand(helpText.root, "add");
   const canAddJson = hasCommand(helpText.root, "add-json");
@@ -260,7 +262,10 @@ function requireInstalled(probe: ClaudeCapabilityProbeResult): string {
   return probe.detection.executable;
 }
 
-function requireCapability(probe: ClaudeCapabilityProbeResult, capability: AdapterCapability): void {
+function requireCapability(
+  probe: ClaudeCapabilityProbeResult,
+  capability: AdapterCapability,
+): void {
   if (!probe.detection.capabilities.includes(capability)) {
     throw new ClaudeCodeAdapterError(
       "CLAUDE_CODE_UNSUPPORTED_CAPABILITY",
@@ -342,7 +347,10 @@ function requireClaudeCodeIntent(options: PlanInstallOptions): void {
 function getInput(inputs: ValidatedInstallInputMap, key: string): InstallInputValue {
   const value = inputs.get(key);
   if (!value) {
-    throw new ClaudeCodeAdapterError("CLAUDE_CODE_INVALID_INPUT", `Missing validated input: ${key}`);
+    throw new ClaudeCodeAdapterError(
+      "CLAUDE_CODE_INVALID_INPUT",
+      `Missing validated input: ${key}`,
+    );
   }
 
   return value;
@@ -679,7 +687,10 @@ function buildRemoteAddOperationArgs(
     );
   }
 
-  const headerArgs = headerPairs.flatMap((pair) => ["--header", `${pair.name}: ${pair.expanded.value}`]);
+  const headerArgs = headerPairs.flatMap((pair) => [
+    "--header",
+    `${pair.name}: ${pair.expanded.value}`,
+  ]);
   return {
     args: [
       "mcp",
@@ -696,7 +707,10 @@ function buildRemoteAddOperationArgs(
   };
 }
 
-function buildInstallPlan(probe: ClaudeCapabilityProbeResult, options: PlanInstallOptions): InstallPlan {
+function buildInstallPlan(
+  probe: ClaudeCapabilityProbeResult,
+  options: PlanInstallOptions,
+): InstallPlan {
   const executable = requireInstalled(probe);
   const { intent } = options;
 
@@ -749,7 +763,11 @@ function parseClaudeListEntries(stdout: string): readonly ClaudeListEntry[] {
     if (!line) {
       continue;
     }
-    if (/^(?:MCP|Configured|Server|Name|Available|No servers|Connected|Disconnected|Pending)/iu.test(line)) {
+    if (
+      /^(?:MCP|Configured|Server|Name|Available|No servers|Connected|Disconnected|Pending)/iu.test(
+        line,
+      )
+    ) {
       continue;
     }
 
@@ -779,7 +797,11 @@ function parseClaudeListEntries(stdout: string): readonly ClaudeListEntry[] {
   return entries;
 }
 
-function parseClaudeDetail(stdout: string, fallbackName: string, fallbackScope: ClientScope): ClaudeServerDetail {
+function parseClaudeDetail(
+  stdout: string,
+  fallbackName: string,
+  fallbackScope: ClientScope,
+): ClaudeServerDetail {
   const metadata: Record<string, string | number | boolean> = {};
   let scope: ClientScope = fallbackScope;
   let transport: "stdio" | "streamable-http" = "streamable-http";
@@ -813,14 +835,25 @@ function parseClaudeDetail(stdout: string, fallbackName: string, fallbackScope: 
     if (key === "transport" || key === "type") {
       if (/\bstdio\b/iu.test(value)) {
         transport = "stdio";
-      } else if (/\bhttp\b/iu.test(value) || /\bstreamable-http\b/iu.test(value) || /\bsse\b/iu.test(value)) {
+      } else if (
+        /\bhttp\b/iu.test(value) ||
+        /\bstreamable-http\b/iu.test(value) ||
+        /\bsse\b/iu.test(value)
+      ) {
         transport = "streamable-http";
       }
       metadata.transport = transport;
       continue;
     }
     if (key === "auth" || key === "authentication") {
-      metadata.authConfigured = !/\b(?:none|disabled|false|no)\b/iu.test(value);
+      if (/^(?:none|disabled|false|no|not configured)$/iu.test(value)) {
+        metadata.authConfigured = false;
+      } else if (
+        /^(?:configured|authenticated|connected|enabled|true|yes)$/iu.test(value) ||
+        /^(?:bearer|basic)\s+\S+/iu.test(value)
+      ) {
+        metadata.authConfigured = true;
+      }
       continue;
     }
     if (key === "status" || key === "issue") {
@@ -836,7 +869,11 @@ async function inspectDetails(
   executable: string,
   listEntry: ClaudeListEntry,
 ): Promise<InstalledMcpServer | null> {
-  const detailResult = await runtime.execFile(executable, ["mcp", "get", listEntry.name], CLAUDE_EXEC_OPTIONS);
+  const detailResult = await runtime.execFile(
+    executable,
+    ["mcp", "get", listEntry.name],
+    CLAUDE_EXEC_OPTIONS,
+  );
   if (detailResult.exitCode !== 0) {
     if (!listEntry.scope) {
       return null;
@@ -856,7 +893,11 @@ async function inspectDetails(
     };
   }
 
-  const detail = parseClaudeDetail(detailResult.stdout, listEntry.name, listEntry.scope ?? "global");
+  const detail = parseClaudeDetail(
+    detailResult.stdout,
+    listEntry.name,
+    listEntry.scope ?? "global",
+  );
   return {
     name: detail.name,
     slug: detail.name,
@@ -933,7 +974,9 @@ function assertClaudeInstallPlan(plan: InstallPlan): void {
     (() => {
       try {
         const parsed = JSON.parse(args[3] ?? "") as unknown;
-        return isRecord(parsed) && typeof parsed.type === "string" && typeof parsed.url === "string";
+        return (
+          isRecord(parsed) && typeof parsed.type === "string" && typeof parsed.url === "string"
+        );
       } catch {
         return false;
       }
@@ -1024,7 +1067,11 @@ export function createClaudeCodeAdapter(runtime: AdapterRuntime): McpClientAdapt
       const executable = requireInstalled(result);
       requireCapability(result, "native-list");
 
-      const commandResult = await runtime.execFile(executable, ["mcp", "list"], CLAUDE_EXEC_OPTIONS);
+      const commandResult = await runtime.execFile(
+        executable,
+        ["mcp", "list"],
+        CLAUDE_EXEC_OPTIONS,
+      );
       if (commandResult.exitCode !== 0) {
         throw new ClaudeCodeAdapterError(
           "CLAUDE_CODE_COMMAND_FAILED",
@@ -1136,7 +1183,9 @@ export function createClaudeCodeAdapter(runtime: AdapterRuntime): McpClientAdapt
       }
     },
     async verifyRemove(plan) {
-      const installed = (await this.inspect(plan.scope)).some((entry) => entry.slug === plan.serverSlug);
+      const installed = (await this.inspect(plan.scope)).some(
+        (entry) => entry.slug === plan.serverSlug,
+      );
       return installed
         ? { ok: false, message: `${plan.serverSlug} is still installed in Claude Code` }
         : { ok: true, message: `${plan.serverSlug} is absent from Claude Code` };
@@ -1152,7 +1201,8 @@ export function createClaudeCodeAdapter(runtime: AdapterRuntime): McpClientAdapt
               {
                 severity: "error",
                 code: "CLAUDE_CODE_NOT_INSTALLED",
-                message: "Claude Code CLI was not found in PATH or a standard installation location.",
+                message:
+                  "Claude Code CLI was not found in PATH or a standard installation location.",
                 recoveryHint: "Install Claude Code and retry detection.",
               },
             ],
