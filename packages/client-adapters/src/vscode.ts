@@ -373,9 +373,15 @@ function buildRemoteServerConfig(
 
       const inputValue = getInput(inputs, definition.key);
       if (definition.sensitive) {
-        // Sensitive placeholders are always converted to VS Code prompt inputs.
-        const inputId = ensurePromptInput(serverSlug, definition, promptInputs);
-        value = value.replaceAll(`{${placeholder}}`, `\${input:${inputId}}`);
+        if (inputValue.kind === "env-reference") {
+          value = value.replaceAll(
+            `{${placeholder}}`,
+            `\${env:${getSafeEnvReferenceInput(inputs, definition.key)}}`,
+          );
+        } else {
+          const inputId = ensurePromptInput(serverSlug, definition, promptInputs);
+          value = value.replaceAll(`{${placeholder}}`, `\${input:${inputId}}`);
+        }
       } else if (inputValue.kind === "text") {
         value = value.replaceAll(`{${placeholder}}`, inputValue.value);
       } else if (inputValue.kind === "env-reference") {

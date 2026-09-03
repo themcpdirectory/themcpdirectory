@@ -53,7 +53,22 @@ describe("planAddCommand", () => {
       }),
     });
     const deps = createCliDependencies({
-      manifest: makePackageManifest(),
+      manifest: makePackageManifest({
+        variants: [
+          makePackageVariant({
+            environmentVariables: [
+              ...makePackageVariant().environmentVariables,
+              {
+                name: "OPTIONAL_LABEL",
+                description: "Optional label",
+                required: false,
+                defaultValue: null,
+                valueSource: "environment",
+              },
+            ],
+          }),
+        ],
+      }),
       adapters: [adapter],
       environment: { GITHUB_TOKEN: "ghs_top_secret_value" },
     });

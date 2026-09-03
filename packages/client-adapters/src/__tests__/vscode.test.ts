@@ -334,15 +334,18 @@ describe("vscode adapter", () => {
     expect(symlinkRuntime.renameCalls).toEqual([]);
   });
 
-  it("stores sensitive remote headers via input references without persisting raw secrets", async () => {
-    const fake = createFakeProcessRuntime({ cwd: "/workspace", entries: { [PROJECT_ROOT]: { type: "directory", mode: 0o755 } } });
+  it("stores sensitive remote headers via environment references without persisting raw secrets", async () => {
+    const fake = createFakeProcessRuntime({
+      cwd: "/workspace",
+      entries: { [PROJECT_ROOT]: { type: "directory", mode: 0o755 } },
+    });
     const adapter = createVsCodeAdapter(fake.runtime);
 
     const plan = await adapter.planInstall({
       intent: makeRemoteIntent("project"),
       inputs: new Map([
         ["workspace", { kind: "text", value: "acme" } as const],
-        ["token", { kind: "secret-value", value: "supersecret", allowPersistence: true } as const],
+        ["token", { kind: "env-reference", envName: "GITHUB_TOKEN" } as const],
         ["team", { kind: "text", value: "platform" } as const],
       ]) satisfies ValidatedInstallInputMap,
       noninteractive: true,
@@ -356,19 +359,15 @@ describe("vscode adapter", () => {
     }
 
     const serialized = JSON.stringify(plan.operations[0].document);
-    expect(serialized).toContain("${input:");
-    expect(serialized).not.toContain("supersecret");
+    expect(serialized).toContain("${env:GITHUB_TOKEN}");
+    expect(serialized).not.toContain("${input:");
 
     const doc = plan.operations[0].document as {
       headers?: Record<string, string>;
       inputs?: Array<{ id?: string; type?: string; password?: boolean }>;
     };
-    expect(doc.headers?.Authorization).toMatch(/^Bearer \$\{input:/u);
-    expect(doc.inputs).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ type: "promptString", password: true }),
-      ]),
-    );
+    expect(doc.headers?.Authorization).toBe("Bearer ${env:GITHUB_TOKEN}");
+    expect(doc.inputs).toBeUndefined();
   });
 
   it("supports idempotent remove without backup collisions and no-op when absent", async () => {
@@ -381,8 +380,16 @@ describe("vscode adapter", () => {
           mode: 0o640,
           content: JSON.stringify({
             servers: {
-              github: { type: "stdio", command: "npx", args: ["--yes", "@example/github-mcp@1.2.3"] },
-              stripe: { type: "stdio", command: "npx", args: ["--yes", "@example/stripe-mcp@1.2.3"] },
+              github: {
+                type: "stdio",
+                command: "npx",
+                args: ["--yes", "@example/github-mcp@1.2.3"],
+              },
+              stripe: {
+                type: "stdio",
+                command: "npx",
+                args: ["--yes", "@example/stripe-mcp@1.2.3"],
+              },
             },
           }),
         },
@@ -390,23 +397,34 @@ describe("vscode adapter", () => {
     });
     const repeatedRemovalsAdapter = createVsCodeAdapter(repeatedRemovalsRuntime.runtime);
 
-    const removeGithub = await repeatedRemovalsAdapter.planRemove({ slug: "github", scope: "project" });
+    const removeGithub = await repeatedRemovalsAdapter.planRemove({
+      slug: "github",
+      scope: "project",
+    });
     await repeatedRemovalsAdapter.executeRemove(removeGithub);
 
-    const removeStripe = await repeatedRemovalsAdapter.planRemove({ slug: "stripe", scope: "project" });
+    const removeStripe = await repeatedRemovalsAdapter.planRemove({
+      slug: "stripe",
+      scope: "project",
+    });
     await repeatedRemovalsAdapter.executeRemove(removeStripe);
 
     const uniqueBackupTargets = new Set(repeatedRemovalsRuntime.copyCalls.map((call) => call.to));
     expect(uniqueBackupTargets.size).toBeGreaterThanOrEqual(2);
 
-    const afterRemovals = JSON.parse(await repeatedRemovalsRuntime.runtime.readFile(PROJECT_CONFIG_PATH)) as {
+    const afterRemovals = JSON.parse(
+      await repeatedRemovalsRuntime.runtime.readFile(PROJECT_CONFIG_PATH),
+    ) as {
       servers?: Record<string, unknown>;
     };
     expect(afterRemovals.servers).toEqual({});
 
     const absentConfigRuntime = createFakeProcessRuntime({ cwd: "/workspace" });
     const absentConfigAdapter = createVsCodeAdapter(absentConfigRuntime.runtime);
-    const absentRemovePlan = await absentConfigAdapter.planRemove({ slug: "github", scope: "project" });
+    const absentRemovePlan = await absentConfigAdapter.planRemove({
+      slug: "github",
+      scope: "project",
+    });
     await absentConfigAdapter.executeRemove(absentRemovePlan);
 
     expect(absentConfigRuntime.mkdirCalls).toEqual([]);

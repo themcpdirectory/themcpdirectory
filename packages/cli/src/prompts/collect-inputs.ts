@@ -93,12 +93,16 @@ async function collectEnvironmentReference(
   definition: Extract<InstallInputDefinition, { source: "environment-variable" }>,
   promptIO: PromptIO,
   env: Readonly<NodeJS.ProcessEnv>,
-): Promise<{ readonly value: InstallInputValue; readonly summary: string }> {
+): Promise<{ readonly value: InstallInputValue; readonly summary: string } | null> {
   if (hasEnvironmentValue(env, definition.name)) {
     return {
       value: { kind: "env-reference", envName: definition.name },
       summary: `Use environment variable $${definition.name} for ${describeInput(definition)}.`,
     };
+  }
+
+  if (!definition.required) {
+    return null;
   }
 
   if (!promptIO.isInteractive) {
