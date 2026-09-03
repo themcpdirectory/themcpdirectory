@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@themcpdirectory/cli':
+        specifier: workspace:*
+        version: link:packages/cli
       prettier:
         specifier: 3.9.6
         version: 3.9.6
@@ -277,12 +280,18 @@ importers:
       '@themcpdirectory/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
+      '@themcpdirectory/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       '@themcpdirectory/typescript-config':
         specifier: workspace:*
         version: link:../../tooling/typescript
       '@types/node':
         specifier: ^20
         version: 20.19.43
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       eslint:
         specifier: 9.39.5
         version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)

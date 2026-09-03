@@ -19,6 +19,8 @@ import type {
 import { describe, expect, it } from "vitest";
 import type { CliDependencies, PromptIO } from "../dependencies.js";
 import { planAddCommand } from "../commands/add-plan.js";
+import { runAddCliCommand } from "../commands/add.js";
+import { renderHumanEnvelope } from "../output/render.js";
 
 type PackageVariant = Extract<InstallManifestV1["variants"][number], { kind: "package" }>;
 type RemoteVariant = Extract<InstallManifestV1["variants"][number], { kind: "remote" }>;
@@ -308,20 +310,15 @@ describe("planAddCommand", () => {
       prompt,
     });
 
-    const result = await planAddCommand(
-      {
-        identifier: "github",
-        targetClients: ["vscode"],
-        dryRun: true,
-        yes: false,
-        json: false,
-      },
-      deps,
-    );
+    const result = await runAddCliCommand(["github", "--to", "vscode", "--dry-run"], deps);
 
     expect(result.exitCode).toBe(0);
     expect(prompt.inputCalls).toEqual([]);
     expect(prompt.secretInputCalls).toHaveLength(1);
+    expect(result.warnings).toEqual([expect.stringContaining("persisted secret")]);
+    expect(renderHumanEnvelope(result.stdout!)).toEqual(
+      expect.arrayContaining([expect.stringContaining("Warning: Remote auth")]),
+    );
     expect(JSON.stringify(result.stdout)).not.toContain("raw_persisted_secret");
   });
 

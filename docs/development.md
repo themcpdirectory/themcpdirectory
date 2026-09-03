@@ -1,10 +1,10 @@
 # Local Development
 
-This guide covers the implemented Phase A-C workspace on macOS or Linux. Commands run from the repository root unless noted otherwise.
+This guide covers the workspace on macOS or Linux. Commands run from the repository root unless noted otherwise.
 
 ## Prerequisites
 
-- Node.js `>=24 <25`
+- Node.js `>=24.10 <25`
 - pnpm `11.17.0`, selected by Corepack from the repository's `packageManager` field
 - Docker with the `docker compose` command
 - Git
@@ -144,6 +144,41 @@ Public web routes are:
 - `/sitemap.xml`
 
 Alias detail routes redirect permanently to the canonical server slug. Listings, search, category counts, and sitemap entries include only active, normally moderated records. Direct detail lookup suppresses hidden and blocked records but may render other listing or moderation states with their factual availability metadata.
+
+## CLI Development
+
+Build and run the repository-linked binary:
+
+```sh
+pnpm --filter @themcpdirectory/cli build
+pnpm --filter @themcpdirectory/cli exec mcpdir --help
+pnpm --filter @themcpdirectory/cli exec mcpdir search github
+```
+
+The default API root is `http://127.0.0.1:3001/api/v1`. Override it per command when testing another API:
+
+```sh
+MCPDIR_API_BASE_URL=https://api.example.test/api/v1 pnpm --filter @themcpdirectory/cli exec mcpdir search github
+```
+
+CLI changes must preserve these safety properties:
+
+- Installation and removal execute only adapter-generated plans accepted by the install-engine validator.
+- Mutating commands require an interactive confirmation or `--yes`; `--dry-run` does not mutate client configuration or receipts.
+- Installation receipts are persisted only after adapter verification succeeds.
+- Secret values are not rendered, serialized into plans, or stored in receipts.
+- `doctor` is read-only and skips adapter inspections that may connect to or start configured MCP servers.
+
+Run the compact command workflow and built-binary smoke gates:
+
+```sh
+pnpm --filter @themcpdirectory/cli exec vitest run src/__tests__/integration-cli.test.ts src/__tests__/binary-smoke.test.ts
+pnpm --filter @themcpdirectory/cli build
+pnpm --filter @themcpdirectory/cli exec mcpdir --help
+pnpm prettier --check README.md docs/development.md docs/superpowers/plans/2026-09-01-phase-e-cli-installation.md
+```
+
+The built file at `packages/cli/dist/index.js` is a bundled local-development executable. Packed-tarball installation, publish validation, and release automation are intentionally deferred to Phase H.
 
 ## Validation
 

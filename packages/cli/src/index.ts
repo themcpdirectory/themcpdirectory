@@ -1,8 +1,21 @@
 #!/usr/bin/env node
 
-import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { runCliMain } from "./cli.js";
 
+export { ADD_USAGE, runAddCliCommand } from "./commands/add.js";
+export {
+  executeAddCommand,
+  type AddExecutionResult,
+  type TargetInstallResultV1,
+} from "./commands/add-execute.js";
+export {
+  planAddCommand,
+  type AddCommandOptions,
+  type AddPlanningResult,
+  type TargetInstallPreview,
+} from "./commands/add-plan.js";
 export { runInfoCommand } from "./commands/info.js";
 export {
   DOCTOR_USAGE,
@@ -46,6 +59,15 @@ export {
 export { serializeJsonEnvelope } from "./output/json.js";
 export { renderHumanEnvelope } from "./output/render.js";
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(process.argv[1])) {
   void runCliMain();
+}
+
+function isDirectExecution(entryPath: string | undefined): boolean {
+  if (!entryPath) return false;
+  try {
+    return realpathSync(entryPath) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
 }

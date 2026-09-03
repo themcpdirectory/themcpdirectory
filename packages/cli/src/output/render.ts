@@ -11,40 +11,38 @@ import type { UpdateResult } from "../commands/update.js";
 import type { JsonEnvelopeV1 } from "../commands/result.js";
 
 export function renderHumanEnvelope(envelope: JsonEnvelopeV1): readonly string[] {
-  if (envelope.data === undefined) {
-    return [];
+  let lines: readonly string[] = [];
+  if (envelope.data !== undefined) {
+    switch (envelope.command) {
+      case "doctor":
+        lines = renderDoctorEnvelope(envelope.data as DoctorReport);
+        break;
+      case "search":
+        lines = renderSearchEnvelope(envelope.data as ServerCollectionResponse);
+        break;
+      case "info":
+        lines = renderInfoEnvelope(envelope.data as ServerDetailResponse);
+        break;
+      case "add":
+        lines = renderAddExecutionEnvelope(envelope.data as AddExecutionResult);
+        break;
+      case "list":
+        lines = renderListEnvelope(envelope.data as readonly ListCommandEntry[]);
+        break;
+      case "remove":
+        lines = renderRemoveEnvelope(
+          envelope.data as RemovalResult | RemovalAmbiguityResult | RemovalNotInstalledResult,
+        );
+        break;
+      case "update":
+        lines = renderUpdateEnvelope(envelope.data as UpdateResult);
+        break;
+    }
   }
 
-  let lines: readonly string[];
-  switch (envelope.command) {
-    case "doctor":
-      lines = renderDoctorEnvelope(envelope.data as DoctorReport);
-      break;
-    case "search":
-      lines = renderSearchEnvelope(envelope.data as ServerCollectionResponse);
-      break;
-    case "info":
-      lines = renderInfoEnvelope(envelope.data as ServerDetailResponse);
-      break;
-    case "add":
-      lines = renderAddExecutionEnvelope(envelope.data as AddExecutionResult);
-      break;
-    case "list":
-      lines = renderListEnvelope(envelope.data as readonly ListCommandEntry[]);
-      break;
-    case "remove":
-      lines = renderRemoveEnvelope(
-        envelope.data as RemovalResult | RemovalAmbiguityResult | RemovalNotInstalledResult,
-      );
-      break;
-    case "update":
-      lines = renderUpdateEnvelope(envelope.data as UpdateResult);
-      break;
-    default:
-      return [];
-  }
-
-  return lines.map(sanitizeTerminalText);
+  return [...lines, ...envelope.warnings.map((warning) => `Warning: ${warning}`)].map(
+    sanitizeTerminalText,
+  );
 }
 
 export function sanitizeTerminalText(value: string): string {

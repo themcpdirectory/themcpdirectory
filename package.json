@@ -24,6 +24,7 @@
     "typecheck": "turbo typecheck"
   },
   "devDependencies": {
+    "@themcpdirectory/cli": "workspace:*",
     "prettier": "3.9.6",
     "turbo": "2.10.12"
   }

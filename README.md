@@ -1,6 +1,6 @@
 ![The MCP Directory Logo](assets/wordmark-with-bg-1000x216.svg)
 
-The MCP Directory is an open directory for discovering Model Context Protocol (MCP) servers. This repository currently implements the Phase A-C foundation: Registry ingestion, deterministic normalization, PostgreSQL search, GitHub repository enrichment, fixture data, and a server-rendered public directory.
+The MCP Directory is an open directory for discovering and installing Model Context Protocol (MCP) servers. The repository includes Registry ingestion, deterministic normalization, PostgreSQL search, GitHub repository enrichment, a versioned public API, and the `mcpdir` CLI.
 
 ## Current Features
 
@@ -11,8 +11,23 @@ The MCP Directory is an open directory for discovering Model Context Protocol (M
 - Optional authenticated GitHub enrichment with append-only repository snapshots
 - PostgreSQL-backed `pg-boss` worker queues
 - Deterministic local seed data and isolated Playwright browser tests
+- Versioned public discovery and install-manifest contracts under `/api/v1`
+- `mcpdir` support for Claude Code, Codex, Cursor, and VS Code
 
-The API currently exposes only `GET /` as a health endpoint. Authentication, installation workflows, client adapters, and the public API contract are reserved package boundaries, not shipped product features.
+## CLI
+
+Build the executable and inspect its commands:
+
+```sh
+pnpm --filter @themcpdirectory/cli build
+pnpm --filter @themcpdirectory/cli exec mcpdir --help
+```
+
+The CLI provides `search`, `info`, `add`, `list`, `remove`, `update`, and `doctor`. It uses `http://127.0.0.1:3001/api/v1` by default; set `MCPDIR_API_BASE_URL` to use another Directory API.
+
+Install and removal plans are restricted to adapter-owned executables, configuration roots, capabilities, and deeplinks. Mutating commands show or require confirmation unless `--yes` is supplied, receipts are written only after successful verification, and `doctor` performs read-only configuration inspection without starting installed MCP servers. Output and receipts never contain environment values or persisted secrets.
+
+The workspace build is intended for local development. Packed-tarball verification and publishing remain Phase H work.
 
 ## Quick Start
 
@@ -80,6 +95,11 @@ GitHub API --------------------> domain <------------+
 - `packages/registry-normalizer`: deterministic Registry normalization
 - `packages/search`: PostgreSQL query construction and ranking
 - `packages/security`: outbound URL and SSRF protections
+- `packages/api-contract`: versioned public API and install-manifest schemas
+- `packages/cli`: bundled `mcpdir` command-line client
+- `packages/client-adapters`: Claude Code, Codex, Cursor, and VS Code integration
+- `packages/directory-client`: validated public API transport
+- `packages/install-engine`: deterministic intent, hashing, and plan validation
 - `packages/ui`: shared visual tokens and UI primitives
 - `tooling/db-seed`: deterministic local fixture seed
 
@@ -95,6 +115,14 @@ pnpm test
 pnpm test:integration
 pnpm build
 pnpm test:e2e
+```
+
+Run the focused CLI integration and binary checks with:
+
+```sh
+pnpm --filter @themcpdirectory/cli exec vitest run src/__tests__/integration-cli.test.ts src/__tests__/binary-smoke.test.ts
+pnpm --filter @themcpdirectory/cli build
+pnpm --filter @themcpdirectory/cli exec mcpdir --help
 ```
 
 The browser suite creates, migrates, seeds, and drops an isolated PostgreSQL database. Install its Chromium runtime once with `pnpm --filter @themcpdirectory/web exec playwright install chromium`.

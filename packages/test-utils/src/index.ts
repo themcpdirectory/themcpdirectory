@@ -36,3 +36,5 @@ export type {
 } from "./directory-api-server.js";
 export { createFakeProcessRuntime } from "./fake-process-runtime.js";
 export type { FakeProcessRuntime, FakeProcessRuntimeOptions } from "./fake-process-runtime.js";
+export { createInProcessCliHarness } from "./cli-harness.js";
+export type { CliHarnessDependencies, InProcessCliHarness } from "./cli-harness.js";

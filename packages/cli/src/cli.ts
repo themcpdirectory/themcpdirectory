@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { ADD_USAGE, runAddCliCommand } from "./commands/add.js";
 import { runInfoCommand } from "./commands/info.js";
 import { runListCommand } from "./commands/list.js";
 import { DOCTOR_USAGE, runDoctorCommand } from "./commands/doctor.js";
@@ -19,6 +20,7 @@ export const CLI_HELP_TEXT = [
   "  doctor                                Diagnose Directory and client health",
   "  search   Search directory listings",
   "  info     Show directory details for one server",
+  "  add <slug-or-alias> [options]          Install an MCP server",
   "  list                                  List installed MCP servers",
   "  remove <slug> [--to <client>]         Remove an installed MCP server",
   "  update [server] [--to <client>]       Update Directory-managed installations",
@@ -27,6 +29,7 @@ export const CLI_HELP_TEXT = [
 type CliCommandHandler = (argv: readonly string[], deps: CliDependencies) => Promise<CommandResult>;
 
 const COMMAND_HANDLERS: Readonly<Record<string, CliCommandHandler>> = Object.freeze({
+  add: runAddCliCommand,
   doctor: runDoctorCommand,
   search: runSearchCommand,
   info: runInfoCommand,
@@ -44,6 +47,11 @@ export async function runCli(argv: readonly string[], deps?: CliDependencies): P
 
   if (!command || command === "help" || command === "--help" || command === "-h") {
     resolvedDeps.output.writeStdout(`${CLI_HELP_TEXT}\n`);
+    return finalizeExitCode(0, ownsProcessExit);
+  }
+
+  if (command === "add" && (commandArgs.includes("--help") || commandArgs.includes("-h"))) {
+    resolvedDeps.output.writeStdout(`${ADD_USAGE}\n`);
     return finalizeExitCode(0, ownsProcessExit);
   }
 
