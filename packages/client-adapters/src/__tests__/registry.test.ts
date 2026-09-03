@@ -15,7 +15,9 @@ import {
   type AdapterRuntime,
   AdapterRuntimeError,
   createAdapterRegistry,
+  createCursorAdapter,
   createNodeAdapterRuntime,
+  createVsCodeAdapter,
   type ClientDetection,
   type DiagnosticResult,
   type ExecFileOptions,
@@ -150,6 +152,51 @@ function createProbeAdapter(id: ClientId, runtime: AdapterRuntime): McpClientAda
 }
 
 describe("createAdapterRegistry", () => {
+  it("detects Cursor and VS Code from runtime installation paths", async () => {
+    const absent = createFakeProcessRuntime({ env: { PATH: "" } });
+    await expect(createCursorAdapter(absent.runtime).detect()).resolves.toMatchObject({
+      installed: false,
+      capabilities: [],
+    });
+    await expect(createVsCodeAdapter(absent.runtime).detect()).resolves.toMatchObject({
+      installed: false,
+      capabilities: [],
+    });
+
+    const present = createFakeProcessRuntime({
+      env: { PATH: "" },
+      entries: {
+        "/Applications/Cursor.app": { type: "directory", mode: 0o755 },
+        "/Applications/Visual Studio Code.app": { type: "directory", mode: 0o755 },
+      },
+    });
+    await expect(createCursorAdapter(present.runtime).detect()).resolves.toMatchObject({
+      installed: true,
+      executable: "/Applications/Cursor.app",
+    });
+    await expect(createVsCodeAdapter(present.runtime).detect()).resolves.toMatchObject({
+      installed: true,
+      executable: "/Applications/Visual Studio Code.app",
+    });
+
+    const windows = createFakeProcessRuntime({
+      platform: "win32",
+      env: { Path: "C:\\Tools", PATHEXT: ".EXE;.CMD" },
+      entries: {
+        "C:\\Tools\\cursor.cmd": { type: "file", content: "", mode: 0o644 },
+        "C:\\Tools\\code.cmd": { type: "file", content: "", mode: 0o644 },
+      },
+    });
+    await expect(createCursorAdapter(windows.runtime).detect()).resolves.toMatchObject({
+      installed: true,
+      executable: "C:\\Tools\\cursor.cmd",
+    });
+    await expect(createVsCodeAdapter(windows.runtime).detect()).resolves.toMatchObject({
+      installed: true,
+      executable: "C:\\Tools\\code.cmd",
+    });
+  });
+
   it("preserves insertion order and returns copy-safe list and detection arrays", async () => {
     const cursor = createStaticAdapter("cursor", { executable: "/Applications/Cursor.app" });
     const codex = createStaticAdapter("codex", { executable: "/usr/local/bin/codex" });

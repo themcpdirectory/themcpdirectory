@@ -1,5 +1,11 @@
 import type { ServerCollectionResponse, ServerDetailResponse } from "@themcpdirectory/api-contract";
 import type { AddExecutionResult } from "../commands/add-execute.js";
+import type { ListCommandEntry } from "../commands/list.js";
+import type {
+  RemovalAmbiguityResult,
+  RemovalNotInstalledResult,
+  RemovalResult,
+} from "../commands/remove.js";
 import type { JsonEnvelopeV1 } from "../commands/result.js";
 
 export function renderHumanEnvelope(envelope: JsonEnvelopeV1): readonly string[] {
@@ -7,16 +13,82 @@ export function renderHumanEnvelope(envelope: JsonEnvelopeV1): readonly string[]
     return [];
   }
 
+  let lines: readonly string[];
   switch (envelope.command) {
     case "search":
-      return renderSearchEnvelope(envelope.data as ServerCollectionResponse);
+      lines = renderSearchEnvelope(envelope.data as ServerCollectionResponse);
+      break;
     case "info":
-      return renderInfoEnvelope(envelope.data as ServerDetailResponse);
+      lines = renderInfoEnvelope(envelope.data as ServerDetailResponse);
+      break;
     case "add":
-      return renderAddExecutionEnvelope(envelope.data as AddExecutionResult);
+      lines = renderAddExecutionEnvelope(envelope.data as AddExecutionResult);
+      break;
+    case "list":
+      lines = renderListEnvelope(envelope.data as readonly ListCommandEntry[]);
+      break;
+    case "remove":
+      lines = renderRemoveEnvelope(
+        envelope.data as RemovalResult | RemovalAmbiguityResult | RemovalNotInstalledResult,
+      );
+      break;
     default:
       return [];
   }
+
+  return lines.map(sanitizeTerminalText);
+}
+
+export function sanitizeTerminalText(value: string): string {
+  let sanitized = "";
+  for (const character of value) {
+    const codePoint = character.codePointAt(0)!;
+    const isControl =
+      codePoint <= 0x1f ||
+      (codePoint >= 0x7f && codePoint <= 0x9f) ||
+      codePoint === 0x061c ||
+      codePoint === 0x200e ||
+      codePoint === 0x200f ||
+      (codePoint >= 0x202a && codePoint <= 0x202e) ||
+      (codePoint >= 0x2066 && codePoint <= 0x2069);
+    sanitized += isControl ? "?" : character;
+  }
+  return sanitized;
+}
+
+function renderListEnvelope(entries: readonly ListCommandEntry[]): readonly string[] {
+  if (entries.length === 0) {
+    return ["No installed MCP servers found."];
+  }
+
+  return entries.map(
+    (entry) =>
+      `${entry.name} (${entry.client}, ${entry.scope}) - ${entry.managedBy === "mcpdir" ? "Directory-managed" : "external"}`,
+  );
+}
+
+function renderRemoveEnvelope(
+  result: RemovalResult | RemovalAmbiguityResult | RemovalNotInstalledResult,
+): readonly string[] {
+  if (result.status === "ambiguous") {
+    return [
+      result.message,
+      ...result.availableTargets.map(
+        (target) => `  ${target.client} (${target.scope}) - ${target.managedBy}`,
+      ),
+    ];
+  }
+
+  if (result.status === "not_installed") {
+    return [result.message];
+  }
+
+  return [
+    `${result.slug} (${result.client}, ${result.scope}): ${result.status}`,
+    `  ${result.executionMessage}`,
+    `  Verification: ${result.verificationMessage}`,
+    `  Recovery: ${result.recoveryHint}`,
+  ];
 }
 
 function renderAddExecutionEnvelope(result: AddExecutionResult): readonly string[] {

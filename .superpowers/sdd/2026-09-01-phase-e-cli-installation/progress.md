@@ -208,3 +208,11 @@
 - Task 12 final review: `Spec: PASS`; `Quality: PASS`.
 - Task 12 residual risk: verification ran on Node `26.5.0`; repository support remains Node `>=24.10 <25` and requires a final Node 24 run.
 - Task 12: complete.
+- Task 13 implementation:
+  - List detects available clients before deriving scopes, inspects adapter state as installation truth, merges receipts only as ownership metadata, sorts deterministically, and sanitizes terminal output.
+  - Remove resolves bare and explicit targets deterministically, validates plans before preview and mutation, verifies absence before receipt deletion, and reports phase-accurate recovery.
+  - Cursor and VS Code detection probes PATH plus platform installation locations, including Windows PATHEXT launchers, and exposes no capabilities when absent.
+- Task 13 final verification: focused list/remove `1/1`; focused registry `16/16`; CLI and client-adapters TypeScript and ESLint passed; Prettier and diff checks passed.
+- Task 13 final review: `Spec: PASS`; `Quality: PASS`.
+- Task 13 residual risk: verification ran on Node `26.5.0`; repository support remains Node `>=24.10 <25` and requires a final Node 24 run.
+- Task 13: complete.

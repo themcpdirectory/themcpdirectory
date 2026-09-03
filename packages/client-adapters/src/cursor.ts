@@ -35,6 +35,7 @@ import type {
   PlanInstallOptions,
   PlanRemoveOptions,
 } from "./types.js";
+import { findInstalledApplication } from "./application-detection.js";
 
 const SAFE_SERVER_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/u;
 const SAFE_ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/u;
@@ -75,8 +76,40 @@ export class CursorAdapterError extends Error {
   }
 }
 
-function getPathModule(runtime: AdapterRuntime) {
-  return runtime.platform === "win32" ? win32 : posix;
+function getCursorInstallationCandidates(
+  runtime: AdapterRuntime,
+): readonly { path: string | undefined; kind: "file" | "directory" }[] {
+  if (runtime.platform === "win32") {
+    return [
+      {
+        path: runtime.env.LOCALAPPDATA
+          ? win32.join(runtime.env.LOCALAPPDATA, "Programs", "cursor", "Cursor.exe")
+          : undefined,
+        kind: "file",
+      },
+      {
+        path: runtime.env.ProgramFiles
+          ? win32.join(runtime.env.ProgramFiles, "Cursor", "Cursor.exe")
+          : undefined,
+        kind: "file",
+      },
+    ];
+  }
+
+  if (runtime.platform === "darwin") {
+    return [
+      { path: "/Applications/Cursor.app", kind: "directory" },
+      {
+        path: posix.join(runtime.homeDirectory, "Applications", "Cursor.app"),
+        kind: "directory",
+      },
+    ];
+  }
+
+  return [
+    { path: "/usr/share/cursor/cursor", kind: "file" },
+    { path: "/opt/cursor/cursor", kind: "file" },
+  ];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -526,11 +559,16 @@ export function createCursorAdapter(runtime: AdapterRuntime): McpClientAdapter {
   const adapter: McpClientAdapter = {
     id: "cursor" as const,
     async detect(): Promise<ClientDetection> {
+      const executable = await findInstalledApplication(
+        runtime,
+        "cursor",
+        getCursorInstallationCandidates(runtime),
+      );
       return {
         id: "cursor",
-        installed: true,
-        executable: getPathModule(runtime).join("/Applications", "Cursor.app"),
-        capabilities: CURSOR_CAPABILITIES,
+        installed: executable !== undefined,
+        ...(executable === undefined ? {} : { executable }),
+        capabilities: executable === undefined ? [] : CURSOR_CAPABILITIES,
       };
     },
     async inspect(scope = "user") {

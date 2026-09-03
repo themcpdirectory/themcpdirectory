@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { posix, win32 } from "node:path";
 import {
   assertExactPinnedVersion,
   validateInstallPlan,
@@ -34,6 +35,7 @@ import type {
   PlanInstallOptions,
   PlanRemoveOptions,
 } from "./types.js";
+import { findInstalledApplication } from "./application-detection.js";
 
 const SAFE_SERVER_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/u;
 const SAFE_ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/u;
@@ -83,6 +85,42 @@ interface VsCodePromptInput {
 interface BuiltVsCodeServerConfig {
   readonly server: Record<string, JsonValue>;
   readonly inputs: readonly VsCodePromptInput[];
+}
+
+function getVsCodeInstallationCandidates(
+  runtime: AdapterRuntime,
+): readonly { path: string | undefined; kind: "file" | "directory" }[] {
+  if (runtime.platform === "win32") {
+    return [
+      {
+        path: runtime.env.LOCALAPPDATA
+          ? win32.join(runtime.env.LOCALAPPDATA, "Programs", "Microsoft VS Code", "Code.exe")
+          : undefined,
+        kind: "file",
+      },
+      {
+        path: runtime.env.ProgramFiles
+          ? win32.join(runtime.env.ProgramFiles, "Microsoft VS Code", "Code.exe")
+          : undefined,
+        kind: "file",
+      },
+    ];
+  }
+
+  if (runtime.platform === "darwin") {
+    return [
+      { path: "/Applications/Visual Studio Code.app", kind: "directory" },
+      {
+        path: posix.join(runtime.homeDirectory, "Applications", "Visual Studio Code.app"),
+        kind: "directory",
+      },
+    ];
+  }
+
+  return [
+    { path: "/usr/share/code/bin/code", kind: "file" },
+    { path: "/snap/bin/code", kind: "file" },
+  ];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -696,10 +734,16 @@ export function createVsCodeAdapter(runtime: AdapterRuntime): McpClientAdapter {
   const adapter: McpClientAdapter = {
     id: "vscode" as const,
     async detect(): Promise<ClientDetection> {
+      const executable = await findInstalledApplication(
+        runtime,
+        "code",
+        getVsCodeInstallationCandidates(runtime),
+      );
       return {
         id: "vscode",
-        installed: true,
-        capabilities: VSCODE_CAPABILITIES,
+        installed: executable !== undefined,
+        ...(executable === undefined ? {} : { executable }),
+        capabilities: executable === undefined ? [] : VSCODE_CAPABILITIES,
       };
     },
     async inspect(scope = "user") {

@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 
 import { runInfoCommand } from "./commands/info.js";
+import { runListCommand } from "./commands/list.js";
+import { REMOVE_USAGE, runRemoveCliCommand } from "./commands/remove.js";
 import type { CommandResult } from "./commands/result.js";
 import { runSearchCommand } from "./commands/search.js";
 import { createDefaultCliDependencies, type CliDependencies } from "./dependencies.js";
 import { serializeJsonEnvelope } from "./output/json.js";
-import { renderHumanEnvelope } from "./output/render.js";
+import { renderHumanEnvelope, sanitizeTerminalText } from "./output/render.js";
 
 export const CLI_HELP_TEXT = [
   "Usage: mcpdir <command> [options]",
@@ -14,6 +16,8 @@ export const CLI_HELP_TEXT = [
   "  help     Show this help",
   "  search   Search directory listings",
   "  info     Show directory details for one server",
+  "  list                                  List installed MCP servers",
+  "  remove <slug> [--to <client>]         Remove an installed MCP server",
 ].join("\n");
 
 type CliCommandHandler = (argv: readonly string[], deps: CliDependencies) => Promise<CommandResult>;
@@ -21,6 +25,8 @@ type CliCommandHandler = (argv: readonly string[], deps: CliDependencies) => Pro
 const COMMAND_HANDLERS: Readonly<Record<string, CliCommandHandler>> = Object.freeze({
   search: runSearchCommand,
   info: runInfoCommand,
+  list: runListCommand,
+  remove: runRemoveCliCommand,
 });
 
 export async function runCli(argv: readonly string[]): Promise<number>;
@@ -35,9 +41,14 @@ export async function runCli(argv: readonly string[], deps?: CliDependencies): P
     return finalizeExitCode(0, ownsProcessExit);
   }
 
+  if (command === "remove" && (commandArgs.includes("--help") || commandArgs.includes("-h"))) {
+    resolvedDeps.output.writeStdout(`${REMOVE_USAGE}\n`);
+    return finalizeExitCode(0, ownsProcessExit);
+  }
+
   const handler = COMMAND_HANDLERS[command];
   if (!handler) {
-    resolvedDeps.output.writeStderr(`Unknown command: ${command}\n`);
+    resolvedDeps.output.writeStderr(`Unknown command: ${sanitizeTerminalText(command)}\n`);
     resolvedDeps.output.writeStderr("Run mcpdir --help for available commands.\n");
     return finalizeExitCode(1, ownsProcessExit);
   }
@@ -51,11 +62,7 @@ export async function runCliMain(argv: readonly string[] = process.argv.slice(2)
   await runCli(argv);
 }
 
-function writeCommandResult(
-  result: CommandResult,
-  jsonMode: boolean,
-  deps: CliDependencies,
-): void {
+function writeCommandResult(result: CommandResult, jsonMode: boolean, deps: CliDependencies): void {
   if (result.stdout) {
     if (jsonMode) {
       deps.output.writeStdout(`${serializeJsonEnvelope(result.stdout)}\n`);
@@ -67,7 +74,7 @@ function writeCommandResult(
   }
 
   for (const line of result.stderrLines) {
-    deps.output.writeStderr(`${line}\n`);
+    deps.output.writeStderr(`${sanitizeTerminalText(line)}\n`);
   }
 }
 
