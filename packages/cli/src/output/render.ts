@@ -1,8 +1,9 @@
 import type { ServerCollectionResponse, ServerDetailResponse } from "@themcpdirectory/api-contract";
+import type { AddExecutionResult } from "../commands/add-execute.js";
 import type { JsonEnvelopeV1 } from "../commands/result.js";
 
 export function renderHumanEnvelope(envelope: JsonEnvelopeV1): readonly string[] {
-  if (!envelope.ok || envelope.data === undefined) {
+  if (envelope.data === undefined) {
     return [];
   }
 
@@ -11,9 +12,19 @@ export function renderHumanEnvelope(envelope: JsonEnvelopeV1): readonly string[]
       return renderSearchEnvelope(envelope.data as ServerCollectionResponse);
     case "info":
       return renderInfoEnvelope(envelope.data as ServerDetailResponse);
+    case "add":
+      return renderAddExecutionEnvelope(envelope.data as AddExecutionResult);
     default:
       return [];
   }
+}
+
+function renderAddExecutionEnvelope(result: AddExecutionResult): readonly string[] {
+  return result.targets.flatMap((target) => [
+    `${target.client} (${target.scope}): ${target.status}`,
+    `  Verification: ${target.verificationMessage}`,
+    `  Recovery: ${target.recoveryHint}`,
+  ]);
 }
 
 function renderSearchEnvelope(response: ServerCollectionResponse): readonly string[] {
@@ -52,7 +63,9 @@ function renderInfoEnvelope(response: ServerDetailResponse): readonly string[] {
   const lines: string[] = [`${data.title} (${data.slug})`, `  ${data.shortDescription}`];
 
   if (data.publisher) {
-    lines.push(`  Publisher: ${data.publisher.name}${data.publisher.verified ? " (verified)" : ""}`);
+    lines.push(
+      `  Publisher: ${data.publisher.name}${data.publisher.verified ? " (verified)" : ""}`,
+    );
   }
 
   if (data.version) {
