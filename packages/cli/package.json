@@ -3,13 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "mcpdir": "./dist/index.js"
+  },
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@themcpdirectory/install-engine": "workspace:*"
   },
   "devDependencies": {
     "eslint": "9.39.5",
