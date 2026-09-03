@@ -228,6 +228,53 @@ describe("cursor adapter", () => {
     expect(fake.chmodCalls.at(-1)).toEqual({ path: USER_CONFIG_PATH, mode: 0o640 });
   });
 
+  it("handles repeated removals without backup collisions and no-ops when config is absent", async () => {
+    const repeatedRemovalsRuntime = createFakeProcessRuntime({
+      cwd: "/workspace",
+      entries: {
+        [PROJECT_ROOT]: { type: "directory", mode: 0o755 },
+        [PROJECT_CONFIG_PATH]: {
+          type: "file",
+          mode: 0o640,
+          content: JSON.stringify({
+            mcpServers: {
+              github: { command: "npx", args: ["--yes", "@example/github-mcp@1.2.3"] },
+              stripe: { command: "npx", args: ["--yes", "@example/stripe-mcp@1.2.3"] },
+            },
+          }),
+        },
+      },
+    });
+    const repeatedRemovalsAdapter = createCursorAdapter(repeatedRemovalsRuntime.runtime);
+
+    const removeGithub = await repeatedRemovalsAdapter.planRemove({ slug: "github", scope: "project" });
+    await repeatedRemovalsAdapter.executeRemove(removeGithub);
+
+    const removeStripe = await repeatedRemovalsAdapter.planRemove({ slug: "stripe", scope: "project" });
+    await repeatedRemovalsAdapter.executeRemove(removeStripe);
+
+    const uniqueBackupTargets = new Set(repeatedRemovalsRuntime.copyCalls.map((call) => call.to));
+    expect(uniqueBackupTargets.size).toBeGreaterThanOrEqual(2);
+
+    const afterRepeatedRemovals = JSON.parse(
+      await repeatedRemovalsRuntime.runtime.readFile(PROJECT_CONFIG_PATH),
+    ) as Record<string, unknown>;
+    expect(afterRepeatedRemovals.mcpServers).toEqual({});
+
+    const absentConfigRuntime = createFakeProcessRuntime({ cwd: "/workspace" });
+    const absentConfigAdapter = createCursorAdapter(absentConfigRuntime.runtime);
+    const absentRemovePlan = await absentConfigAdapter.planRemove({ slug: "github", scope: "project" });
+    await absentConfigAdapter.executeRemove(absentRemovePlan);
+
+    expect(absentConfigRuntime.mkdirCalls).toEqual([]);
+    expect(absentConfigRuntime.copyCalls).toEqual([]);
+    expect(absentConfigRuntime.fileWrites).toEqual([]);
+    expect(absentConfigRuntime.renameCalls).toEqual([]);
+    expect(absentConfigRuntime.fsyncFileCalls).toEqual([]);
+    expect(absentConfigRuntime.fsyncDirectoryCalls).toEqual([]);
+    expect(absentConfigRuntime.unlinkCalls).toEqual([]);
+  });
+
   it("maps user/project scopes to explicit paths and rejects unsupported global scope", async () => {
     const fake = createFakeProcessRuntime({ cwd: "/workspace" });
 

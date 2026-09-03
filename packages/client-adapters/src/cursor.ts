@@ -1,4 +1,5 @@
 import { posix, win32 } from "node:path";
+import { createHash } from "node:crypto";
 import {
   assertExactPinnedVersion,
   validateInstallPlan,
@@ -451,6 +452,20 @@ function serializeOperations(plan: InstallPlan | RemovalPlan): string {
   return JSON.stringify(plan.operations);
 }
 
+function deriveRemovalMutationIntentHash(plan: RemovalPlan, mutationKey: string): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        client: plan.client,
+        scope: plan.scope,
+        serverSlug: plan.serverSlug,
+        mutationKey,
+        operations: plan.operations,
+      }),
+    )
+    .digest("hex");
+}
+
 function toInstalledEntry(
   scope: ClientScope,
   name: string,
@@ -693,13 +708,21 @@ export function createCursorAdapter(runtime: AdapterRuntime): McpClientAdapter {
       const mutation = createCursorConfigMutation(runtime, {
         scope: validated.scope,
         serverKey: operation.mutationKey,
-        intentHash: "0".repeat(64),
+        intentHash: deriveRemovalMutationIntentHash(validated, operation.mutationKey),
       });
       if (operation.path !== mutation.path) {
         throw new CursorAdapterError(
           "CURSOR_INVALID_PLAN",
           "Cursor removal path does not match the scope-approved configuration path",
         );
+      }
+
+      const currentDocument = await readCursorConfigDocument(runtime, mutation);
+      if (currentDocument === null) {
+        return;
+      }
+      if (getCursorServerEntry(currentDocument, operation.mutationKey) === undefined) {
+        return;
       }
 
       await applyCursorConfigMutation(runtime, {

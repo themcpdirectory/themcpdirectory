@@ -181,6 +181,27 @@ async function safeUnlink(runtime: AdapterRuntime, path: string): Promise<void> 
   }
 }
 
+async function copyFileToAvailableBackupPath(
+  runtime: AdapterRuntime,
+  fromPath: string,
+  preferredBackupPath: string,
+): Promise<string> {
+  let suffix = 0;
+  while (true) {
+    const candidatePath = suffix === 0 ? preferredBackupPath : `${preferredBackupPath}.${suffix}`;
+    try {
+      await runtime.copyFile(fromPath, candidatePath, { exclusive: true });
+      return candidatePath;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "EEXIST") {
+        throw error;
+      }
+      suffix += 1;
+    }
+  }
+}
+
 export function resolveCursorScopePaths(runtime: AdapterRuntime, scope: ClientScope): CursorScopePaths {
   const pathModule = getPathModule(runtime.platform);
   if (scope === "global") {
@@ -289,9 +310,14 @@ export async function applyCursorConfigMutation(
     );
   }
 
+  let backupPathUsed: string | null = null;
   await safeUnlink(runtime, mutation.tempPath);
   if (fileExists) {
-    await runtime.copyFile(mutation.path, mutation.backupPath, { exclusive: true });
+    backupPathUsed = await copyFileToAvailableBackupPath(
+      runtime,
+      mutation.path,
+      mutation.backupPath,
+    );
   }
 
   await runtime.writeFile(mutation.tempPath, toCanonicalJson(nextDocument), {
@@ -306,8 +332,8 @@ export async function applyCursorConfigMutation(
   try {
     verified = parseCursorConfigDocument(await runtime.readFile(mutation.path));
   } catch (error) {
-    if (fileExists) {
-      await runtime.copyFile(mutation.backupPath, mutation.path);
+    if (fileExists && backupPathUsed !== null) {
+      await runtime.copyFile(backupPathUsed, mutation.path);
       await runtime.chmod(mutation.path, currentMode);
       await runtime.fsyncFile(mutation.path);
       await safeFsyncDirectory(runtime, scopePaths.rootPath);
@@ -319,8 +345,8 @@ export async function applyCursorConfigMutation(
   }
 
   if (!options.verify(verified)) {
-    if (fileExists) {
-      await runtime.copyFile(mutation.backupPath, mutation.path);
+    if (fileExists && backupPathUsed !== null) {
+      await runtime.copyFile(backupPathUsed, mutation.path);
       await runtime.chmod(mutation.path, currentMode);
       await runtime.fsyncFile(mutation.path);
       await safeFsyncDirectory(runtime, scopePaths.rootPath);
