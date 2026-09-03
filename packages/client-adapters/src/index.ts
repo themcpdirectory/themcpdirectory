@@ -24,6 +24,14 @@ export {
   type CodexAdapterErrorCode,
   type CodexCapabilityProbeResult,
 } from "./codex.js";
+export {
+  ClaudeCodeAdapterError,
+  createClaudeCodeAdapter,
+  detectClaudeCode,
+  probeClaudeCodeCapabilities,
+  type ClaudeCapabilityProbeResult,
+  type ClaudeCodeAdapterErrorCode,
+} from "./claude-code.js";
 export type {
   AdapterRegistry,
   AdapterRollbackResult,
