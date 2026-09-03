@@ -167,6 +167,10 @@ function getParentPath(path: string): string | null {
   return path.slice(0, boundary);
 }
 
+function isDescendantPath(path: string, parent: string): boolean {
+  return path.startsWith(`${parent}/`) || path.startsWith(`${parent}\\`);
+}
+
 function collectMissingParents(entries: Map<string, FakeEntry>, path: string): string[] {
   const parents: string[] = [];
   let current = getParentPath(path);
@@ -297,8 +301,19 @@ export function createFakeProcessRuntime(
         throw createFsError("ENOTDIR", `Cannot rename directory over non-directory: ${to}`);
       }
 
-      entries.set(to, cloneEntry(entry));
-      entries.delete(from);
+      const movedEntries =
+        entry.type === "directory"
+          ? [...entries.entries()].filter(
+              ([sourcePath]) => sourcePath === from || isDescendantPath(sourcePath, from),
+            )
+          : [[from, entry] as const];
+
+      for (const [sourcePath] of movedEntries) {
+        entries.delete(sourcePath);
+      }
+      for (const [sourcePath, sourceEntry] of movedEntries) {
+        entries.set(`${to}${sourcePath.slice(from.length)}`, cloneEntry(sourceEntry));
+      }
     },
     async mkdir(path, mkdirOptions): Promise<void> {
       mkdirCalls.push({ path, options: mkdirOptions });

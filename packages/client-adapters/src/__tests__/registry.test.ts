@@ -357,18 +357,49 @@ describe("createNodeAdapterRuntime", () => {
     ).resolves.toEqual({ exitCode: 7, stdout: "ok", stderr: "bad" });
   });
 
-  it("rejects shell-enabled execution options at runtime", async () => {
+  it("preserves the forced output-limit error when the process exits immediately", async () => {
     const runtime = createNodeAdapterRuntime();
-    const unsafeOptions = {
+
+    await expect(
+      runtime.execFile(
+        process.execPath,
+        ["-e", "process.stdout.write('over-limit'); process.exit(0)"],
+        {
+          timeoutMs: 1_000,
+          maxStdoutBytes: 4,
+          maxStderrBytes: 128,
+          shell: false,
+          stdin: "ignore",
+        },
+      ),
+    ).rejects.toMatchObject({ code: "EXEC_OUTPUT_LIMIT", operation: "execFile" });
+  });
+
+  it("rejects shell-enabled and inherited-stdin execution options at runtime", async () => {
+    const runtime = createNodeAdapterRuntime();
+    const shellOptions = {
       timeoutMs: 1_000,
       maxStdoutBytes: 128,
       maxStderrBytes: 128,
       shell: true,
       stdin: "ignore",
     } as unknown as ExecFileOptions;
+    const stdinOptions = {
+      timeoutMs: 1_000,
+      maxStdoutBytes: 128,
+      maxStderrBytes: 128,
+      shell: false,
+      stdin: "inherit",
+    } as unknown as ExecFileOptions;
 
     await expect(
-      runtime.execFile(process.execPath, ["-e", ""], unsafeOptions),
+      runtime.execFile(process.execPath, ["-e", ""], shellOptions),
+    ).rejects.toMatchObject({
+      code: "EXEC_INVALID_OPTIONS",
+      operation: "execFile",
+    });
+    await expect(
+      runtime.execFile(process.execPath, ["-e", ""], stdinOptions),
     ).rejects.toMatchObject({
       code: "EXEC_INVALID_OPTIONS",
       operation: "execFile",
@@ -442,6 +473,45 @@ describe("createFakeProcessRuntime", () => {
 
     expect(await fakeRuntime.runtime.readFile("/repo/config.json")).toBe("after");
     expect((await fakeRuntime.runtime.lstat("/repo/config-link.json")).isSymbolicLink()).toBe(true);
+  });
+
+  it("moves directory descendants when renaming a directory", async () => {
+    const fakeRuntime = createFakeProcessRuntime({
+      entries: {
+        "/repo": { type: "directory", mode: 0o755 },
+        "/repo/source": { type: "directory", mode: 0o750 },
+        "/repo/source/nested": { type: "directory", mode: 0o700 },
+        "/repo/source/nested/config.json": {
+          type: "file",
+          content: "moved",
+          mode: 0o640,
+        },
+      },
+    });
+
+    await fakeRuntime.runtime.rename("/repo/source", "/repo/moved");
+
+    await expect(fakeRuntime.runtime.readFile("/repo/moved/nested/config.json")).resolves.toBe(
+      "moved",
+    );
+    await expect(
+      fakeRuntime.runtime.lstat("/repo/source/nested/config.json"),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("rejects inherited stdin in the fake runtime", async () => {
+    const fakeRuntime = createFakeProcessRuntime();
+    const stdinOptions = {
+      timeoutMs: 1_000,
+      maxStdoutBytes: 128,
+      maxStderrBytes: 128,
+      shell: false,
+      stdin: "inherit",
+    } as unknown as ExecFileOptions;
+
+    await expect(fakeRuntime.runtime.execFile("probe", [], stdinOptions)).rejects.toMatchObject({
+      code: "EXEC_INVALID_OPTIONS",
+    });
   });
 
   it("tracks mutation primitives and symlink-aware file inspection deterministically", async () => {
