@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, index, check } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, index, uniqueIndex, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { servers } from "./servers.js";
 import { serverVersions } from "./server-versions.js";
@@ -26,6 +26,13 @@ export const trustSignals = pgTable(
   (t) => [
     index("trust_signals_server_id_idx").on(t.serverId),
     index("trust_signals_server_version_id_idx").on(t.serverVersionId),
+    uniqueIndex("trust_signals_server_key_checked_at_uidx").on(
+      t.serverId,
+      t.signalKey,
+      t.checkedAt,
+    ),
+    index("trust_signals_checked_at_idx").on(t.checkedAt),
+    index("trust_signals_expires_at_idx").on(t.expiresAt),
     check(
       "trust_signals_status_check",
       sql`${t.status} in ('positive', 'neutral', 'warning', 'negative', 'unknown')`,

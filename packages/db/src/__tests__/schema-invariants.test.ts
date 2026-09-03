@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getTableConfig } from "drizzle-orm/pg-core";
+import { legalHolds } from "../index.js";
 import {
   registrySources,
   registrySyncRuns,
@@ -39,7 +40,53 @@ function hasIndex(table: Parameters<typeof getTableConfig>[0], partialName: stri
   return config.indexes.some((idx) => idx.config.name?.includes(partialName));
 }
 
+function indexColumns(table: Parameters<typeof getTableConfig>[0], name: string) {
+  const index = getConfig(table).indexes.find((candidate) => candidate.config.name === name);
+  expect(index, `Missing index ${name}`).toBeDefined();
+  return index!.config.columns.map((column) => {
+    if ("name" in column && typeof column.name === "string") return column.name;
+    throw new Error(`Index ${name} contains an expression instead of a named column`);
+  });
+}
+
 describe("schema invariants", () => {
+  it("defines Phase F observation metadata, idempotency, retention, and legal holds", () => {
+    expect(getConfig(serverHealthChecks).columns.map((column) => column.name)).toEqual(
+      expect.arrayContaining(["final_origin", "redirect_count", "method_used"]),
+    );
+    expect(indexColumns(serverHealthChecks, "server_health_checks_remote_checked_at_uidx")).toEqual(
+      ["remote_id", "checked_at"],
+    );
+    expect(indexColumns(serverHealthChecks, "server_health_checks_checked_at_idx")).toEqual([
+      "checked_at",
+    ]);
+    expect(indexColumns(trustSignals, "trust_signals_server_key_checked_at_uidx")).toEqual([
+      "server_id",
+      "signal_key",
+      "checked_at",
+    ]);
+    expect(indexColumns(trustSignals, "trust_signals_checked_at_idx")).toEqual(["checked_at"]);
+    expect(indexColumns(trustSignals, "trust_signals_expires_at_idx")).toEqual(["expires_at"]);
+
+    expect(getConfig(legalHolds).columns.map((column) => column.name)).toEqual(
+      expect.arrayContaining([
+        "scope",
+        "subject_type",
+        "subject_id",
+        "reason",
+        "expires_at",
+        "created_by",
+        "released_at",
+      ]),
+    );
+    expect(indexColumns(legalHolds, "legal_holds_lookup_idx")).toEqual([
+      "scope",
+      "subject_type",
+      "subject_id",
+      "expires_at",
+    ]);
+  });
+
   describe("UUID primary keys with DB-generated defaults", () => {
     const tables = [
       { name: "registry_sources", table: registrySources },
@@ -56,6 +103,7 @@ describe("schema invariants", () => {
       { name: "categories", table: categories },
       { name: "trust_signals", table: trustSignals },
       { name: "server_health_checks", table: serverHealthChecks },
+      { name: "legal_holds", table: legalHolds },
       { name: "repository_snapshots", table: repositorySnapshots },
       { name: "client_compatibility", table: clientCompatibility },
       { name: "install_overrides", table: installOverrides },

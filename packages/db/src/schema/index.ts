@@ -14,6 +14,7 @@ export { categories } from "./categories.js";
 export { serverCategories } from "./server-categories.js";
 export { trustSignals } from "./trust-signals.js";
 export { serverHealthChecks } from "./server-health-checks.js";
+export { legalHolds } from "./legal-holds.js";
 export { repositorySnapshots } from "./repository-snapshots.js";
 export { clientCompatibility } from "./client-compatibility.js";
 export { installOverrides } from "./install-overrides.js";

@@ -22,6 +22,13 @@
       "when": 1788259500441,
       "tag": "0002_wide_green_goblin",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788470776308,
+      "tag": "0003_phase_f_trust_health",
+      "breakpoints": true
     }
   ]
 }
