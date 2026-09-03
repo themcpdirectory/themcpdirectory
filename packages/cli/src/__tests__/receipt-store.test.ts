@@ -66,7 +66,7 @@ describe("createReceiptStore", () => {
   it("writes and finds receipts atomically without persisting unknown fields", async () => {
     const { store, stateDir } = await createStore();
     const noisyReceipt = {
-      ...createReceipt(),
+      ...createReceipt({ slug: "secrets-manager" }),
       unknownField: "must-not-persist",
       secretValue: "super-secret-token",
       nested: { arbitrary: true },
@@ -76,7 +76,7 @@ describe("createReceiptStore", () => {
 
     const receipts = await store.list();
     expect(receipts).toHaveLength(1);
-    expect(await store.find({ slug: "github", client: "codex", scope: "user" })).toEqual(
+    expect(await store.find({ slug: "secrets-manager", client: "codex", scope: "user" })).toEqual(
       receipts[0],
     );
 

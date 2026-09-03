@@ -1,7 +1,6 @@
 import { mkdir, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { ClientId, ClientScope } from "@themcpdirectory/install-engine";
-import { assertNoSensitiveValue } from "../output/redaction.js";
 import type { CliStatePaths } from "./state-paths.js";
 import { FileLockError, type FileLockOptions, withFileLock } from "./file-lock.js";
 
@@ -74,7 +73,7 @@ export function createReceiptStore(
 
   return {
     async list(): Promise<readonly InstallationReceipt[]> {
-      const state = await loadState(paths, now);
+      const state = await readState(paths, options?.lock, now);
       return state.receipts.map((receipt) => ({ ...receipt }));
     },
 
@@ -103,11 +102,23 @@ export function createReceiptStore(
 
     async find(key: ReceiptKey): Promise<InstallationReceipt | null> {
       const sanitizedKey = sanitizeReceiptKey(key);
-      const state = await loadState(paths, now);
+      const state = await readState(paths, options?.lock, now);
       const match = state.receipts.find((candidate) => sameReceiptKey(candidate, sanitizedKey));
       return match ? { ...match } : null;
     },
   };
+}
+
+async function readState(
+  paths: CliStatePaths,
+  lockOptions: FileLockOptions | undefined,
+  now: () => Date,
+): Promise<ReceiptStateFile> {
+  try {
+    return await withFileLock(paths.lockFile, () => loadState(paths, now), lockOptions);
+  } catch (error) {
+    throw mapStoreError(error, paths, "read");
+  }
 }
 
 async function mutateState(
@@ -127,22 +138,30 @@ async function mutateState(
       lockOptions,
     );
   } catch (error) {
-    if (
-      error instanceof FileLockError &&
-      (error.code === "LOCK_BUSY" || error.code === "LOCK_TIMEOUT")
-    ) {
-      throw new ReceiptStoreError("RECEIPT_STATE_LOCKED", `State is locked at ${paths.lockFile}`);
-    }
-
-    if (error instanceof ReceiptStoreError) {
-      throw error;
-    }
-
-    throw new ReceiptStoreError(
-      "RECEIPT_STATE_IO",
-      `Failed to update receipts at ${paths.receiptsFile}`,
-    );
+    throw mapStoreError(error, paths, "update");
   }
+}
+
+function mapStoreError(
+  error: unknown,
+  paths: CliStatePaths,
+  operation: "read" | "update",
+): ReceiptStoreError {
+  if (
+    error instanceof FileLockError &&
+    (error.code === "LOCK_BUSY" || error.code === "LOCK_TIMEOUT")
+  ) {
+    return new ReceiptStoreError("RECEIPT_STATE_LOCKED", `State is locked at ${paths.lockFile}`);
+  }
+
+  if (error instanceof ReceiptStoreError) {
+    return error;
+  }
+
+  return new ReceiptStoreError(
+    "RECEIPT_STATE_IO",
+    `Failed to ${operation} receipts at ${paths.receiptsFile}`,
+  );
 }
 
 async function loadState(paths: CliStatePaths, now: () => Date): Promise<ReceiptStateFile> {
@@ -249,13 +268,6 @@ function sanitizeReceipt(input: unknown, source = "receipt"): InstallationReceip
       `${source} installedAt must be an ISO timestamp`,
     );
   }
-
-  assertNoSensitiveValue(slug, `${source}.slug`);
-  assertNoSensitiveValue(serverVersion, `${source}.serverVersion`);
-  assertNoSensitiveValue(variantId, `${source}.variantId`);
-  assertNoSensitiveValue(manifestHash, `${source}.manifestHash`);
-  assertNoSensitiveValue(installedAt, `${source}.installedAt`);
-  assertNoSensitiveValue(adapterFingerprint, `${source}.adapterFingerprint`);
 
   return {
     schemaVersion: 1,
