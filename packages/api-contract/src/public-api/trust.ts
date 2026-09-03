@@ -7,7 +7,8 @@ export const TrustSignalStateSchema = z.enum([
   "warning",
   "negative",
   "unknown",
-]);
+]).meta({ id: "TrustSignalState", example: "positive" });
+export type TrustSignalState = z.infer<typeof TrustSignalStateSchema>;
 
 export const TrustSignalKeySchema = z.enum([
   "official_registry",
@@ -21,7 +22,17 @@ export const TrustSignalKeySchema = z.enum([
   "current_version_present",
   "package_present",
   "upstream_deleted",
-]);
+]).meta({ id: "TrustSignalKey", example: "official_registry" });
+export type TrustSignalKey = z.infer<typeof TrustSignalKeySchema>;
+
+const trustSignalExample = {
+  key: "official_registry",
+  state: "positive",
+  label: "Listed in the Official MCP Registry",
+  observedAt: "2026-09-01T12:00:00Z",
+  source: "registry",
+  reason: null,
+} as const;
 
 const TrustSignalShape = {
   key: TrustSignalKeySchema,
@@ -35,12 +46,20 @@ const TrustSignalShape = {
 export const TrustProfileV1Schema = strictObject({
   schemaVersion: z.literal(1),
   signals: z.array(strictObject(TrustSignalShape)),
+}).meta({
+  id: "TrustProfileV1",
+  example: {
+    schemaVersion: 1,
+    signals: [trustSignalExample],
+  },
 });
+export type TrustProfileV1 = z.infer<typeof TrustProfileV1Schema>;
 
 export const TrustProfileV1ClientSchema = clientObject({
   schemaVersion: z.literal(1),
   signals: z.array(clientObject(TrustSignalShape)),
 });
+export type TrustProfileV1Client = z.infer<typeof TrustProfileV1ClientSchema>;
 
 const legacyTrustSignalShape = {
   key: z.string().min(1),

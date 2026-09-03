@@ -14,12 +14,11 @@ import {
 } from "./shared.js";
 import {
   compatibilityStatusSchema,
-  installAvailabilityValues,
+  InstallAvailabilitySchema,
   supportedClientIdSchema,
 } from "./servers.js";
 import { legacyTrustProfileServerSchema } from "./trust.js";
-
-export const InstallAvailabilitySchema = z.enum(installAvailabilityValues);
+export { InstallAvailabilitySchema };
 
 function isExactNpmPackageVersion(version: string): boolean {
   return validSemver(version) !== null && version.trim() === version && /^\d/.test(version);

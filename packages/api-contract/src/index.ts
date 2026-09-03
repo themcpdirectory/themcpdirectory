@@ -16,6 +16,9 @@ export {
   HealthCheckOutcomeSchema,
   RemoteHealthObservationV1ClientSchema,
   RemoteHealthObservationV1Schema,
+  type HealthCheckOutcome,
+  type RemoteHealthObservationV1,
+  type RemoteHealthObservationV1Client,
 } from "./public-api/health.js";
 export {
   compatibilityStatusSchema,
@@ -70,6 +73,10 @@ export {
   TrustProfileV1Schema,
   TrustSignalKeySchema,
   TrustSignalStateSchema,
+  type TrustProfileV1,
+  type TrustProfileV1Client,
+  type TrustSignalKey,
+  type TrustSignalState,
 } from "./public-api/trust.js";
 export {
   categoryDetailResponseSchema,

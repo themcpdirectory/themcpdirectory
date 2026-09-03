@@ -5,6 +5,13 @@ import {
   createPublicApiOpenApiDocument,
   installManifestResponseSchema,
   publisherDetailResponseSchema,
+  type HealthCheckOutcome,
+  type RemoteHealthObservationV1,
+  type RemoteHealthObservationV1Client,
+  type TrustProfileV1,
+  type TrustProfileV1Client,
+  type TrustSignalKey,
+  type TrustSignalState,
 } from "../index.js";
 
 type OpenAPIObject = ReturnType<typeof createPublicApiOpenApiDocument>;
@@ -43,6 +50,68 @@ const serverSummaryExample = {
   installAvailability: "available",
 };
 
+const canonicalTypeExportsSmoke = {
+  trustSignalState: "positive",
+  trustSignalKey: "official_registry",
+  trustProfile: {
+    schemaVersion: 1,
+    signals: [
+      {
+        key: "official_registry",
+        state: "positive",
+        label: "Listed in the Official MCP Registry",
+        observedAt: "2026-09-01T12:00:00Z",
+        source: "registry",
+        reason: null,
+      },
+    ],
+  },
+  trustProfileClient: {
+    schemaVersion: 1,
+    signals: [
+      {
+        key: "official_registry",
+        state: "positive",
+        label: "Listed in the Official MCP Registry",
+        observedAt: "2026-09-01T12:00:00Z",
+        source: "registry",
+        reason: null,
+      },
+    ],
+    futureTrustField: { safe: true },
+  },
+  healthCheckOutcome: "healthy",
+  remoteHealthObservation: {
+    schemaVersion: 1,
+    outcome: "healthy",
+    checkedAt: "2026-09-01T12:00:00Z",
+    durationMs: 120,
+    httpStatus: 200,
+    finalOrigin: "https://api.example.com",
+    redirectCount: 0,
+  },
+  remoteHealthObservationClient: {
+    schemaVersion: 1,
+    outcome: "healthy",
+    checkedAt: "2026-09-01T12:00:00Z",
+    durationMs: 120,
+    httpStatus: 200,
+    finalOrigin: "https://api.example.com",
+    redirectCount: 0,
+    futureHealthField: { safe: true },
+  },
+} satisfies {
+  readonly trustSignalState: TrustSignalState;
+  readonly trustSignalKey: TrustSignalKey;
+  readonly trustProfile: TrustProfileV1;
+  readonly trustProfileClient: TrustProfileV1Client;
+  readonly healthCheckOutcome: HealthCheckOutcome;
+  readonly remoteHealthObservation: RemoteHealthObservationV1;
+  readonly remoteHealthObservationClient: RemoteHealthObservationV1Client;
+};
+
+void canonicalTypeExportsSmoke;
+
 function getResponseSchemaRef(document: OpenAPIObject, path: string): string | null {
   const paths = document.paths ?? {};
   const response = paths[path]?.get?.responses?.["200"];
@@ -78,6 +147,45 @@ function getPathParameters(document: OpenAPIObject, path: string): OpenApiParame
   return ((paths[path]?.get?.parameters as OpenApiParameter[] | undefined) ?? []).filter(
     (parameter) => !isReferenceObject(parameter) && parameter.in === "path",
   );
+}
+
+function getComponentSchema(document: OpenAPIObject, componentKey: string): Record<string, unknown> {
+  const schema = document.components?.schemas?.[componentKey];
+  if (!schema || isReferenceObject(schema)) {
+    throw new Error(`Missing object schema component: ${componentKey}`);
+  }
+
+  return schema as Record<string, unknown>;
+}
+
+function getSchemaValueAtPath(value: unknown, path: readonly string[]): unknown {
+  let current = value;
+
+  for (const key of path) {
+    if (!current || typeof current !== "object") {
+      return null;
+    }
+
+    current = (current as Record<string, unknown>)[key];
+  }
+
+  return current;
+}
+
+function collectSchemaRefs(value: unknown, refs: string[] = []): string[] {
+  if (!value || typeof value !== "object") {
+    return refs;
+  }
+
+  if (isReferenceObject(value as { readonly $ref?: string })) {
+    refs.push((value as { readonly $ref: string }).$ref);
+  }
+
+  for (const child of Object.values(value as Record<string, unknown>)) {
+    collectSchemaRefs(child, refs);
+  }
+
+  return refs;
 }
 
 function findPackageVersionPatterns(
@@ -357,15 +465,141 @@ describe("createPublicApiOpenApiDocument", () => {
     });
 
     const document = createPublicApiOpenApiDocument("https://api.themcpdirectory.test");
-    const serializedSchemas = JSON.stringify(document.components?.schemas ?? {});
+    const schemaKeys = Object.keys(document.components?.schemas ?? {}).sort();
+    const trustProfileComponent = getComponentSchema(document, "TrustProfileV1");
+    const remoteHealthComponent = getComponentSchema(document, "RemoteHealthObservationV1");
 
     expect(installExample.data.schemaVersion).toBe(1);
     expect(categoryExample.data.category.slug).toBe("developer-tools");
     expect(publisherExample.data.publisher.websiteUrl).toBe("https://github.com");
     expect(clientExample.data.client.id).toBe("cursor");
-    expect(serializedSchemas).toContain("installAvailability");
-    expect(serializedSchemas).toContain("latestHealth");
-    expect(serializedSchemas).toContain("latestHealthOutcome");
+    expect(schemaKeys).toEqual(
+      expect.arrayContaining([
+        "HealthCheckOutcome",
+        "InstallAvailability",
+        "RemoteHealthObservationV1",
+        "TrustProfileV1",
+        "TrustSignalKey",
+        "TrustSignalState",
+      ]),
+    );
+    expect(getComponentSchema(document, "TrustSignalState")).toEqual(
+      expect.objectContaining({
+        example: "positive",
+      }),
+    );
+    expect(getComponentSchema(document, "TrustSignalKey")).toEqual(
+      expect.objectContaining({
+        example: "official_registry",
+      }),
+    );
+    expect(getComponentSchema(document, "HealthCheckOutcome")).toEqual(
+      expect.objectContaining({
+        example: "healthy",
+      }),
+    );
+    expect(getComponentSchema(document, "InstallAvailability")).toEqual(
+      expect.objectContaining({
+        example: "available",
+      }),
+    );
+    expect(getSchemaValueAtPath(trustProfileComponent, ["example"])) .toEqual({
+      schemaVersion: 1,
+      signals: [
+        {
+          key: "official_registry",
+          state: "positive",
+          label: "Listed in the Official MCP Registry",
+          observedAt: "2026-09-01T12:00:00Z",
+          source: "registry",
+          reason: null,
+        },
+      ],
+    });
+    expect(
+      collectSchemaRefs(
+        getSchemaValueAtPath(trustProfileComponent, ["properties", "signals", "items"]),
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        "#/components/schemas/TrustSignalKey",
+        "#/components/schemas/TrustSignalState",
+      ]),
+    );
+    expect(getSchemaValueAtPath(remoteHealthComponent, ["example"])).toEqual({
+      schemaVersion: 1,
+      outcome: "healthy",
+      checkedAt: "2026-09-01T12:00:00Z",
+      durationMs: 120,
+      httpStatus: 200,
+      finalOrigin: "https://api.example.com",
+      redirectCount: 0,
+    });
+    expect(
+      collectSchemaRefs(getSchemaValueAtPath(remoteHealthComponent, ["properties", "outcome"])),
+    ).toContain("#/components/schemas/HealthCheckOutcome");
+    expect(
+      collectSchemaRefs(
+        getSchemaValueAtPath(getComponentSchema(document, "ServerCollectionResponse"), [
+          "properties",
+          "data",
+          "items",
+          "properties",
+          "latestHealthOutcome",
+        ]),
+      ),
+    ).toContain("#/components/schemas/HealthCheckOutcome");
+    expect(
+      collectSchemaRefs(
+        getSchemaValueAtPath(getComponentSchema(document, "ServerCollectionResponse"), [
+          "properties",
+          "data",
+          "items",
+          "properties",
+          "installAvailability",
+        ]),
+      ),
+    ).toContain("#/components/schemas/InstallAvailability");
+    expect(
+      collectSchemaRefs(
+        getSchemaValueAtPath(getComponentSchema(document, "ServerDetailResponse"), [
+          "properties",
+          "data",
+          "properties",
+          "latestHealth",
+        ]),
+      ),
+    ).toContain("#/components/schemas/RemoteHealthObservationV1");
+    expect(
+      collectSchemaRefs(
+        getSchemaValueAtPath(getComponentSchema(document, "ServerDetailResponse"), [
+          "properties",
+          "data",
+          "properties",
+          "installAvailability",
+        ]),
+      ),
+    ).toContain("#/components/schemas/InstallAvailability");
+    expect(
+      collectSchemaRefs(
+        getSchemaValueAtPath(getComponentSchema(document, "InstallManifestResponse"), [
+          "properties",
+          "data",
+          "properties",
+          "latestHealth",
+        ]),
+      ),
+    ).toContain("#/components/schemas/RemoteHealthObservationV1");
+    expect(
+      collectSchemaRefs(
+        getSchemaValueAtPath(getComponentSchema(document, "InstallManifestResponse"), [
+          "properties",
+          "data",
+          "properties",
+          "installAvailability",
+        ]),
+      ),
+    ).toContain("#/components/schemas/InstallAvailability");
 
     expect(getResponseSchemaRef(document, "/api/v1/servers/{slug}/install")).toBe(
       "#/components/schemas/InstallManifestResponse",
@@ -501,11 +735,17 @@ describe("createPublicApiOpenApiDocument", () => {
           "CategoryDetailResponse",
           "ClientDetailResponse",
           "ClientsCollectionResponse",
+          "HealthCheckOutcome",
+          "InstallAvailability",
           "InstallManifestResponse",
           "PublisherDetailResponse",
+          "RemoteHealthObservationV1",
           "ResolvedServerResponse",
           "ServerCollectionResponse",
           "ServerDetailResponse",
+          "TrustProfileV1",
+          "TrustSignalKey",
+          "TrustSignalState",
         ],
         "servers": [
           {

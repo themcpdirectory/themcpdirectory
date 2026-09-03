@@ -4,6 +4,7 @@ import {
   extendZodWithOpenApi,
 } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
+import { HealthCheckOutcomeSchema, RemoteHealthObservationV1Schema } from "./health.js";
 import {
   categoryDetailResponseSchema,
   categoriesCollectionResponseSchema,
@@ -13,7 +14,11 @@ import {
   discoveryPageQuerySchema,
   publisherDetailResponseSchema,
 } from "./discovery.js";
-import { installManifestQuerySchema, installManifestResponseSchema } from "./install.js";
+import {
+  InstallAvailabilitySchema,
+  installManifestQuerySchema,
+  installManifestResponseSchema,
+} from "./install.js";
 import {
   resolveServerIdentifierResponseSchema,
   searchCollectionQuerySchema,
@@ -22,6 +27,7 @@ import {
   serverDetailResponseSchema,
 } from "./servers.js";
 import { httpUrlSchema, identifierPathParamsSchema, slugPathParamsSchema } from "./shared.js";
+import { TrustProfileV1Schema, TrustSignalKeySchema, TrustSignalStateSchema } from "./trust.js";
 
 extendZodWithOpenApi(z);
 
@@ -203,7 +209,15 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
     },
   });
 
-  const generator = new OpenApiGeneratorV31(registry.definitions);
+  const generator = new OpenApiGeneratorV31([
+    ...registry.definitions,
+    { type: "schema", schema: TrustSignalStateSchema },
+    { type: "schema", schema: TrustSignalKeySchema },
+    { type: "schema", schema: TrustProfileV1Schema },
+    { type: "schema", schema: HealthCheckOutcomeSchema },
+    { type: "schema", schema: RemoteHealthObservationV1Schema },
+    { type: "schema", schema: InstallAvailabilitySchema },
+  ]);
   return generator.generateDocument({
     openapi: "3.1.0",
     info: { title: "The MCP Directory Public API", version: "1.0.0" },

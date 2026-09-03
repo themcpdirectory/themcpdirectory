@@ -37,6 +37,11 @@ export const installAvailabilityValues = [
   "upstream_deleted",
 ] as const;
 
+export const InstallAvailabilitySchema = z.enum(installAvailabilityValues).meta({
+  id: "InstallAvailability",
+  example: "available",
+});
+
 export const serverSortSchema = z.enum(["relevance", "recent", "updated", "popular", "name"]);
 export type PublicServerSort = z.infer<typeof serverSortSchema>;
 
@@ -123,7 +128,7 @@ export const serverSummaryServerSchema = strictObject({
   signals: serverSignalsServerSchema,
   publisherVerified: z.boolean().optional(),
   latestHealthOutcome: HealthCheckOutcomeSchema.nullable().optional(),
-  installAvailability: z.enum(installAvailabilityValues).optional(),
+  installAvailability: InstallAvailabilitySchema.optional(),
 });
 
 export const serverCollectionResponseSchema =
@@ -222,7 +227,7 @@ const serverDetailServerSchema = strictObject({
   }),
   trustProfile: legacyTrustProfileServerSchema,
   latestHealth: RemoteHealthObservationV1Schema.optional(),
-  installAvailability: z.enum(installAvailabilityValues).optional(),
+  installAvailability: InstallAvailabilitySchema.optional(),
   timestamps: serverTimestampsSchema,
 });
 
