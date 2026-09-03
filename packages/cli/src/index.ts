@@ -11,6 +11,14 @@ export {
   type JsonEnvelopeV1,
 } from "./commands/result.js";
 export { runSearchCommand } from "./commands/search.js";
+export {
+  runUpdateCliCommand,
+  runUpdateCommand,
+  UPDATE_USAGE,
+  type UpdateCandidate,
+  type UpdateCommandOptions,
+  type UpdateResult,
+} from "./commands/update.js";
 export { CLI_HELP_TEXT, runCli, runCliMain } from "./cli.js";
 export { resolveCliRuntimeConfig, type CliRuntimeConfig } from "./config/runtime.js";
 export { resolveCliStatePaths, type CliStatePaths } from "./config/state-paths.js";

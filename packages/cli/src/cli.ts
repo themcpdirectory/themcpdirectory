@@ -5,6 +5,7 @@ import { runListCommand } from "./commands/list.js";
 import { REMOVE_USAGE, runRemoveCliCommand } from "./commands/remove.js";
 import type { CommandResult } from "./commands/result.js";
 import { runSearchCommand } from "./commands/search.js";
+import { runUpdateCliCommand, UPDATE_USAGE } from "./commands/update.js";
 import { createDefaultCliDependencies, type CliDependencies } from "./dependencies.js";
 import { serializeJsonEnvelope } from "./output/json.js";
 import { renderHumanEnvelope, sanitizeTerminalText } from "./output/render.js";
@@ -18,6 +19,7 @@ export const CLI_HELP_TEXT = [
   "  info     Show directory details for one server",
   "  list                                  List installed MCP servers",
   "  remove <slug> [--to <client>]         Remove an installed MCP server",
+  "  update [server] [--to <client>]       Update Directory-managed installations",
 ].join("\n");
 
 type CliCommandHandler = (argv: readonly string[], deps: CliDependencies) => Promise<CommandResult>;
@@ -27,6 +29,7 @@ const COMMAND_HANDLERS: Readonly<Record<string, CliCommandHandler>> = Object.fre
   info: runInfoCommand,
   list: runListCommand,
   remove: runRemoveCliCommand,
+  update: runUpdateCliCommand,
 });
 
 export async function runCli(argv: readonly string[]): Promise<number>;
@@ -43,6 +46,11 @@ export async function runCli(argv: readonly string[], deps?: CliDependencies): P
 
   if (command === "remove" && (commandArgs.includes("--help") || commandArgs.includes("-h"))) {
     resolvedDeps.output.writeStdout(`${REMOVE_USAGE}\n`);
+    return finalizeExitCode(0, ownsProcessExit);
+  }
+
+  if (command === "update" && (commandArgs.includes("--help") || commandArgs.includes("-h"))) {
+    resolvedDeps.output.writeStdout(`${UPDATE_USAGE}\n`);
     return finalizeExitCode(0, ownsProcessExit);
   }
 

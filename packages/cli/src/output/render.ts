@@ -6,6 +6,7 @@ import type {
   RemovalNotInstalledResult,
   RemovalResult,
 } from "../commands/remove.js";
+import type { UpdateResult } from "../commands/update.js";
 import type { JsonEnvelopeV1 } from "../commands/result.js";
 
 export function renderHumanEnvelope(envelope: JsonEnvelopeV1): readonly string[] {
@@ -32,6 +33,9 @@ export function renderHumanEnvelope(envelope: JsonEnvelopeV1): readonly string[]
         envelope.data as RemovalResult | RemovalAmbiguityResult | RemovalNotInstalledResult,
       );
       break;
+    case "update":
+      lines = renderUpdateEnvelope(envelope.data as UpdateResult);
+      break;
     default:
       return [];
   }
@@ -54,6 +58,17 @@ export function sanitizeTerminalText(value: string): string {
     sanitized += isControl ? "?" : character;
   }
   return sanitized;
+}
+
+function renderUpdateEnvelope(result: UpdateResult): readonly string[] {
+  return [
+    ...result.updated.flatMap((target) => [
+      `${target.client} (${target.scope}): ${target.status}`,
+      `  Verification: ${target.verificationMessage}`,
+      `  Recovery: ${target.recoveryHint}`,
+    ]),
+    ...result.skipped,
+  ];
 }
 
 function renderListEnvelope(entries: readonly ListCommandEntry[]): readonly string[] {
