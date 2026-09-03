@@ -599,6 +599,45 @@ function removePromptInputsById(
   return next;
 }
 
+function collectInputIdsFromValue(value: unknown, output: Set<string>): void {
+  if (typeof value === "string") {
+    for (const match of value.matchAll(/\$\{input:([^}]+)\}/gu)) {
+      const id = match[1];
+      if (id && id.length > 0) {
+        output.add(id);
+      }
+    }
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectInputIdsFromValue(item, output);
+    }
+    return;
+  }
+
+  if (!isRecord(value)) {
+    return;
+  }
+
+  for (const nested of Object.values(value)) {
+    collectInputIdsFromValue(nested, output);
+  }
+}
+
+function collectReferencedInputIdsFromServers(servers: unknown): ReadonlySet<string> {
+  if (!isRecord(servers)) {
+    return new Set<string>();
+  }
+
+  const referenced = new Set<string>();
+  for (const entry of Object.values(servers)) {
+    collectInputIdsFromValue(entry, referenced);
+  }
+  return referenced;
+}
+
 function toInstalledEntry(
   scope: ClientScope,
   name: string,
@@ -610,7 +649,7 @@ function toInstalledEntry(
   }
 
   const declaredType = typeof value.type === "string" ? value.type : null;
-  const transport = declaredType === "http" ? "http" : "stdio";
+  const transport = declaredType === "http" ? "streamable-http" : "stdio";
   const slug = SAFE_SERVER_SLUG_PATTERN.test(name) ? name : undefined;
   return {
     name,
@@ -884,9 +923,15 @@ export function createVsCodeAdapter(runtime: AdapterRuntime): McpClientAdapter {
             return withoutServer;
           }
 
+          const stillReferenced = collectReferencedInputIdsFromServers(withoutServer.servers);
+          const orphanedIds = inputIdsToRemove.filter((inputId) => !stillReferenced.has(inputId));
+          if (orphanedIds.length === 0) {
+            return withoutServer;
+          }
+
           return setVsCodeInputs(
             withoutServer,
-            removePromptInputsById(withoutServer.inputs, inputIdsToRemove),
+            removePromptInputsById(withoutServer.inputs, orphanedIds),
           );
         },
         verify: (document) => {
@@ -905,7 +950,10 @@ export function createVsCodeAdapter(runtime: AdapterRuntime): McpClientAdapter {
               .filter((item): item is { id: string } => isRecord(item) && typeof item.id === "string")
               .map((item) => item.id),
           );
-          return inputIdsToRemove.every((inputId) => !remainingInputIds.has(inputId));
+
+          const stillReferenced = collectReferencedInputIdsFromServers(document.servers);
+          const orphanedIds = inputIdsToRemove.filter((inputId) => !stillReferenced.has(inputId));
+          return orphanedIds.every((inputId) => !remainingInputIds.has(inputId));
         },
       });
     },

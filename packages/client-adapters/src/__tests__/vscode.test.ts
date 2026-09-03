@@ -239,6 +239,52 @@ describe("vscode adapter", () => {
         "X-Team": "platform",
       },
     });
+
+    const installedBeforeRemove = await adapter.inspect("project");
+    const githubBeforeRemove = installedBeforeRemove.find((entry) => entry.slug === "github");
+    expect.soft(githubBeforeRemove?.transport).toBe("streamable-http");
+
+    const githubHeaders = (next.servers?.github as { headers?: Record<string, string> } | undefined)
+      ?.headers;
+    const sharedInputReference = githubHeaders?.Authorization?.match(/\$\{input:([^}]+)\}/u)?.[1];
+    expect(sharedInputReference).toBeTruthy();
+    if (!sharedInputReference) {
+      throw new Error("Expected github server to include an input reference");
+    }
+
+    await fake.runtime.writeFile(
+      PROJECT_CONFIG_PATH,
+      JSON.stringify({
+        ...next,
+        servers: {
+          ...(next.servers ?? {}),
+          shared: {
+            type: "http",
+            url: "https://example.com/opaque",
+            opaque: {
+              nested: [
+                {
+                  tokenReference: `Bearer \${input:${sharedInputReference}}`,
+                },
+              ],
+            },
+          },
+        },
+      }),
+      { mode: 0o640 },
+    );
+
+    const removePlan = await adapter.planRemove({ slug: "github", scope: "project" });
+    await adapter.executeRemove(removePlan);
+
+    const afterRemove = JSON.parse(await fake.runtime.readFile(PROJECT_CONFIG_PATH)) as {
+      servers?: Record<string, unknown>;
+      inputs?: Array<{ id?: string }>;
+    };
+
+    expect(afterRemove.servers?.github).toBeUndefined();
+    expect(afterRemove.servers?.shared).toBeDefined();
+    expect.soft(afterRemove.inputs?.some((entry) => entry.id === sharedInputReference)).toBe(true);
   });
 
   it("refuses malformed JSON overwrite and symlinked configs", async () => {
