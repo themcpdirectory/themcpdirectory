@@ -16,6 +16,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@themcpdirectory/api-contract": "workspace:*",
+    "@themcpdirectory/client-adapters": "workspace:*",
+    "@themcpdirectory/directory-client": "workspace:*",
     "@themcpdirectory/install-engine": "workspace:*"
   },
   "devDependencies": {

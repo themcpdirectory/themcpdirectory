@@ -1,38 +1,80 @@
 #!/usr/bin/env node
 
+import { runInfoCommand } from "./commands/info.js";
+import type { CommandResult } from "./commands/result.js";
+import { runSearchCommand } from "./commands/search.js";
+import { createDefaultCliDependencies, type CliDependencies } from "./dependencies.js";
+import { serializeJsonEnvelope } from "./output/json.js";
+import { renderHumanEnvelope } from "./output/render.js";
+
 export const CLI_HELP_TEXT = [
   "Usage: mcpdir <command> [options]",
   "",
   "Commands:",
   "  help     Show this help",
-  "",
-  "Task 9 note: full command dispatch is implemented in later tasks.",
+  "  search   Search directory listings",
+  "  info     Show directory details for one server",
 ].join("\n");
 
-export interface CliIo {
-  readonly stdout: Pick<NodeJS.WriteStream, "write">;
-  readonly stderr: Pick<NodeJS.WriteStream, "write">;
-}
+type CliCommandHandler = (argv: readonly string[], deps: CliDependencies) => Promise<CommandResult>;
 
-export async function runCli(
-  argv: readonly string[],
-  io: CliIo = { stdout: process.stdout, stderr: process.stderr },
-): Promise<number> {
-  const [command] = argv;
+const COMMAND_HANDLERS: Readonly<Record<string, CliCommandHandler>> = Object.freeze({
+  search: runSearchCommand,
+  info: runInfoCommand,
+});
+
+export async function runCli(argv: readonly string[]): Promise<number>;
+export async function runCli(argv: readonly string[], deps: CliDependencies): Promise<number>;
+export async function runCli(argv: readonly string[], deps?: CliDependencies): Promise<number> {
+  const ownsProcessExit = deps === undefined;
+  const resolvedDeps = deps ?? createDefaultCliDependencies();
+  const [command, ...commandArgs] = argv;
 
   if (!command || command === "help" || command === "--help" || command === "-h") {
-    io.stdout.write(`${CLI_HELP_TEXT}\n`);
-    return 0;
+    resolvedDeps.output.writeStdout(`${CLI_HELP_TEXT}\n`);
+    return finalizeExitCode(0, ownsProcessExit);
   }
 
-  io.stderr.write(`Unknown command: ${command}\n`);
-  io.stderr.write("Run mcpdir --help for available commands.\n");
-  return 1;
+  const handler = COMMAND_HANDLERS[command];
+  if (!handler) {
+    resolvedDeps.output.writeStderr(`Unknown command: ${command}\n`);
+    resolvedDeps.output.writeStderr("Run mcpdir --help for available commands.\n");
+    return finalizeExitCode(1, ownsProcessExit);
+  }
+
+  const result = await handler(commandArgs, resolvedDeps);
+  writeCommandResult(result, commandArgs.includes("--json"), resolvedDeps);
+  return finalizeExitCode(result.exitCode, ownsProcessExit);
 }
 
 export async function runCliMain(argv: readonly string[] = process.argv.slice(2)): Promise<void> {
-  const exitCode = await runCli(argv);
-  if (exitCode !== 0) {
+  await runCli(argv);
+}
+
+function writeCommandResult(
+  result: CommandResult,
+  jsonMode: boolean,
+  deps: CliDependencies,
+): void {
+  if (result.stdout) {
+    if (jsonMode) {
+      deps.output.writeStdout(`${serializeJsonEnvelope(result.stdout)}\n`);
+    } else {
+      for (const line of renderHumanEnvelope(result.stdout)) {
+        deps.output.writeStdout(`${line}\n`);
+      }
+    }
+  }
+
+  for (const line of result.stderrLines) {
+    deps.output.writeStderr(`${line}\n`);
+  }
+}
+
+function finalizeExitCode(exitCode: number, ownsProcessExit: boolean): number {
+  if (ownsProcessExit) {
     process.exitCode = exitCode;
   }
+
+  return exitCode;
 }

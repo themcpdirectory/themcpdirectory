@@ -261,6 +261,15 @@ importers:
 
   packages/cli:
     dependencies:
+      '@themcpdirectory/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
+      '@themcpdirectory/client-adapters':
+        specifier: workspace:*
+        version: link:../client-adapters
+      '@themcpdirectory/directory-client':
+        specifier: workspace:*
+        version: link:../directory-client
       '@themcpdirectory/install-engine':
         specifier: workspace:*
         version: link:../install-engine
