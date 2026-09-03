@@ -25,6 +25,7 @@ const SENSITIVE_INPUT_NAME_PATTERN = /(secret|token|password|auth|key)/i;
 export type ResolveIntentErrorReason =
   | "INVALID_SCOPE"
   | "NONINTERACTIVE_PERSISTED_SECRET"
+  | "UNSAFE_PACKAGE_ARGUMENT"
   | "UNSUPPORTED_REMOTE_AUTH"
   | "UNSAFE_REMOTE_HEADER"
   | "UNSAFE_INPUT_DEFAULT";
@@ -122,8 +123,52 @@ function assertSafeVariableDefaults(
   }
 }
 
-function assertSafeSerializableVariant(variant: InstallManifestVariantV1): void {
+function isSensitivePackageArgumentHint(value: string | null | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value
+    .replace(/([a-z0-9])([A-Z])/gu, "$1-$2")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/u)
+    .filter(Boolean);
+  const sensitiveTerms = new Set([
+    "auth",
+    "authentication",
+    "authorization",
+    "credential",
+    "credentials",
+    "key",
+    "passwd",
+    "password",
+    "secret",
+    "token",
+  ]);
+  return normalized.some((term) => sensitiveTerms.has(term));
+}
+
+function assertSafePackageArguments(variant: InstallManifestPackageVariantV1): void {
+  for (const argument of [...variant.runtimeArguments, ...variant.packageArguments]) {
+    if (
+      !isSensitivePackageArgumentHint(argument.name) &&
+      !isSensitivePackageArgumentHint(argument.valueHint)
+    ) {
+      continue;
+    }
+
+    const inputName = argument.name ?? argument.valueHint ?? "package argument";
+    throw new ResolveIntentError(
+      "UNSAFE_PACKAGE_ARGUMENT",
+      `Package argument ${inputName} may contain credential data; declare it as an environment variable instead`,
+      { inputName },
+    );
+  }
+}
+
+export function assertSafeInstallVariant(variant: InstallManifestVariantV1): void {
   if (variant.kind === "package") {
+    assertSafePackageArguments(variant);
     assertSafeVariableDefaults(variant.environmentVariables);
     return;
   }
@@ -273,7 +318,7 @@ export function createResolvedInstallIntent(
     );
   }
 
-  assertSafeSerializableVariant(variant);
+  assertSafeInstallVariant(variant);
 
   const inputs = createInstallInputDefinitions(variant);
   const remoteHeaderInputs = variant.kind === "remote" ? getRemoteHeaderInputs(inputs) : [];

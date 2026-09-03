@@ -6,6 +6,7 @@ export {
   validateInputValues,
 } from "./input-resolution.js";
 export {
+  assertSafeInstallVariant,
   createResolvedInstallIntent,
   ResolveIntentError,
   type ResolveIntentErrorReason,

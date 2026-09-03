@@ -637,7 +637,7 @@ git commit -m "feat(cli): add command runner search and info"
 - Produces `function planAddCommand(options: AddCommandOptions, deps: CliDependencies): Promise<CommandResult<AddPlanningResult>>`.
 
 - [ ] Write `packages/cli/src/__tests__/add-planning.test.ts` to cover `mcpdir add <slug>`, `mcpdir add <alias>`, `--to codex,cursor`, `--to all`, `--dry-run`, interactive `All detected clients`, noninteractive missing-input failure, and unsupported capability-gated remote variants.
-- [ ] Implement `add` planning so all target plans are built and validated before any mutation, dry runs perform no write or spawn, and unverified client flags remain unsupported rather than guessed.
+- [ ] Implement `add` planning so all target plans are built and validated before any mutation, dry runs perform no writes or mutation-operation spawns, bounded read-only capability probes remain allowed, and unverified client flags remain unsupported rather than guessed.
 - [ ] Implement input collection so env references are preferred, explicit persisted-secret consent is interactive only, and noninteractive runs fail with a stable required-input error when consent or data is missing.
 - [ ] Run exact verification commands:
 

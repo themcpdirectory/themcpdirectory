@@ -46,7 +46,7 @@ Allowed operation variants are:
 
 There is no generic executable operation. `shell`, `script`, `eval`, `download-and-execute`, free-form command strings, and manifest-selected executables are impossible in the TypeScript union.
 
-Plans have canonical JSON serialisation and a SHA-256 manifest hash for receipts and dry-run comparison. Dry-run output redacts values and performs no write, process spawn, browser open, receipt change, or backup creation.
+Plans have canonical JSON serialisation and a SHA-256 manifest hash for receipts and dry-run comparison. Dry-run output redacts values and performs no write, install or removal process spawn, browser open, receipt change, or backup creation. Bounded read-only version and help probes remain allowed because client capabilities must be verified rather than guessed.
 
 ## Add Flow
 

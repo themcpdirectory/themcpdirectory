@@ -378,7 +378,16 @@ function buildPackageCommand(
       "Codex adapter supports exact npm package variants through npx only",
     );
   }
-  if (variant.environmentVariables.length > 0) {
+  const hasConfiguredEnvironment = variant.environmentVariables.some((variable) => {
+    const definition = definitions.find(
+      (
+        candidate,
+      ): candidate is Extract<InstallInputDefinition, { source: "environment-variable" }> =>
+        candidate.source === "environment-variable" && candidate.name === variable.name,
+    );
+    return definition !== undefined && inputs.has(definition.key);
+  });
+  if (hasConfiguredEnvironment) {
     throw new CodexAdapterError(
       "CODEX_UNSUPPORTED_CAPABILITY",
       "Installed Codex CLI does not prove stdio environment-reference support",

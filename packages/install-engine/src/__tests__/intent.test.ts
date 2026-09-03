@@ -689,7 +689,7 @@ describe("createResolvedInstallIntent", () => {
     }
   });
 
-  it("rejects sensitive defaults before they can enter a serializable intent", () => {
+  it("rejects sensitive package inputs before they can enter a serializable intent", () => {
     const createResolvedInstallIntent = getCreateResolvedInstallIntent();
     const error = expectIntentError(
       () =>
@@ -721,6 +721,33 @@ describe("createResolvedInstallIntent", () => {
 
     expect(String(error)).toContain("API_TOKEN");
     expect(String(error)).not.toContain("super-secret-token");
+
+    expectIntentError(
+      () =>
+        createResolvedInstallIntent(
+          makeManifest([
+            makePackageVariant({
+              runtimeArguments: [
+                {
+                  type: "named",
+                  name: "api-key",
+                  valueHint: "token",
+                  description: "API credential.",
+                  required: true,
+                },
+              ],
+              environmentVariables: [],
+            }),
+          ]),
+          {
+            client: "codex",
+            scope: "user",
+            requestedVariantId: PACKAGE_VARIANT_ID,
+            inputValues: { "api-key": { kind: "text", value: "super-secret-token" } },
+          },
+        ),
+      { reason: "UNSAFE_PACKAGE_ARGUMENT", inputName: "api-key" },
+    );
   });
 
   it("rejects scopes outside the Phase E client scope union", () => {

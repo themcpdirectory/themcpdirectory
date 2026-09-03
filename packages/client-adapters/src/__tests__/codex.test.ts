@@ -88,7 +88,15 @@ function makePackageIntent(): ResolvedInstallIntent {
         required: true,
       },
     ],
-    environmentVariables: [],
+    environmentVariables: [
+      {
+        name: "OPTIONAL_LABEL",
+        description: "Optional label.",
+        required: false,
+        defaultValue: null,
+        valueSource: "environment",
+      },
+    ],
     integrity: null,
   };
 
@@ -121,6 +129,14 @@ function makePackageIntent(): ResolvedInstallIntent {
         description: "Workspace.",
         required: true,
         accepts: ["text"],
+      },
+      {
+        key: "OPTIONAL_LABEL",
+        source: "environment-variable",
+        name: "OPTIONAL_LABEL",
+        description: "Optional label.",
+        required: false,
+        accepts: ["env-reference"],
       },
     ],
     remoteAuth: { kind: "none" },

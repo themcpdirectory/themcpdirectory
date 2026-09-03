@@ -72,7 +72,9 @@ function createClaudeRuntime(execResults = makeProbeResults()) {
   });
 }
 
-function makePackageIntent(scope: "global" | "project" | "user" = "project"): ResolvedInstallIntent {
+function makePackageIntent(
+  scope: "global" | "project" | "user" = "project",
+): ResolvedInstallIntent {
   const variant: InstallManifestPackageVariantV1 = {
     id: VARIANT_ID,
     kind: "package",
@@ -99,7 +101,15 @@ function makePackageIntent(scope: "global" | "project" | "user" = "project"): Re
         required: true,
       },
     ],
-    environmentVariables: [],
+    environmentVariables: [
+      {
+        name: "OPTIONAL_LABEL",
+        description: "Optional label.",
+        required: false,
+        defaultValue: null,
+        valueSource: "environment",
+      },
+    ],
     integrity: null,
   };
 
@@ -133,13 +143,23 @@ function makePackageIntent(scope: "global" | "project" | "user" = "project"): Re
         required: true,
         accepts: ["text"],
       },
+      {
+        key: "OPTIONAL_LABEL",
+        source: "environment-variable",
+        name: "OPTIONAL_LABEL",
+        description: "Optional label.",
+        required: false,
+        accepts: ["env-reference"],
+      },
     ],
     remoteAuth: { kind: "none" },
     requiredEnvReferences: [],
   };
 }
 
-function makeRemoteIntent(remoteAuthKind: "env-reference" | "persisted-secret"): ResolvedInstallIntent {
+function makeRemoteIntent(
+  remoteAuthKind: "env-reference" | "persisted-secret",
+): ResolvedInstallIntent {
   const variant: InstallManifestRemoteVariantV1 = {
     id: VARIANT_ID,
     kind: "remote",
@@ -332,8 +352,8 @@ describe("createClaudeCodeAdapter", () => {
       expect(plan.operations[0].args[2]).toBe("github");
       expect(plan.operations[0].args[4]).toBe("--scope");
       expect(plan.operations[0].args[5]).toBe("project");
-      expect(plan.operations[0].args[3]).toContain("\"url\":\"https://example.com/mcp/acme\"");
-      expect(plan.operations[0].args[3]).toContain("\"Authorization\":\"Bearer ${GITHUB_TOKEN}\"");
+      expect(plan.operations[0].args[3]).toContain('"url":"https://example.com/mcp/acme"');
+      expect(plan.operations[0].args[3]).toContain('"Authorization":"Bearer ${GITHUB_TOKEN}"');
       expect(plan.operations[0].args[3]).not.toContain("supersecret");
     }
   });

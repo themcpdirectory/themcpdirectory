@@ -469,7 +469,16 @@ function buildPackageCommand(
     );
   }
 
-  if (variant.environmentVariables.length > 0) {
+  const hasConfiguredEnvironment = variant.environmentVariables.some((variable) => {
+    const definition = definitions.find(
+      (
+        candidate,
+      ): candidate is Extract<InstallInputDefinition, { source: "environment-variable" }> =>
+        candidate.source === "environment-variable" && candidate.name === variable.name,
+    );
+    return definition !== undefined && inputs.has(definition.key);
+  });
+  if (hasConfiguredEnvironment) {
     throw new ClaudeCodeAdapterError(
       "CLAUDE_CODE_UNSUPPORTED_CAPABILITY",
       "Installed Claude Code CLI does not prove stdio environment-reference support",

@@ -35,7 +35,15 @@ function makePackageIntent(scope: "user" | "project"): ResolvedInstallIntent {
     transport: "stdio",
     runtimeArguments: [],
     packageArguments: [],
-    environmentVariables: [],
+    environmentVariables: [
+      {
+        name: "OPTIONAL_LABEL",
+        description: "Optional label.",
+        required: false,
+        defaultValue: null,
+        valueSource: "environment",
+      },
+    ],
     integrity: null,
   };
 
@@ -46,7 +54,16 @@ function makePackageIntent(scope: "user" | "project"): ResolvedInstallIntent {
     scope,
     variant,
     warnings: [],
-    inputs: [],
+    inputs: [
+      {
+        key: "OPTIONAL_LABEL",
+        source: "environment-variable",
+        name: "OPTIONAL_LABEL",
+        description: "Optional label.",
+        required: false,
+        accepts: ["env-reference"],
+      },
+    ],
     remoteAuth: { kind: "none" },
     requiredEnvReferences: [],
   };
@@ -186,9 +203,15 @@ describe("cursor adapter", () => {
     });
     expect(fake.fsyncDirectoryCalls).toContain(PROJECT_ROOT);
 
-    const next = JSON.parse(await fake.runtime.readFile(PROJECT_CONFIG_PATH)) as Record<string, unknown>;
+    const next = JSON.parse(await fake.runtime.readFile(PROJECT_CONFIG_PATH)) as Record<
+      string,
+      unknown
+    >;
     expect(next.theme).toBe("midnight");
-    expect(next.mcpServers).toMatchObject({ keep: { command: "node" }, github: { command: "npx" } });
+    expect(next.mcpServers).toMatchObject({
+      keep: { command: "node" },
+      github: { command: "npx" },
+    });
   });
 
   it("rolls back deterministically when post-write verification fails", async () => {
@@ -222,7 +245,10 @@ describe("cursor adapter", () => {
       }),
     ).rejects.toThrowError(CursorJsonError);
 
-    const restored = JSON.parse(await fake.runtime.readFile(USER_CONFIG_PATH)) as Record<string, unknown>;
+    const restored = JSON.parse(await fake.runtime.readFile(USER_CONFIG_PATH)) as Record<
+      string,
+      unknown
+    >;
     expect(restored).toEqual({ mcpServers: { keep: { command: "node" } } });
     expect(fake.copyCalls.length).toBeGreaterThanOrEqual(2);
     expect(fake.chmodCalls.at(-1)).toEqual({ path: USER_CONFIG_PATH, mode: 0o640 });
@@ -247,10 +273,16 @@ describe("cursor adapter", () => {
     });
     const repeatedRemovalsAdapter = createCursorAdapter(repeatedRemovalsRuntime.runtime);
 
-    const removeGithub = await repeatedRemovalsAdapter.planRemove({ slug: "github", scope: "project" });
+    const removeGithub = await repeatedRemovalsAdapter.planRemove({
+      slug: "github",
+      scope: "project",
+    });
     await repeatedRemovalsAdapter.executeRemove(removeGithub);
 
-    const removeStripe = await repeatedRemovalsAdapter.planRemove({ slug: "stripe", scope: "project" });
+    const removeStripe = await repeatedRemovalsAdapter.planRemove({
+      slug: "stripe",
+      scope: "project",
+    });
     await repeatedRemovalsAdapter.executeRemove(removeStripe);
 
     const uniqueBackupTargets = new Set(repeatedRemovalsRuntime.copyCalls.map((call) => call.to));
@@ -263,7 +295,10 @@ describe("cursor adapter", () => {
 
     const absentConfigRuntime = createFakeProcessRuntime({ cwd: "/workspace" });
     const absentConfigAdapter = createCursorAdapter(absentConfigRuntime.runtime);
-    const absentRemovePlan = await absentConfigAdapter.planRemove({ slug: "github", scope: "project" });
+    const absentRemovePlan = await absentConfigAdapter.planRemove({
+      slug: "github",
+      scope: "project",
+    });
     await absentConfigAdapter.executeRemove(absentRemovePlan);
 
     expect(absentConfigRuntime.mkdirCalls).toEqual([]);
@@ -295,7 +330,10 @@ describe("cursor adapter", () => {
   });
 
   it("writes secret-safe env references for sensitive remote auth and rejects raw secret values", async () => {
-    const fake = createFakeProcessRuntime({ cwd: "/workspace", entries: { [PROJECT_ROOT]: { type: "directory", mode: 0o755 } } });
+    const fake = createFakeProcessRuntime({
+      cwd: "/workspace",
+      entries: { [PROJECT_ROOT]: { type: "directory", mode: 0o755 } },
+    });
     const adapter = createCursorAdapter(fake.runtime);
     const safeInputs = new Map([
       ["workspace", { kind: "text", value: "acme" } as const],

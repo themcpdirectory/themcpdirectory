@@ -356,6 +356,45 @@ describe("planAddCommand", () => {
     });
     expect(codex.state.executeCalls.current).toBe(0);
     expect(codex.state.verifyCalls.current).toBe(0);
+
+    const prompt = createPromptIoDouble({ isInteractive: true });
+    const unsafePackageResult = await planAddCommand(
+      {
+        identifier: "github",
+        targetClients: ["codex"],
+        dryRun: true,
+        yes: false,
+        json: false,
+      },
+      createCliDependencies({
+        manifest: makePackageManifest({
+          variants: [
+            makePackageVariant({
+              runtimeArguments: [
+                {
+                  type: "named",
+                  name: "api-key",
+                  valueHint: "token",
+                  description: "API credential.",
+                  required: true,
+                },
+              ],
+              environmentVariables: [],
+            }),
+          ],
+        }),
+        adapters: [codex],
+        prompt,
+      }),
+    );
+
+    expect(unsafePackageResult.exitCode).toBe(1);
+    expect(unsafePackageResult.stdout).toMatchObject({
+      ok: false,
+      error: expect.objectContaining({ code: "UNSAFE_CONFIGURATION" }),
+    });
+    expect(prompt.inputCalls).toEqual([]);
+    expect(prompt.secretInputCalls).toEqual([]);
   });
 });
 

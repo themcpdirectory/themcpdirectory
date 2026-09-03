@@ -1,5 +1,6 @@
 import type { InstallManifestV1 } from "@themcpdirectory/api-contract";
 import {
+  assertSafeInstallVariant,
   createInstallInputDefinitions,
   type AdapterCapability,
   type InstallInputDefinition,
@@ -17,6 +18,7 @@ export async function collectInstallInputs(
   promptIO: PromptIO,
   env: Readonly<NodeJS.ProcessEnv>,
 ): Promise<CollectedInputsResult> {
+  assertSafeInstallVariant(options.variant);
   const definitions = createInstallInputDefinitions(options.variant);
   const values: Record<string, InstallInputValue> = {};
   const inputSummary: string[] = [];

@@ -206,7 +206,10 @@ function buildPackageServerConfig(
   definitions: readonly InstallInputDefinition[],
   inputs: ValidatedInstallInputMap,
 ): Record<string, JsonValue> {
-  if (variant.registryType !== "npm" || (variant.runtimeHint !== null && variant.runtimeHint !== "npx")) {
+  if (
+    variant.registryType !== "npm" ||
+    (variant.runtimeHint !== null && variant.runtimeHint !== "npx")
+  ) {
     throw new CursorAdapterError(
       "CURSOR_UNSUPPORTED_CAPABILITY",
       "Cursor adapter supports exact npm package variants through npx only",
@@ -216,21 +219,38 @@ function buildPackageServerConfig(
 
   const version = assertExactPinnedVersion(variant.version);
   const args: string[] = ["--yes"];
-  appendPackageArguments(args, variant.runtimeArguments, "package-runtime-argument", definitions, inputs);
+  appendPackageArguments(
+    args,
+    variant.runtimeArguments,
+    "package-runtime-argument",
+    definitions,
+    inputs,
+  );
   args.push(`${variant.identifier}@${version}`);
   appendPackageArguments(args, variant.packageArguments, "package-argument", definitions, inputs);
 
   const envObject: Record<string, string> = {};
   for (const variable of variant.environmentVariables) {
     const definition = definitions.find(
-      (candidate): candidate is Extract<InstallInputDefinition, { source: "environment-variable" }> =>
+      (
+        candidate,
+      ): candidate is Extract<InstallInputDefinition, { source: "environment-variable" }> =>
         candidate.source === "environment-variable" && candidate.name === variable.name,
     );
     if (!definition) {
       continue;
     }
 
-    const value = getInput(inputs, definition.key);
+    const value = inputs.get(definition.key);
+    if (!value && !definition.required && !variable.required) {
+      continue;
+    }
+    if (!value) {
+      throw new CursorAdapterError(
+        "CURSOR_INVALID_INPUT",
+        `Missing validated input: ${definition.key}`,
+      );
+    }
     if (value.kind === "text") {
       envObject[variable.name] = value.value;
     } else if (value.kind === "env-reference") {
@@ -250,7 +270,10 @@ function buildPackageServerConfig(
   };
 }
 
-function applyRemoteTemplate(template: string, variables: Readonly<Record<string, string>>): string {
+function applyRemoteTemplate(
+  template: string,
+  variables: Readonly<Record<string, string>>,
+): string {
   return template.replace(/\{([A-Za-z0-9_-]+)\}/gu, (segment, token: string) => {
     const replacement = variables[token];
     return replacement === undefined ? segment : replacement;
@@ -357,7 +380,10 @@ function canUseUserMediatedDeeplink(options: PlanInstallOptions): boolean {
     return false;
   }
 
-  if (options.intent.remoteAuth.kind === "persisted-secret" || options.intent.remoteAuth.kind === "mixed") {
+  if (
+    options.intent.remoteAuth.kind === "persisted-secret" ||
+    options.intent.remoteAuth.kind === "mixed"
+  ) {
     return false;
   }
 
@@ -626,7 +652,8 @@ export function createCursorAdapter(runtime: AdapterRuntime): McpClientAdapter {
 
       await applyCursorConfigMutation(runtime, {
         mutation,
-        apply: (document) => setCursorServerEntry(document, operation.mutationKey, operation.document),
+        apply: (document) =>
+          setCursorServerEntry(document, operation.mutationKey, operation.document),
         verify: (document) => {
           const entry = getCursorServerEntry(document, operation.mutationKey);
           return JSON.stringify(entry) === JSON.stringify(operation.document);
