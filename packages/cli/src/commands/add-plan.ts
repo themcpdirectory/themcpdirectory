@@ -4,10 +4,15 @@ import {
   createResolvedInstallIntent,
   hashInstallManifest,
   hashResolvedInstallIntent,
+  InstallInputValidationError,
+  PlanValidationError,
+  ResolveIntentError,
+  UnsupportedVariantError,
   validateInputValues,
   validateInstallPlan,
   type ClientId,
   type ClientScope,
+  type InstallInputValue,
   type InstallPlan,
   type ResolvedInstallIntent,
 } from "@themcpdirectory/install-engine";
@@ -67,7 +72,11 @@ export async function planAddCommand(
 
     for (const target of selectedTargets) {
       const variant = await selectVariantForClient(
-        createVariantSelectionOptions(manifestResponse.data, target.client, options.requestedVariantId),
+        createVariantSelectionOptions(
+          manifestResponse.data,
+          target.client,
+          options.requestedVariantId,
+        ),
         deps.promptIO,
       );
       const collectedInputs = await collectInstallInputs(
@@ -77,6 +86,7 @@ export async function planAddCommand(
           capabilities: target.detection.capabilities,
         },
         deps.promptIO,
+        deps.environment,
       );
       const intent = createResolvedInstallIntent(manifestResponse.data, {
         client: target.client,
@@ -96,6 +106,7 @@ export async function planAddCommand(
         intentHash,
       });
       const plan = validateInstallPlan(plannedInstall, adapter.getSafetyDescriptor());
+      assertPlanDoesNotExposeSecrets(plan, collectedInputs.values);
 
       previews.push({
         client: target.client,
@@ -140,10 +151,41 @@ function toAddPlanningFailure(error: unknown): CommandResult<AddPlanningResult> 
     }) as CommandResult<AddPlanningResult>;
   }
 
-  if (error instanceof Error && /does not support|unsupported/i.test(error.message)) {
+  if (error instanceof UnsupportedVariantError) {
+    const unsafeReasons = new Set(["MUTABLE_VERSION", "MALFORMED_INTEGRITY"]);
     return createFailureResult(COMMAND_NAME, {
       exitCode: 1,
-      code: "UNSUPPORTED_CLIENT",
+      code: unsafeReasons.has(error.reason) ? "UNSAFE_CONFIGURATION" : "UNSUPPORTED_CLIENT",
+      message: error.message,
+    }) as CommandResult<AddPlanningResult>;
+  }
+
+  if (error instanceof PlanValidationError) {
+    return createFailureResult(COMMAND_NAME, {
+      exitCode: 1,
+      code: "UNSAFE_CONFIGURATION",
+      message: error.message,
+    }) as CommandResult<AddPlanningResult>;
+  }
+
+  if (error instanceof InstallInputValidationError) {
+    return createFailureResult(COMMAND_NAME, {
+      exitCode: 1,
+      code: error.reason === "MISSING_REQUIRED_INPUT" ? "REQUIRED_INPUT" : "UNSAFE_CONFIGURATION",
+      message: error.message,
+    }) as CommandResult<AddPlanningResult>;
+  }
+
+  if (error instanceof ResolveIntentError) {
+    const code =
+      error.reason === "NONINTERACTIVE_PERSISTED_SECRET"
+        ? "REQUIRED_INPUT"
+        : error.reason === "UNSUPPORTED_REMOTE_AUTH"
+          ? "UNSUPPORTED_CLIENT"
+          : "UNSAFE_CONFIGURATION";
+    return createFailureResult(COMMAND_NAME, {
+      exitCode: 1,
+      code,
       message: error.message,
     }) as CommandResult<AddPlanningResult>;
   }
@@ -153,6 +195,35 @@ function toAddPlanningFailure(error: unknown): CommandResult<AddPlanningResult> 
     code: "COMMAND_FAILED",
     message: error instanceof Error ? error.message : "Add planning failed",
   }) as CommandResult<AddPlanningResult>;
+}
+
+function assertPlanDoesNotExposeSecrets(
+  plan: InstallPlan,
+  values: Readonly<Record<string, InstallInputValue>>,
+): void {
+  const secrets = Object.values(values)
+    .filter((value) => value.kind === "secret-value")
+    .map((value) => value.value);
+
+  if (secrets.some((secret) => containsString(plan, secret))) {
+    throw new AddPlanningPromptError(
+      "UNSAFE_CONFIGURATION",
+      "The selected client produced an install plan containing a persisted secret value.",
+    );
+  }
+}
+
+function containsString(value: unknown, expected: string): boolean {
+  if (typeof value === "string") {
+    return value.includes(expected);
+  }
+  if (Array.isArray(value)) {
+    return value.some((item) => containsString(item, expected));
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.values(value).some((item) => containsString(item, expected));
+  }
+  return false;
 }
 
 function createVariantSelectionOptions(
@@ -171,7 +242,10 @@ function createVariantSelectionOptions(
   };
 }
 
-function mapDirectoryError(error: DirectoryClientError): { readonly code: string; readonly message: string } {
+function mapDirectoryError(error: DirectoryClientError): {
+  readonly code: string;
+  readonly message: string;
+} {
   if (error.code === "DIRECTORY_AMBIGUOUS") {
     return {
       code: "AMBIGUOUS_SERVER",

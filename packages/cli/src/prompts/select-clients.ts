@@ -61,10 +61,10 @@ export async function selectTargetClients(
     labelToTarget.set(label, target);
     return label;
   });
-  const selected = await deps.promptIO.select(
-    "Install to which client?",
-    [...labels, ALL_DETECTED_CLIENTS_OPTION],
-  );
+  const selected = await deps.promptIO.select("Install to which client?", [
+    ...labels,
+    ALL_DETECTED_CLIENTS_OPTION,
+  ]);
 
   if (selected === ALL_DETECTED_CLIENTS_OPTION) {
     return installedTargets;
@@ -72,10 +72,7 @@ export async function selectTargetClients(
 
   const resolved = labelToTarget.get(selected);
   if (!resolved) {
-    throw new AddPlanningPromptError(
-      "REQUIRED_INPUT",
-      "A supported MCP client must be selected.",
-    );
+    throw new AddPlanningPromptError("REQUIRED_INPUT", "A supported MCP client must be selected.");
   }
 
   return [resolved];
@@ -86,6 +83,13 @@ async function selectExplicitTargets(
   scope: ClientScope,
   adapterRegistry: AdapterRegistry,
 ): Promise<readonly SelectedAddTarget[]> {
+  if (targetClients.length === 0) {
+    throw new AddPlanningPromptError(
+      "REQUIRED_INPUT",
+      "At least one target client must be selected.",
+    );
+  }
+
   const selectedTargets: SelectedAddTarget[] = [];
   const seen = new Set<ClientId>();
 

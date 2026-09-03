@@ -15,14 +15,20 @@ import {
 export async function collectInstallInputs(
   options: CollectInputsOptions,
   promptIO: PromptIO,
-  env: Readonly<NodeJS.ProcessEnv> = process.env,
+  env: Readonly<NodeJS.ProcessEnv>,
 ): Promise<CollectedInputsResult> {
   const definitions = createInstallInputDefinitions(options.variant);
   const values: Record<string, InstallInputValue> = {};
   const inputSummary: string[] = [];
 
   for (const definition of definitions) {
-    const collected = await collectInputValue(definition, options.variant, options.capabilities, promptIO, env);
+    const collected = await collectInputValue(
+      definition,
+      options.variant,
+      options.capabilities,
+      promptIO,
+      env,
+    );
     if (!collected) {
       continue;
     }
@@ -72,7 +78,10 @@ async function collectInputValue(
     );
   }
 
-  const textValue = await promptForNonEmptyValue(promptIO, `Value for ${describeInput(definition)}`);
+  const textValue = await promptForNonEmptyValue(
+    promptIO,
+    `Value for ${describeInput(definition)}`,
+  );
 
   return {
     value: { kind: "text", value: textValue },
@@ -100,7 +109,9 @@ async function collectEnvironmentReference(
   }
 
   while (true) {
-    const envName = (await promptIO.input(`Environment variable for ${describeInput(definition)}`)).trim();
+    const envName = (
+      await promptIO.input(`Environment variable for ${describeInput(definition)}`)
+    ).trim();
     if (envName.length === 0) {
       continue;
     }
@@ -162,10 +173,10 @@ async function collectSensitiveRemoteHeader(
     return await promptForPersistedSecret(definition, promptIO);
   }
 
-  const method = await promptIO.select(
-    `How should ${describeInput(definition)} be provided?`,
-    ["Environment variable reference", "Persisted secret value"],
-  );
+  const method = await promptIO.select(`How should ${describeInput(definition)} be provided?`, [
+    "Environment variable reference",
+    "Persisted secret value",
+  ]);
 
   if (method === "Environment variable reference") {
     return await promptForSecretEnvReference(definition, promptIO, env);
@@ -180,7 +191,9 @@ async function promptForSecretEnvReference(
   env: Readonly<NodeJS.ProcessEnv>,
 ): Promise<{ readonly value: InstallInputValue; readonly summary: string }> {
   while (true) {
-    const envName = (await promptIO.input(`Environment variable for ${describeInput(definition)}`)).trim();
+    const envName = (
+      await promptIO.input(`Environment variable for ${describeInput(definition)}`)
+    ).trim();
     if (envName.length === 0) {
       continue;
     }
@@ -210,12 +223,24 @@ async function promptForPersistedSecret(
     );
   }
 
-  const secretValue = await promptForNonEmptyValue(promptIO, `Secret value for ${describeInput(definition)}`);
+  const secretValue = await promptForNonEmptySecret(
+    promptIO,
+    `Secret value for ${describeInput(definition)}`,
+  );
 
   return {
     value: { kind: "secret-value", value: secretValue, allowPersistence: true },
     summary: `Persist an interactive secret value for ${describeInput(definition)}.`,
   };
+}
+
+async function promptForNonEmptySecret(promptIO: PromptIO, message: string): Promise<string> {
+  while (true) {
+    const value = (await promptIO.secretInput(message)).trim();
+    if (value.length > 0) {
+      return value;
+    }
+  }
 }
 
 async function promptForNonEmptyValue(promptIO: PromptIO, message: string): Promise<string> {

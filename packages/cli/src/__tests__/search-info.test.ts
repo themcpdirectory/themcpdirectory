@@ -144,6 +144,9 @@ function createPromptStub(): PromptIO {
     async input(): Promise<string> {
       throw new Error("Prompt should not be used in search/info tests");
     },
+    async secretInput(): Promise<string> {
+      throw new Error("Prompt should not be used in search/info tests");
+    },
     async confirm(): Promise<boolean> {
       throw new Error("Prompt should not be used in search/info tests");
     },
@@ -221,6 +224,7 @@ function createDependencies(options?: {
         apiBaseUrl: "https://directory.example/api/v1",
         requestTimeoutMs: 15_000,
       },
+      environment: {},
       clock: () => new Date("2026-09-03T12:00:00.000Z"),
     },
     stdout,
@@ -236,17 +240,20 @@ describe("Task 10 search and info command runner", () => {
   it("returns a CommandResult for search with the exact Phase D envelope and no direct writes", async () => {
     const context = createDependencies();
 
-    const result = await runSearchCommand([
-      "github",
-      "--client",
-      "codex",
-      "--category",
-      "developer-tools",
-      "--limit",
-      "5",
-      "--sort",
-      "name",
-    ], context.deps);
+    const result = await runSearchCommand(
+      [
+        "github",
+        "--client",
+        "codex",
+        "--category",
+        "developer-tools",
+        "--limit",
+        "5",
+        "--sort",
+        "name",
+      ],
+      context.deps,
+    );
 
     expect(context.calls.search).toEqual([
       {

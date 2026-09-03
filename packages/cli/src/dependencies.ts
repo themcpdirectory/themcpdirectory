@@ -1,4 +1,5 @@
 import { createInterface } from "node:readline/promises";
+import { Writable } from "node:stream";
 import {
   createAdapterRegistry,
   createClaudeCodeAdapter,
@@ -18,6 +19,7 @@ export interface PromptIO {
   readonly isInteractive: boolean;
   select<T extends string>(message: string, options: readonly T[]): Promise<T>;
   input(message: string): Promise<string>;
+  secretInput(message: string): Promise<string>;
   confirm(message: string): Promise<boolean>;
 }
 
@@ -33,6 +35,7 @@ export interface CliDependencies {
   readonly promptIO: PromptIO;
   readonly output: OutputWriter;
   readonly runtime: CliRuntimeConfig;
+  readonly environment: Readonly<NodeJS.ProcessEnv>;
   readonly clock: () => Date;
 }
 
@@ -79,6 +82,7 @@ export function createDefaultCliDependencies(
     promptIO: createPromptIO(stdin, stdout),
     output: createOutputWriter(stdout, stderr),
     runtime,
+    environment: env,
     clock,
   };
 }
@@ -97,10 +101,7 @@ export function createOutputWriter(
   };
 }
 
-export function createPromptIO(
-  stdin: NodeJS.ReadStream,
-  stdout: NodeJS.WriteStream,
-): PromptIO {
+export function createPromptIO(stdin: NodeJS.ReadStream, stdout: NodeJS.WriteStream): PromptIO {
   const isInteractive = Boolean(stdin.isTTY && stdout.isTTY);
 
   return {
@@ -130,6 +131,11 @@ export function createPromptIO(
       return await ask(stdin, stdout, `${message}: `);
     },
 
+    async secretInput(message: string): Promise<string> {
+      assertInteractive(isInteractive);
+      return await askSecret(stdin, stdout, `${message}: `);
+    },
+
     async confirm(message: string): Promise<boolean> {
       assertInteractive(isInteractive);
 
@@ -147,6 +153,28 @@ export function createPromptIO(
       }
     },
   };
+}
+
+async function askSecret(
+  stdin: NodeJS.ReadStream,
+  stdout: NodeJS.WriteStream,
+  message: string,
+): Promise<string> {
+  const mutedOutput = new Writable({
+    write(_chunk, _encoding, callback): void {
+      callback();
+    },
+  });
+  const readline = createInterface({ input: stdin, output: mutedOutput, terminal: true });
+  stdout.write(message);
+
+  try {
+    return await readline.question("");
+  } finally {
+    stdout.write("\n");
+    readline.close();
+    mutedOutput.destroy();
+  }
 }
 
 async function ask(

@@ -15,7 +15,8 @@ import type {
   ResolvedInstallIntent,
   ValidatedInstallInputMap,
 } from "@themcpdirectory/install-engine";
-import { afterEach, describe, expect, it } from "vitest";
+import { UnsupportedVariantError } from "@themcpdirectory/install-engine";
+import { describe, expect, it } from "vitest";
 import type { CliDependencies, PromptIO } from "../dependencies.js";
 import { planAddCommand } from "../commands/add-plan.js";
 
@@ -25,6 +26,7 @@ type RemoteVariant = Extract<InstallManifestV1["variants"][number], { kind: "rem
 interface PromptIoDouble extends PromptIO {
   readonly selectCalls: Array<{ readonly message: string; readonly options: readonly string[] }>;
   readonly inputCalls: string[];
+  readonly secretInputCalls: string[];
   readonly confirmCalls: string[];
 }
 
@@ -41,21 +43,8 @@ interface FakeAdapterState {
   readonly verifyCalls: { current: number };
 }
 
-const ORIGINAL_GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-
-afterEach(() => {
-  if (ORIGINAL_GITHUB_TOKEN === undefined) {
-    delete process.env.GITHUB_TOKEN;
-    return;
-  }
-
-  process.env.GITHUB_TOKEN = ORIGINAL_GITHUB_TOKEN;
-});
-
 describe("planAddCommand", () => {
   it("plans a slug install for the only detected client and redacts environment summaries", async () => {
-    process.env.GITHUB_TOKEN = "ghs_top_secret_value";
-
     const adapter = createFakeAdapter({
       id: "codex",
       detection: createDetection("codex", {
@@ -66,6 +55,7 @@ describe("planAddCommand", () => {
     const deps = createCliDependencies({
       manifest: makePackageManifest(),
       adapters: [adapter],
+      environment: { GITHUB_TOKEN: "ghs_top_secret_value" },
     });
 
     const result = await planAddCommand(
@@ -98,8 +88,6 @@ describe("planAddCommand", () => {
   });
 
   it("resolves aliases and plans every explicitly requested client", async () => {
-    process.env.GITHUB_TOKEN = "ghs_alias_secret";
-
     const codex = createFakeAdapter({
       id: "codex",
       detection: createDetection("codex", {
@@ -117,6 +105,7 @@ describe("planAddCommand", () => {
     const deps = createCliDependencies({
       manifest: makePackageManifest(),
       adapters: [codex, cursor],
+      environment: { GITHUB_TOKEN: "ghs_alias_secret" },
     });
 
     const result = await planAddCommand(
@@ -144,8 +133,6 @@ describe("planAddCommand", () => {
   });
 
   it("supports --to all and the interactive All detected clients flow", async () => {
-    process.env.GITHUB_TOKEN = "ghs_all_secret";
-
     const codex = createFakeAdapter({
       id: "codex",
       detection: createDetection("codex", {
@@ -164,6 +151,7 @@ describe("planAddCommand", () => {
     const allDeps = createCliDependencies({
       manifest: makePackageManifest(),
       adapters: [codex, cursor],
+      environment: { GITHUB_TOKEN: "ghs_all_secret" },
     });
     const dryRunResult = await planAddCommand(
       {
@@ -189,6 +177,7 @@ describe("planAddCommand", () => {
     const interactiveDeps = createCliDependencies({
       manifest: makePackageManifest(),
       adapters: [codex, cursor],
+      environment: { GITHUB_TOKEN: "ghs_all_secret" },
       prompt: createPromptIoDouble({
         isInteractive: true,
         selectResponses: ["All detected clients"],
@@ -220,8 +209,6 @@ describe("planAddCommand", () => {
   });
 
   it("fails deterministically when noninteractive client choice or required input is missing", async () => {
-    process.env.GITHUB_TOKEN = "ghs_available";
-
     const codex = createFakeAdapter({
       id: "codex",
       detection: createDetection("codex", {
@@ -247,6 +234,7 @@ describe("planAddCommand", () => {
       createCliDependencies({
         manifest: makePackageManifest(),
         adapters: [codex, cursor],
+        environment: { GITHUB_TOKEN: "ghs_available" },
         prompt: createPromptIoDouble({ isInteractive: false }),
       }),
     );
@@ -256,8 +244,6 @@ describe("planAddCommand", () => {
       ok: false,
       error: expect.objectContaining({ code: "REQUIRED_INPUT" }),
     });
-
-    delete process.env.GITHUB_TOKEN;
 
     const inputFailure = await planAddCommand(
       {
@@ -280,6 +266,48 @@ describe("planAddCommand", () => {
       error: expect.objectContaining({ code: "REQUIRED_INPUT" }),
     });
     expect(JSON.stringify(inputFailure.stdout)).not.toContain("ghs_available");
+  });
+
+  it("collects persisted secrets through masked input without exposing them in the preview", async () => {
+    const adapter = createFakeAdapter({
+      id: "vscode",
+      detection: createDetection("vscode", {
+        installed: true,
+        capabilities: ["native-add-remote", "persisted-secret", "native-scope-user"],
+      }),
+    });
+    const prompt = createPromptIoDouble({
+      isInteractive: true,
+      confirmResponses: [true],
+      secretInputResponses: ["raw_persisted_secret"],
+    });
+    const deps = createCliDependencies({
+      manifest: makeRemoteManifest({
+        variants: [
+          makeRemoteVariant({
+            headers: [{ name: "Authorization", value: "Bearer {token}" }],
+          }),
+        ],
+      }),
+      adapters: [adapter],
+      prompt,
+    });
+
+    const result = await planAddCommand(
+      {
+        identifier: "github",
+        targetClients: ["vscode"],
+        dryRun: true,
+        yes: false,
+        json: false,
+      },
+      deps,
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(prompt.inputCalls).toEqual([]);
+    expect(prompt.secretInputCalls).toHaveLength(1);
+    expect(JSON.stringify(result.stdout)).not.toContain("raw_persisted_secret");
   });
 
   it("blocks unsupported capability-gated remote variants without executing mutations", async () => {
@@ -388,10 +416,7 @@ function makeRemoteManifest(overrides: Partial<InstallManifestV1> = {}): Install
   });
 }
 
-function createDetection(
-  id: ClientId,
-  overrides: Partial<ClientDetection> = {},
-): ClientDetection {
+function createDetection(id: ClientId, overrides: Partial<ClientDetection> = {}): ClientDetection {
   return {
     id,
     installed: false,
@@ -404,16 +429,19 @@ function createPromptIoDouble(options: {
   readonly isInteractive: boolean;
   readonly selectResponses?: readonly string[];
   readonly inputResponses?: readonly string[];
+  readonly secretInputResponses?: readonly string[];
   readonly confirmResponses?: readonly boolean[];
 }): PromptIoDouble {
   const selectResponses = [...(options.selectResponses ?? [])];
   const inputResponses = [...(options.inputResponses ?? [])];
+  const secretInputResponses = [...(options.secretInputResponses ?? [])];
   const confirmResponses = [...(options.confirmResponses ?? [])];
 
   return {
     isInteractive: options.isInteractive,
     selectCalls: [],
     inputCalls: [],
+    secretInputCalls: [],
     confirmCalls: [],
     async select<T extends string>(message: string, values: readonly T[]): Promise<T> {
       this.selectCalls.push({ message, options: values });
@@ -428,6 +456,14 @@ function createPromptIoDouble(options: {
       const response = inputResponses.shift();
       if (response === undefined) {
         throw new Error(`Missing input response for: ${message}`);
+      }
+      return response;
+    },
+    async secretInput(message: string): Promise<string> {
+      this.secretInputCalls.push(message);
+      const response = secretInputResponses.shift();
+      if (response === undefined) {
+        throw new Error(`Missing secret input response for: ${message}`);
       }
       return response;
     },
@@ -476,7 +512,11 @@ function createFakeAdapter(options: {
       const requiredCapability: AdapterCapability =
         planOptions.intent.variant.kind === "remote" ? "native-add-remote" : "native-add-stdio";
       if (!options.detection.capabilities.includes(requiredCapability)) {
-        throw new Error(`${options.id} does not support ${requiredCapability}`);
+        throw new UnsupportedVariantError(
+          "CLIENT_INCOMPATIBLE",
+          options.id,
+          `${options.id} is not compatible with ${requiredCapability}`,
+        );
       }
 
       return {
@@ -505,7 +545,8 @@ function createFakeAdapter(options: {
       state.verifyCalls.current += 1;
       const firstOperation = plan.operations[0];
       const transport =
-        firstOperation?.type === "client-command" && firstOperation.capability === "native-add-remote"
+        firstOperation?.type === "client-command" &&
+        firstOperation.capability === "native-add-remote"
           ? "streamable-http"
           : "stdio";
       return {
@@ -576,6 +617,7 @@ function createCliDependencies(options: {
   readonly manifest: InstallManifestV1;
   readonly adapters: readonly (McpClientAdapter & { readonly state: FakeAdapterState })[];
   readonly prompt?: PromptIoDouble;
+  readonly environment?: Readonly<NodeJS.ProcessEnv>;
 }): CliDependencies & {
   readonly resolveInstallCalls: string[];
   readonly prompt: PromptIoDouble;
@@ -616,6 +658,7 @@ function createCliDependencies(options: {
       apiBaseUrl: "http://127.0.0.1:3001/api/v1",
       requestTimeoutMs: 15_000,
     },
+    environment: options.environment ?? {},
     clock: () => new Date("2026-09-03T12:00:00.000Z"),
   };
 }

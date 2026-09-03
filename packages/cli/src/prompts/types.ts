@@ -34,7 +34,8 @@ export type AddPlanningPromptErrorCode =
   | "REQUIRED_INPUT"
   | "USER_CANCELLED"
   | "CLIENT_UNAVAILABLE"
-  | "UNSUPPORTED_CLIENT";
+  | "UNSUPPORTED_CLIENT"
+  | "UNSAFE_CONFIGURATION";
 
 export class AddPlanningPromptError extends Error {
   readonly code: AddPlanningPromptErrorCode;
