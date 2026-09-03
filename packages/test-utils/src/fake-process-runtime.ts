@@ -69,6 +69,7 @@ export interface FakeProcessRuntimeOptions {
   readonly env?: NodeJS.ProcessEnv;
   readonly homeDirectory?: string;
   readonly execResults?: readonly ExecResult[];
+  readonly execDelaysMs?: readonly number[];
   readonly entries?: Readonly<Record<string, FakeEntry>>;
 }
 
@@ -132,6 +133,30 @@ function createFsError(code: string, message: string): NodeJS.ErrnoException {
   return error;
 }
 
+function assertParentDirectory(entries: Map<string, FakeEntry>, path: string): void {
+  const parent = getParentPath(path);
+  if (!parent) {
+    return;
+  }
+
+  const resolvedParent = resolveRealPath(entries, parent);
+  if (getEntry(entries, resolvedParent).type !== "directory") {
+    throw createFsError("ENOTDIR", `Fake parent is not a directory: ${parent}`);
+  }
+}
+
+function resolveWritablePath(entries: Map<string, FakeEntry>, path: string): string {
+  const entry = entries.get(path);
+  if (!entry) {
+    return path;
+  }
+  if (entry.type === "directory") {
+    throw createFsError("EISDIR", `Cannot write directory path: ${path}`);
+  }
+
+  return entry.type === "symlink" ? resolveRealPath(entries, path) : path;
+}
+
 function getParentPath(path: string): string | null {
   const separators = [path.lastIndexOf("/"), path.lastIndexOf("\\")];
   const boundary = Math.max(...separators);
@@ -187,6 +212,7 @@ export function createFakeProcessRuntime(
     Object.entries(options.entries ?? {}).map(([path, entry]) => [path, cloneEntry(entry)]),
   );
   const execResults = [...(options.execResults ?? [])];
+  const execDelaysMs = [...(options.execDelaysMs ?? [])];
   const spawnCalls: FakeProcessRuntime["spawnCalls"] = [];
   const openCalls: string[] = [];
   const fileWrites: FakeProcessRuntime["fileWrites"] = [];
@@ -208,8 +234,30 @@ export function createFakeProcessRuntime(
     env: createFrozenEnv(options.env),
     homeDirectory: options.homeDirectory ?? "/Users/fake-runtime",
     async execFile(executable, args, execOptions): Promise<ExecResult> {
+      if (execOptions.shell !== false || execOptions.stdin !== "ignore") {
+        throw createFsError(
+          "EXEC_INVALID_OPTIONS",
+          "Adapter commands require shell: false and stdin: ignore",
+        );
+      }
+
       spawnCalls.push({ executable, args: [...args], options: { ...execOptions } });
-      return execResults.shift() ?? { exitCode: 0, stdout: "", stderr: "" };
+      const result = execResults.shift() ?? { exitCode: 0, stdout: "", stderr: "" };
+      const delayMs = execDelaysMs.shift() ?? 0;
+      if (delayMs > execOptions.timeoutMs) {
+        throw createFsError("EXEC_TIMEOUT", `Fake command timed out: ${executable}`);
+      }
+      if (
+        Buffer.byteLength(result.stdout) > execOptions.maxStdoutBytes ||
+        Buffer.byteLength(result.stderr) > execOptions.maxStderrBytes
+      ) {
+        throw createFsError(
+          "EXEC_OUTPUT_LIMIT",
+          `Fake command exceeded output limit: ${executable}`,
+        );
+      }
+
+      return result;
     },
     async readFile(path): Promise<string> {
       readCalls.push(path);
@@ -226,29 +274,56 @@ export function createFakeProcessRuntime(
         throw createFsError("EEXIST", `Fake path already exists: ${path}`);
       }
 
-      const parent = getParentPath(path);
-      if (parent && !entries.has(parent)) {
-        throw createFsError("ENOENT", `Missing fake parent directory: ${parent}`);
-      }
+      assertParentDirectory(entries, path);
+      const writablePath = resolveWritablePath(entries, path);
+      const existingEntry = entries.get(writablePath);
 
       fileWrites.push({ path, content, options: writeOptions });
-      entries.set(path, {
+      entries.set(writablePath, {
         type: "file",
         content,
-        mode: writeOptions?.mode ?? 0o666,
+        mode: existingEntry?.type === "file" ? existingEntry.mode : (writeOptions?.mode ?? 0o666),
       });
     },
     async rename(from, to): Promise<void> {
       renameCalls.push({ from, to });
       const entry = getEntry(entries, from);
+      assertParentDirectory(entries, to);
+      const destination = entries.get(to);
+      if (destination?.type === "directory" && entry.type !== "directory") {
+        throw createFsError("EISDIR", `Cannot rename non-directory over directory: ${to}`);
+      }
+      if (destination && destination.type !== "directory" && entry.type === "directory") {
+        throw createFsError("ENOTDIR", `Cannot rename directory over non-directory: ${to}`);
+      }
+
       entries.set(to, cloneEntry(entry));
       entries.delete(from);
     },
     async mkdir(path, mkdirOptions): Promise<void> {
       mkdirCalls.push({ path, options: mkdirOptions });
+      const existingEntry = entries.get(path);
+      if (existingEntry) {
+        if (existingEntry.type === "directory" && mkdirOptions?.recursive) {
+          return;
+        }
+        throw createFsError("EEXIST", `Fake path already exists: ${path}`);
+      }
+
       const missingParents = collectMissingParents(entries, path);
       if (missingParents.length > 0 && !mkdirOptions?.recursive) {
         throw createFsError("ENOENT", `Missing fake parent directory for ${path}`);
+      }
+
+      const nearestExistingParent = getParentPath(missingParents[0] ?? path);
+      if (nearestExistingParent) {
+        const resolvedParent = resolveRealPath(entries, nearestExistingParent);
+        if (getEntry(entries, resolvedParent).type !== "directory") {
+          throw createFsError(
+            "ENOTDIR",
+            `Fake parent is not a directory: ${nearestExistingParent}`,
+          );
+        }
       }
 
       for (const parent of missingParents) {
@@ -271,7 +346,10 @@ export function createFakeProcessRuntime(
     },
     async unlink(path): Promise<void> {
       unlinkCalls.push(path);
-      getEntry(entries, path);
+      const entry = getEntry(entries, path);
+      if (entry.type === "directory") {
+        throw createFsError("EISDIR", `Cannot unlink directory path: ${path}`);
+      }
       entries.delete(path);
     },
     async chmod(path, mode): Promise<void> {
@@ -285,8 +363,13 @@ export function createFakeProcessRuntime(
         throw createFsError("EEXIST", `Fake copy destination exists: ${to}`);
       }
 
+      assertParentDirectory(entries, to);
       const sourceEntry = getEntry(entries, resolveRealPath(entries, from));
-      entries.set(to, cloneEntry(sourceEntry));
+      if (sourceEntry.type !== "file") {
+        throw createFsError("EISDIR", `Cannot copy non-file path: ${from}`);
+      }
+      const destinationPath = resolveWritablePath(entries, to);
+      entries.set(destinationPath, cloneEntry(sourceEntry));
     },
     async fsyncFile(path): Promise<void> {
       fsyncFileCalls.push(path);

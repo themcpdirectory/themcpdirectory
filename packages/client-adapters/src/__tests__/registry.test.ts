@@ -18,6 +18,7 @@ import {
   createNodeAdapterRuntime,
   type ClientDetection,
   type DiagnosticResult,
+  type ExecFileOptions,
   type InstallVerificationResult,
   type InstalledMcpServer,
   type McpClientAdapter,
@@ -327,9 +328,122 @@ describe("createNodeAdapterRuntime", () => {
       expect(String(error)).not.toContain("super-secret-output-value");
     }
   });
+
+  it("enforces stderr limits and preserves bounded nonzero results", async () => {
+    const runtime = createNodeAdapterRuntime();
+
+    await expect(
+      runtime.execFile(process.execPath, ["-e", "process.stderr.write('too much stderr')"], {
+        timeoutMs: 1_000,
+        maxStdoutBytes: 128,
+        maxStderrBytes: 4,
+        shell: false,
+        stdin: "ignore",
+      }),
+    ).rejects.toMatchObject({ code: "EXEC_OUTPUT_LIMIT", operation: "execFile" });
+
+    await expect(
+      runtime.execFile(
+        process.execPath,
+        ["-e", "process.stdout.write('ok'); process.stderr.write('bad'); process.exit(7)"],
+        {
+          timeoutMs: 1_000,
+          maxStdoutBytes: 8,
+          maxStderrBytes: 8,
+          shell: false,
+          stdin: "ignore",
+        },
+      ),
+    ).resolves.toEqual({ exitCode: 7, stdout: "ok", stderr: "bad" });
+  });
+
+  it("rejects shell-enabled execution options at runtime", async () => {
+    const runtime = createNodeAdapterRuntime();
+    const unsafeOptions = {
+      timeoutMs: 1_000,
+      maxStdoutBytes: 128,
+      maxStderrBytes: 128,
+      shell: true,
+      stdin: "ignore",
+    } as unknown as ExecFileOptions;
+
+    await expect(
+      runtime.execFile(process.execPath, ["-e", ""], unsafeOptions),
+    ).rejects.toMatchObject({
+      code: "EXEC_INVALID_OPTIONS",
+      operation: "execFile",
+    });
+  });
 });
 
 describe("createFakeProcessRuntime", () => {
+  it("enforces configured execution output and timeout bounds deterministically", async () => {
+    const outputLimited = createFakeProcessRuntime({
+      execResults: [{ exitCode: 0, stdout: "too much output", stderr: "" }],
+    });
+
+    await expect(
+      outputLimited.runtime.execFile("probe", [], {
+        timeoutMs: 1_000,
+        maxStdoutBytes: 4,
+        maxStderrBytes: 4,
+        shell: false,
+        stdin: "ignore",
+      }),
+    ).rejects.toMatchObject({ code: "EXEC_OUTPUT_LIMIT" });
+
+    const timedOut = createFakeProcessRuntime({
+      execResults: [{ exitCode: 0, stdout: "", stderr: "" }],
+      execDelaysMs: [1_001],
+    });
+
+    await expect(
+      timedOut.runtime.execFile("probe", [], {
+        timeoutMs: 1_000,
+        maxStdoutBytes: 4,
+        maxStderrBytes: 4,
+        shell: false,
+        stdin: "ignore",
+      }),
+    ).rejects.toMatchObject({ code: "EXEC_TIMEOUT" });
+  });
+
+  it("mirrors real filesystem failures and follows symlinks on writes", async () => {
+    const fakeRuntime = createFakeProcessRuntime({
+      entries: {
+        "/repo": { type: "directory", mode: 0o755 },
+        "/repo/config.json": { type: "file", content: "before", mode: 0o640 },
+        "/repo/config-link.json": {
+          type: "symlink",
+          target: "/repo/config.json",
+          mode: 0o777,
+        },
+        "/repo/not-a-directory": { type: "file", content: "file", mode: 0o600 },
+      },
+    });
+
+    await expect(fakeRuntime.runtime.writeFile("/repo", "invalid")).rejects.toMatchObject({
+      code: "EISDIR",
+    });
+    await expect(
+      fakeRuntime.runtime.mkdir("/repo/not-a-directory", { recursive: true }),
+    ).rejects.toMatchObject({ code: "EEXIST" });
+    await expect(
+      fakeRuntime.runtime.copyFile("/repo/config.json", "/missing/config.json"),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(fakeRuntime.runtime.unlink("/repo")).rejects.toMatchObject({
+      code: "EISDIR",
+    });
+    await expect(fakeRuntime.runtime.rename("/repo/config.json", "/repo")).rejects.toMatchObject({
+      code: "EISDIR",
+    });
+
+    await fakeRuntime.runtime.writeFile("/repo/config-link.json", "after");
+
+    expect(await fakeRuntime.runtime.readFile("/repo/config.json")).toBe("after");
+    expect((await fakeRuntime.runtime.lstat("/repo/config-link.json")).isSymbolicLink()).toBe(true);
+  });
+
   it("tracks mutation primitives and symlink-aware file inspection deterministically", async () => {
     const fakeRuntime = createFakeProcessRuntime({
       cwd: join(tmpdir(), "mcpdir-fake-runtime"),

@@ -24,6 +24,7 @@ import type {
 } from "./types.js";
 
 export type AdapterRuntimeErrorCode =
+  | "EXEC_INVALID_OPTIONS"
   | "EXEC_SPAWN_FAILED"
   | "EXEC_TIMEOUT"
   | "EXEC_OUTPUT_LIMIT"
@@ -150,6 +151,14 @@ export function createNodeAdapterRuntime(options: NodeAdapterRuntimeOptions = {}
       args: readonly string[],
       execOptions: ExecFileOptions,
     ): Promise<ExecResult> {
+      if (execOptions.shell !== false || execOptions.stdin !== "ignore") {
+        throw new AdapterRuntimeError(
+          "EXEC_INVALID_OPTIONS",
+          "execFile",
+          "Adapter commands require shell: false and stdin: ignore",
+        );
+      }
+
       return await new Promise<ExecResult>((resolve, reject) => {
         let settled = false;
         let forcedError: AdapterRuntimeError | undefined;
