@@ -21,12 +21,13 @@ async function connectToAdminDatabase(): Promise<{ url: string; sql: Sql }> {
   throw new Error("Unable to establish a local PostgreSQL admin connection.");
 }
 
-async function executeMigrations(sql: Sql): Promise<void> {
+async function migrationFilenames(): Promise<string[]> {
   const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.meta.url));
-  const filenames = (await readdir(migrationsFolder))
-    .filter((filename) => filename.endsWith(".sql"))
-    .sort();
+  return (await readdir(migrationsFolder)).filter((filename) => filename.endsWith(".sql")).sort();
+}
 
+async function executeMigrations(sql: Sql, filenames: string[]): Promise<void> {
+  const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.meta.url));
   await sql.begin(async (transaction) => {
     for (const filename of filenames) {
       const migration = await readFile(`${migrationsFolder}/${filename}`, "utf8");
@@ -49,19 +50,8 @@ it("migrates Phase F storage and enforces observation idempotency", async () => 
   const sql = postgres(databaseUrl.toString(), { max: 1 });
 
   try {
-    await executeMigrations(sql);
-
-    const [storage] = await sql<Array<{ legal_holds: string | null; health_columns: number }>>`
-      select
-        to_regclass('legal_holds')::text as legal_holds,
-        count(*) filter (
-          where table_name = 'server_health_checks'
-            and column_name in ('final_origin', 'redirect_count', 'method_used')
-        )::int as health_columns
-      from information_schema.columns
-    `;
-    expect(storage).toEqual({ legal_holds: "legal_holds", health_columns: 3 });
-
+    const filenames = await migrationFilenames();
+    await executeMigrations(sql, filenames.slice(0, 3));
     const serverId = randomUUID();
     const serverVersionId = randomUUID();
     const remoteId = randomUUID();
@@ -86,6 +76,64 @@ it("migrates Phase F storage and enforces observation idempotency", async () => 
       insert into server_remotes (id, server_version_id, transport_type, url_template)
       values (${remoteId}, ${serverVersionId}, 'streamable-http', 'https://api.example.com/mcp')
     `;
+
+    const historicalCheckedAt = "2026-08-31T18:00:00.000Z";
+    await sql`
+      insert into server_health_checks (
+        server_id, remote_id, check_type, status, error_summary, checked_at, created_at
+      ) values
+        (
+          ${serverId}, ${remoteId}, 'remote_probe', 'unhealthy', 'superseded health row',
+          ${historicalCheckedAt}, '2026-08-31T18:00:01.000Z'
+        ),
+        (
+          ${serverId}, ${remoteId}, 'remote_probe', 'healthy', 'retained health row',
+          ${historicalCheckedAt}, '2026-08-31T18:00:02.000Z'
+        )
+    `;
+    await sql`
+      insert into trust_signals (
+        server_id, signal_key, status, summary, checked_at, created_at, updated_at
+      ) values
+        (
+          ${serverId}, 'official_registry', 'unknown', 'superseded trust row',
+          ${historicalCheckedAt}, '2026-08-31T18:00:01.000Z', '2026-08-31T18:00:01.000Z'
+        ),
+        (
+          ${serverId}, 'official_registry', 'positive', 'retained trust row',
+          ${historicalCheckedAt}, '2026-08-31T18:00:02.000Z', '2026-08-31T18:00:02.000Z'
+        )
+    `;
+
+    await executeMigrations(sql, filenames.slice(3));
+
+    const [storage] = await sql<Array<{ legal_holds: string | null; health_columns: number }>>`
+      select
+        to_regclass('legal_holds')::text as legal_holds,
+        count(*) filter (
+          where table_name = 'server_health_checks'
+            and column_name in ('final_origin', 'redirect_count', 'method_used')
+        )::int as health_columns
+      from information_schema.columns
+    `;
+    expect(storage).toEqual({ legal_holds: "legal_holds", health_columns: 3 });
+
+    const historicalRows = await sql<Array<{ record_type: string; summary: string | null }>>`
+      select 'health' as record_type, error_summary as summary
+      from server_health_checks
+      where remote_id = ${remoteId} and checked_at = ${historicalCheckedAt}
+      union all
+      select 'trust' as record_type, summary
+      from trust_signals
+      where server_id = ${serverId}
+        and signal_key = 'official_registry'
+        and checked_at = ${historicalCheckedAt}
+      order by record_type
+    `;
+    expect(historicalRows).toEqual([
+      { record_type: "health", summary: "retained health row" },
+      { record_type: "trust", summary: "retained trust row" },
+    ]);
 
     const healthCheckedAt = "2026-09-01T18:00:00.000Z";
     await sql`
