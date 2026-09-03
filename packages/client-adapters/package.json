@@ -12,10 +12,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@themcpdirectory/api-contract": "workspace:*"
+    "@themcpdirectory/api-contract": "workspace:*",
+    "@themcpdirectory/install-engine": "workspace:*"
   },
   "devDependencies": {
     "eslint": "9.39.5",
+    "@themcpdirectory/test-utils": "workspace:*",
     "@themcpdirectory/eslint-config": "workspace:*",
     "@themcpdirectory/typescript-config": "workspace:*",
     "@types/node": "^20",

@@ -34,3 +34,5 @@ export type {
   FixtureDirectoryApiServer,
   FixtureDirectoryApiServerOptions,
 } from "./directory-api-server.js";
+export { createFakeProcessRuntime } from "./fake-process-runtime.js";
+export type { FakeProcessRuntime, FakeProcessRuntimeOptions } from "./fake-process-runtime.js";
