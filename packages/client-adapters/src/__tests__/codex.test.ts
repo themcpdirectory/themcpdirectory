@@ -322,15 +322,16 @@ describe("createCodexAdapter", () => {
       ["token", { kind: "env-reference", envName: "GITHUB_TOKEN" } as const],
     ]) satisfies ValidatedInstallInputMap;
 
-    await expect(
-      supportedAdapter.planInstall({
-        intent: makeRemoteIntent(),
-        inputs,
-        noninteractive: true,
-        manifestHash: MANIFEST_HASH,
-        intentHash: INTENT_HASH,
-      }),
-    ).resolves.toMatchObject({
+    const plan = await supportedAdapter.planInstall({
+      intent: makeRemoteIntent(),
+      inputs,
+      noninteractive: true,
+      manifestHash: MANIFEST_HASH,
+      intentHash: INTENT_HASH,
+    });
+
+    expect(plan).toMatchObject({
+      previewLines: ["Add GitHub to Codex user configuration.", "Configure a remote MCP endpoint."],
       operations: [
         {
           type: "client-command",
@@ -421,6 +422,99 @@ describe("createCodexAdapter", () => {
       placeholderAdapter.planInstall({
         intent: intentWithOptionalPlaceholder,
         inputs: new Map(),
+        noninteractive: true,
+        manifestHash: MANIFEST_HASH,
+        intentHash: INTENT_HASH,
+      }),
+    ).rejects.toMatchObject({ code: "CODEX_INVALID_INPUT" });
+  });
+
+  it("rejects unsafe npx runtime flags and sensitive remote URL variables", async () => {
+    const runtimeFlagFake = createCodexRuntime();
+    const runtimeFlagAdapter = createCodexAdapter(runtimeFlagFake.runtime);
+    const packageIntent = makePackageIntent();
+    if (packageIntent.variant.kind !== "package") {
+      throw new Error("Expected package intent fixture");
+    }
+    const unsafeRuntimeIntent: ResolvedInstallIntent = {
+      ...packageIntent,
+      variant: {
+        ...packageIntent.variant,
+        packageArguments: [],
+        runtimeArguments: [
+          {
+            type: "named",
+            name: "call",
+            valueHint: "command",
+            description: "Command.",
+            required: true,
+          },
+        ],
+      },
+      inputs: [
+        {
+          key: "command",
+          source: "package-runtime-argument",
+          argumentType: "named",
+          index: 0,
+          name: "call",
+          valueHint: "command",
+          description: "Command.",
+          required: true,
+          accepts: ["text"],
+        },
+      ],
+    };
+
+    await expect(
+      runtimeFlagAdapter.planInstall({
+        intent: unsafeRuntimeIntent,
+        inputs: new Map([["command", { kind: "text", value: "sh -c whoami" }]]),
+        noninteractive: true,
+        manifestHash: MANIFEST_HASH,
+        intentHash: INTENT_HASH,
+      }),
+    ).rejects.toMatchObject({ code: "CODEX_UNSUPPORTED_CAPABILITY" });
+
+    const sensitiveUrlFake = createCodexRuntime();
+    const sensitiveUrlAdapter = createCodexAdapter(sensitiveUrlFake.runtime);
+    const remoteIntent = makeRemoteIntent();
+    if (remoteIntent.variant.kind !== "remote") {
+      throw new Error("Expected remote intent fixture");
+    }
+    const sensitiveUrlIntent: ResolvedInstallIntent = {
+      ...remoteIntent,
+      variant: {
+        ...remoteIntent.variant,
+        urlTemplate: "https://example.com/mcp?api_key={api_key}",
+        headers: [],
+        variables: [
+          {
+            name: "api_key",
+            description: "API key.",
+            required: true,
+            defaultValue: null,
+          },
+        ],
+      },
+      inputs: [
+        {
+          key: "api_key",
+          source: "remote-variable",
+          name: "api_key",
+          description: "API key.",
+          required: true,
+          accepts: ["text"],
+        },
+      ],
+      remoteAuth: { kind: "none" },
+      requiredEnvReferences: [],
+    };
+
+    await expect(
+      sensitiveUrlAdapter.planInstall({
+        intent: sensitiveUrlIntent,
+        inputs: new Map([["api_key", { kind: "text", value: "do-not-serialize" }]]),
         noninteractive: true,
         manifestHash: MANIFEST_HASH,
         intentHash: INTENT_HASH,
@@ -520,6 +614,28 @@ describe("createCodexAdapter", () => {
     expect(changedFake.spawnCalls).toHaveLength(10);
   });
 
+  it("rejects substitution of a planned removal target", async () => {
+    const fake = createCodexRuntime([...makeProbeResults(), ...makeProbeResults()]);
+    const adapter = createCodexAdapter(fake.runtime);
+    const plan = await adapter.planRemove({ slug: "github" });
+
+    await expect(
+      adapter.executeRemove({
+        ...plan,
+        serverSlug: "production",
+        operations: [
+          {
+            type: "client-command",
+            executable: CODEX_PATH,
+            args: ["mcp", "remove", "production"],
+            capability: "native-remove",
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: "CODEX_INVALID_PLAN" });
+    expect(fake.spawnCalls).toHaveLength(10);
+  });
+
   it("rejects unsupported scopes and malformed JSON listing output", async () => {
     const scopeFake = createCodexRuntime();
     const scopeAdapter = createCodexAdapter(scopeFake.runtime);
@@ -561,6 +677,36 @@ describe("createCodexAdapter", () => {
             type: "client-command",
             executable: CODEX_PATH,
             args: ["mcp", "remove", "github"],
+            capability: "native-add-stdio",
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: "CODEX_INVALID_PLAN" });
+    expect(fake.spawnCalls).toHaveLength(10);
+  });
+
+  it("rejects substitution of only the planned stdio command tail", async () => {
+    const fake = createCodexRuntime([...makeProbeResults(), ...makeProbeResults()]);
+    const adapter = createCodexAdapter(fake.runtime);
+    const plan = await adapter.planInstall({
+      intent: makePackageIntent(),
+      inputs: new Map([
+        ["registry", { kind: "text", value: "https://registry.example" } as const],
+        ["workspace", { kind: "text", value: "acme/platform" } as const],
+      ]),
+      noninteractive: true,
+      manifestHash: MANIFEST_HASH,
+      intentHash: INTENT_HASH,
+    });
+
+    await expect(
+      adapter.executePlan({
+        ...plan,
+        operations: [
+          {
+            type: "client-command",
+            executable: CODEX_PATH,
+            args: ["mcp", "add", "github", "--", "sh", "-c", "whoami"],
             capability: "native-add-stdio",
           },
         ],

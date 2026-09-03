@@ -40,6 +40,9 @@ const EMPTY_HELP_TEXT: CodexCapabilityProbeResult["helpText"] = Object.freeze({
   remove: "",
 });
 
+const SAFE_NPX_RUNTIME_OPTIONS = new Set(["registry"]);
+const SENSITIVE_INPUT_PATTERN = /(?:api[_-]?key|auth|credential|password|secret|token)/iu;
+
 export type CodexAdapterErrorCode =
   | "CODEX_NOT_INSTALLED"
   | "CODEX_UNSUPPORTED_CAPABILITY"
@@ -330,6 +333,15 @@ function appendPackageArguments(
     if (!value && !argument.required) {
       continue;
     }
+    if (
+      source === "package-runtime-argument" &&
+      (argument.type !== "named" || !argument.name || !SAFE_NPX_RUNTIME_OPTIONS.has(argument.name))
+    ) {
+      throw new CodexAdapterError(
+        "CODEX_UNSUPPORTED_CAPABILITY",
+        "Codex adapter does not support the requested npx runtime option",
+      );
+    }
     const text = getTextInput(inputs, definition.key);
     if (argument.type === "named") {
       if (!argument.name) {
@@ -394,12 +406,24 @@ function expandRemoteUrl(
   let url = variant.urlTemplate;
   for (const variable of variant.variables) {
     const definition = definitions.find(
-      (candidate) => candidate.source === "remote-variable" && candidate.name === variable.name,
+      (candidate): candidate is Extract<InstallInputDefinition, { source: "remote-variable" }> =>
+        candidate.source === "remote-variable" && candidate.name === variable.name,
     );
     if (!definition) {
       throw new CodexAdapterError(
         "CODEX_INVALID_INPUT",
         `Missing input definition for remote variable ${variable.name}`,
+      );
+    }
+    if (
+      definition.accepts.some((kind) => kind !== "text") ||
+      SENSITIVE_INPUT_PATTERN.test(
+        [definition.key, definition.name, definition.description ?? ""].join(" "),
+      )
+    ) {
+      throw new CodexAdapterError(
+        "CODEX_INVALID_INPUT",
+        "Sensitive values cannot be placed in a remote URL",
       );
     }
     const value = inputs.get(definition.key);
@@ -498,7 +522,7 @@ function buildInstallPlan(
       url,
       ...(bearerTokenEnvName ? ["--bearer-token-env-var", bearerTokenEnvName] : []),
     ];
-    effect = `Configure remote URL ${url}.`;
+    effect = "Configure a remote MCP endpoint.";
   }
 
   return {
@@ -681,6 +705,25 @@ function assertCodexRemovalPlan(plan: RemovalPlan): void {
   }
 }
 
+function getInstallPlanIdentity(plan: InstallPlan): string {
+  return [
+    plan.manifestHash,
+    plan.intentHash,
+    plan.client,
+    plan.scope,
+    plan.serverSlug,
+    plan.variantId,
+  ].join(":");
+}
+
+function getRemovalPlanIdentity(plan: RemovalPlan): string {
+  return [plan.client, plan.scope, plan.serverSlug].join(":");
+}
+
+function serializeOperations(plan: InstallPlan | RemovalPlan): string {
+  return JSON.stringify(plan.operations);
+}
+
 async function executeCommand(
   runtime: AdapterRuntime,
   executable: string,
@@ -697,6 +740,8 @@ async function executeCommand(
 
 export function createCodexAdapter(runtime: AdapterRuntime): McpClientAdapter {
   let latestProbe: CodexCapabilityProbeResult | undefined;
+  const plannedInstallOperations = new Map<string, string>();
+  const plannedRemovalOperations = new Map<string, string>();
   const probe = async (): Promise<CodexCapabilityProbeResult> => {
     latestProbe = await probeCodexCapabilities(runtime);
     return latestProbe;
@@ -727,12 +772,23 @@ export function createCodexAdapter(runtime: AdapterRuntime): McpClientAdapter {
     },
     async planInstall(options) {
       requireCodexIntent(options);
-      return buildInstallPlan(await probe(), options);
+      const plan = buildInstallPlan(await probe(), options);
+      plannedInstallOperations.set(getInstallPlanIdentity(plan), serializeOperations(plan));
+      return plan;
     },
     async executePlan(plan) {
       const result = await probe();
       const validated = validateInstallPlan(plan, createSafetyDescriptor(result));
       assertCodexInstallPlan(validated);
+      if (
+        plannedInstallOperations.get(getInstallPlanIdentity(validated)) !==
+        serializeOperations(validated)
+      ) {
+        throw new CodexAdapterError(
+          "CODEX_INVALID_PLAN",
+          "Codex install operation differs from the operation produced during planning",
+        );
+      }
       for (const operation of validated.operations) {
         if (operation.type !== "client-command") {
           throw new CodexAdapterError(
@@ -757,7 +813,7 @@ export function createCodexAdapter(runtime: AdapterRuntime): McpClientAdapter {
       const result = await probe();
       const executable = requireInstalled(result);
       requireCapability(result, "native-remove");
-      return {
+      const plan: RemovalPlan = {
         schemaVersion: 1,
         serverSlug: options.slug,
         client: "codex",
@@ -772,11 +828,22 @@ export function createCodexAdapter(runtime: AdapterRuntime): McpClientAdapter {
         ],
         previewLines: [`Remove ${options.slug} from Codex user configuration.`],
       };
+      plannedRemovalOperations.set(getRemovalPlanIdentity(plan), serializeOperations(plan));
+      return plan;
     },
     async executeRemove(plan) {
       const result = await probe();
       const validated = validateRemovalPlan(plan, createSafetyDescriptor(result));
       assertCodexRemovalPlan(validated);
+      if (
+        plannedRemovalOperations.get(getRemovalPlanIdentity(validated)) !==
+        serializeOperations(validated)
+      ) {
+        throw new CodexAdapterError(
+          "CODEX_INVALID_PLAN",
+          "Codex removal operation differs from the operation produced during planning",
+        );
+      }
       for (const operation of validated.operations) {
         if (operation.type !== "client-command") {
           throw new CodexAdapterError(
