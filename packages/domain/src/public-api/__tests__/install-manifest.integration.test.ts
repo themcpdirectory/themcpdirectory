@@ -32,7 +32,11 @@ describe("buildInstallManifest", () => {
         registryName: "Official MCP Registry",
         observedAt: "2026-09-01T12:00:00.000Z",
       },
-      compatibility: { cursor: "supported", "claude-code": "unsupported" },
+      compatibility: {
+        cursor: "supported",
+        "claude-code": "unsupported",
+        vscode: "unsupported",
+      },
     });
     expect(manifest.variants).toEqual(
       expect.arrayContaining([
@@ -77,7 +81,7 @@ describe("buildInstallManifest", () => {
 
   it("filters all variants when a requested client is unsupported", async () => {
     await expect(
-      buildInstallManifest(context.db, { identifier: "github", clientId: "claude-code" }),
+      buildInstallManifest(context.db, { identifier: "github", clientId: "vscode" }),
     ).rejects.toMatchObject({ name: "InstallManifestUnavailableError" });
   });
 

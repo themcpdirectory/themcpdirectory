@@ -30,7 +30,11 @@ describe("getServerDetailBySlug", () => {
       publisher: { slug: "github", name: "GitHub", verified: true },
       repository: { url: "https://github.com/github/github-mcp-server" },
       categories: [{ slug: "developer-tools", name: "Developer Tools" }],
-      compatibility: { cursor: "supported", "claude-code": "unsupported" },
+      compatibility: {
+        cursor: "supported",
+        "claude-code": "unsupported",
+        vscode: "unsupported",
+      },
       trustProfile: {
         officialRegistry: true,
         publisherVerified: true,

@@ -95,3 +95,10 @@ export {
   listPublicClients,
   loadClientCompatibilityCounts,
 } from "./public-api/clients.js";
+
+export {
+  decideRemoteProbeEligibility,
+  type RemoteProbeEligibilityInput,
+  type RemoteProbeEligibilityOptions,
+  type RemoteProbeEligibilityResult,
+} from "./health/remote-probe-eligibility.js";

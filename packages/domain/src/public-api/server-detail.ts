@@ -25,7 +25,12 @@ import {
   type Database,
 } from "@themcpdirectory/db";
 
-const SUPPORTED_CLIENT_IDS = new Set<SupportedClientId>(["claude-code", "codex", "cursor"]);
+const SUPPORTED_CLIENT_IDS = new Set<SupportedClientId>([
+  "claude-code",
+  "codex",
+  "cursor",
+  "vscode",
+]);
 const COMPATIBILITY_STATUSES = new Set<
   InstallManifestCompatibility[keyof InstallManifestCompatibility]
 >(["supported", "supported_with_configuration", "unsupported", "unknown"]);
@@ -47,6 +52,7 @@ export type InstallManifestCompatibility = {
   readonly "claude-code"?: "supported" | "supported_with_configuration" | "unsupported" | "unknown";
   readonly codex?: "supported" | "supported_with_configuration" | "unsupported" | "unknown";
   readonly cursor?: "supported" | "supported_with_configuration" | "unsupported" | "unknown";
+  readonly vscode?: "supported" | "supported_with_configuration" | "unsupported" | "unknown";
 };
 
 export interface ServerPackageRow {

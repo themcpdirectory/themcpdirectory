@@ -207,6 +207,7 @@ export async function createPublicApiTestContext(): Promise<PublicApiTestContext
   await db.insert(clientCompatibility).values([
     { serverId: github.serverId, clientId: "cursor", status: "supported" },
     { serverId: github.serverId, clientId: "claude-code", status: "unsupported" },
+    { serverId: github.serverId, clientId: "vscode", status: "unsupported" },
     {
       id: "00000000-0000-4000-8000-000000000001",
       serverId: github.serverId,
