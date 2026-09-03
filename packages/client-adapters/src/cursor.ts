@@ -537,6 +537,7 @@ function toInstalledEntry(
 
   const transport = typeof value.url === "string" ? "streamable-http" : "stdio";
   const slug = SAFE_SERVER_SLUG_PATTERN.test(name) ? name : undefined;
+  const environmentReferences = collectEnvironmentReferences(value);
   return {
     name,
     ...(slug === undefined ? {} : { slug }),
@@ -544,11 +545,34 @@ function toInstalledEntry(
     scope,
     transport,
     managedBy: "external",
+    ...(environmentReferences.length > 0 ? { environmentReferences } : {}),
     adapterMetadata: {
       configPath,
       source: "cursor-json",
     },
   };
+}
+
+function collectEnvironmentReferences(value: unknown): readonly string[] {
+  const references = new Set<string>();
+  collectStringMatches(value, references);
+  return [...references].sort();
+}
+
+function collectStringMatches(value: unknown, output: Set<string>): void {
+  if (typeof value === "string") {
+    for (const match of value.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/gu)) {
+      if (match[1]) output.add(match[1]);
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectStringMatches(item, output);
+    return;
+  }
+  if (isRecord(value)) {
+    for (const nested of Object.values(value)) collectStringMatches(nested, output);
+  }
 }
 
 export function createCursorAdapter(runtime: AdapterRuntime): McpClientAdapter {
@@ -558,6 +582,7 @@ export function createCursorAdapter(runtime: AdapterRuntime): McpClientAdapter {
 
   const adapter: McpClientAdapter = {
     id: "cursor" as const,
+    inspectionSafety: "configuration-only",
     async detect(): Promise<ClientDetection> {
       const executable = await findInstalledApplication(
         runtime,

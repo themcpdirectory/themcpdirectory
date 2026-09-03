@@ -571,6 +571,7 @@ describe("createCodexAdapter", () => {
         scope: "user",
         transport: "streamable-http",
         managedBy: "external",
+        environmentReferences: ["GITHUB_TOKEN"],
         adapterMetadata: {
           enabled: true,
           authStatus: "unsupported",

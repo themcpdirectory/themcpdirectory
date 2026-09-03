@@ -546,6 +546,7 @@ function createFakeAdapter(options: {
 
   return {
     id: options.id,
+    inspectionSafety: "configuration-only",
     state,
     async detect(): Promise<ClientDetection> {
       state.detectCalls.current += 1;

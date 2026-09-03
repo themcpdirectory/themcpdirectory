@@ -321,6 +321,7 @@ function createAdapter(
 
   return {
     id: client,
+    inspectionSafety: "configuration-only",
     async detect() {
       detected = true;
       return {

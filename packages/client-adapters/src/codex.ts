@@ -577,6 +577,7 @@ function parseCodexList(stdout: string, scope: ClientScope): readonly InstalledM
       scope,
       transport: entry.transport,
       managedBy: "external",
+      ...(entry.bearerTokenEnvVar ? { environmentReferences: [entry.bearerTokenEnvVar] } : {}),
       adapterMetadata: {
         ...(entry.enabled === undefined ? {} : { enabled: entry.enabled }),
         ...(entry.authStatus === undefined ? {} : { authStatus: entry.authStatus }),
@@ -765,6 +766,7 @@ export function createCodexAdapter(runtime: AdapterRuntime): McpClientAdapter {
 
   const adapter: McpClientAdapter = {
     id: "codex" as const,
+    inspectionSafety: "configuration-only",
     async detect() {
       return (await probe()).detection;
     },

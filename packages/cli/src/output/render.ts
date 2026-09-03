@@ -1,5 +1,6 @@
 import type { ServerCollectionResponse, ServerDetailResponse } from "@themcpdirectory/api-contract";
 import type { AddExecutionResult } from "../commands/add-execute.js";
+import type { DoctorReport } from "../commands/doctor.js";
 import type { ListCommandEntry } from "../commands/list.js";
 import type {
   RemovalAmbiguityResult,
@@ -16,6 +17,9 @@ export function renderHumanEnvelope(envelope: JsonEnvelopeV1): readonly string[]
 
   let lines: readonly string[];
   switch (envelope.command) {
+    case "doctor":
+      lines = renderDoctorEnvelope(envelope.data as DoctorReport);
+      break;
     case "search":
       lines = renderSearchEnvelope(envelope.data as ServerCollectionResponse);
       break;
@@ -58,6 +62,13 @@ export function sanitizeTerminalText(value: string): string {
     sanitized += isControl ? "?" : character;
   }
   return sanitized;
+}
+
+function renderDoctorEnvelope(report: DoctorReport): readonly string[] {
+  return report.checks.flatMap((check) => [
+    `${check.status.toUpperCase()}: ${check.name} - ${check.message}`,
+    ...(check.recoveryHint ? [`  Recovery: ${check.recoveryHint}`] : []),
+  ]);
 }
 
 function renderUpdateEnvelope(result: UpdateResult): readonly string[] {

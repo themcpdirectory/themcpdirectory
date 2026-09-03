@@ -2,6 +2,7 @@
 
 import { runInfoCommand } from "./commands/info.js";
 import { runListCommand } from "./commands/list.js";
+import { DOCTOR_USAGE, runDoctorCommand } from "./commands/doctor.js";
 import { REMOVE_USAGE, runRemoveCliCommand } from "./commands/remove.js";
 import type { CommandResult } from "./commands/result.js";
 import { runSearchCommand } from "./commands/search.js";
@@ -15,6 +16,7 @@ export const CLI_HELP_TEXT = [
   "",
   "Commands:",
   "  help     Show this help",
+  "  doctor                                Diagnose Directory and client health",
   "  search   Search directory listings",
   "  info     Show directory details for one server",
   "  list                                  List installed MCP servers",
@@ -25,6 +27,7 @@ export const CLI_HELP_TEXT = [
 type CliCommandHandler = (argv: readonly string[], deps: CliDependencies) => Promise<CommandResult>;
 
 const COMMAND_HANDLERS: Readonly<Record<string, CliCommandHandler>> = Object.freeze({
+  doctor: runDoctorCommand,
   search: runSearchCommand,
   info: runInfoCommand,
   list: runListCommand,
@@ -51,6 +54,11 @@ export async function runCli(argv: readonly string[], deps?: CliDependencies): P
 
   if (command === "update" && (commandArgs.includes("--help") || commandArgs.includes("-h"))) {
     resolvedDeps.output.writeStdout(`${UPDATE_USAGE}\n`);
+    return finalizeExitCode(0, ownsProcessExit);
+  }
+
+  if (command === "doctor" && (commandArgs.includes("--help") || commandArgs.includes("-h"))) {
+    resolvedDeps.output.writeStdout(`${DOCTOR_USAGE}\n`);
     return finalizeExitCode(0, ownsProcessExit);
   }
 

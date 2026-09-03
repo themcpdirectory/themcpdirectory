@@ -5,6 +5,12 @@ import { runCliMain } from "./cli.js";
 
 export { runInfoCommand } from "./commands/info.js";
 export {
+  DOCTOR_USAGE,
+  runDoctorCommand,
+  type DoctorCheckResult,
+  type DoctorReport,
+} from "./commands/doctor.js";
+export {
   createFailureResult,
   createSuccessResult,
   type CommandResult,

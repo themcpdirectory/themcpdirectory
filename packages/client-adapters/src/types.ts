@@ -86,6 +86,7 @@ export interface InstalledMcpServer {
   readonly managedBy: "external";
   readonly variantId?: string;
   readonly manifestHash?: string;
+  readonly environmentReferences?: readonly string[];
   readonly adapterMetadata: Readonly<Record<string, string | number | boolean>>;
 }
 
@@ -133,6 +134,7 @@ export interface AdapterRollbackResult {
 
 export interface McpClientAdapter {
   readonly id: ClientId;
+  readonly inspectionSafety: "configuration-only" | "may-connect";
   detect(): Promise<ClientDetection>;
   inspect(scope?: ClientScope): Promise<readonly InstalledMcpServer[]>;
   planInstall(options: PlanInstallOptions): Promise<InstallPlan>;

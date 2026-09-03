@@ -1068,6 +1068,7 @@ export function createClaudeCodeAdapter(runtime: AdapterRuntime): McpClientAdapt
 
   const adapter: McpClientAdapter = {
     id: "claude-code" as const,
+    inspectionSafety: "may-connect",
     async detect() {
       return (await probe()).detection;
     },

@@ -104,6 +104,7 @@ function createStaticAdapter(
 
   return {
     id,
+    inspectionSafety: "configuration-only",
     detect: async () => detection,
     inspect: async () => [inspectedEntry],
     planInstall: async () => createInstallPlan(id),

@@ -204,6 +204,7 @@ function createAdapter(
 
   return {
     id: client,
+    inspectionSafety: "configuration-only",
     async detect() {
       throw new Error("not used");
     },
