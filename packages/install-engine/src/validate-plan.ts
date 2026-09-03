@@ -24,7 +24,7 @@ const WINDOWS_DRIVE_PATTERN = /^[A-Za-z]:/u;
 const WINDOWS_ABSOLUTE_DRIVE_PATTERN = /^[A-Za-z]:[\\/]/u;
 const WINDOWS_DEVICE_PATH_PATTERN = /^(?:\\\\\?\\|\\\\\.\\)/u;
 
-const CLIENT_IDS = new Set<ClientId>(["claude-code", "codex", "cursor"]);
+const CLIENT_IDS = new Set<ClientId>(["claude-code", "codex", "cursor", "vscode"]);
 const CLIENT_SCOPES = new Set<ClientScope>(["user", "project", "global"]);
 const KNOWN_CAPABILITIES = new Set<AdapterCapability>([
   "native-add-stdio",

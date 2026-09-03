@@ -150,6 +150,7 @@ const serverDetailClientResponseSchema = clientObject({
       "claude-code": compatibilityStatusSchema.optional(),
       codex: compatibilityStatusSchema.optional(),
       cursor: compatibilityStatusSchema.optional(),
+      vscode: compatibilityStatusSchema.optional(),
     }),
     trustProfile: clientObject({
       officialRegistry: z.boolean(),

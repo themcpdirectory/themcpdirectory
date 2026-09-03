@@ -167,6 +167,7 @@ const installManifestServerSchema = strictObject({
     "claude-code": compatibilityStatusSchema.optional(),
     codex: compatibilityStatusSchema.optional(),
     cursor: compatibilityStatusSchema.optional(),
+    vscode: compatibilityStatusSchema.optional(),
   }),
 });
 

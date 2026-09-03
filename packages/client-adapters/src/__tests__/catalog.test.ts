@@ -7,11 +7,23 @@ describe("SUPPORTED_CLIENTS", () => {
       "claude-code",
       "codex",
       "cursor",
+      "vscode",
     ]);
     expect(getSupportedClientById("cursor")).toMatchObject({
       name: "Cursor",
       capabilities: {
         deeplink: true,
+        stdio: true,
+        streamableHttp: true,
+        headers: true,
+        environmentVariables: true,
+        remoteVariables: true,
+      },
+    });
+    expect(getSupportedClientById("vscode")).toMatchObject({
+      name: "VS Code",
+      capabilities: {
+        deeplink: false,
         stdio: true,
         streamableHttp: true,
         headers: true,

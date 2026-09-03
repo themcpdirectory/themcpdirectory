@@ -52,6 +52,18 @@ export const SUPPORTED_CLIENTS = [
       remoteVariables: true,
     },
   },
+  {
+    id: "vscode",
+    name: "VS Code",
+    capabilities: {
+      deeplink: false,
+      stdio: true,
+      streamableHttp: true,
+      headers: true,
+      environmentVariables: true,
+      remoteVariables: true,
+    },
+  },
 ] as const satisfies readonly ClientDescriptor[];
 
 export function getSupportedClientById(id: string): ClientDescriptor | null {

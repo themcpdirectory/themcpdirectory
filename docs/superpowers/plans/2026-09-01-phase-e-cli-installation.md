@@ -494,6 +494,45 @@ git add packages/client-adapters/src/cursor-json.ts packages/client-adapters/src
 git commit -m "feat(client-adapters): add cursor adapter and atomic config writes"
 ```
 
+### Task 8A: VS Code Adapter And Portable MCP Configuration
+
+**Files:**
+
+- Modify `packages/api-contract/src/public-api/servers.ts`
+- Modify `packages/api-contract/src/public-api/install.ts`
+- Modify `packages/api-contract/src/public-api/client-parsers.ts`
+- Modify `packages/client-adapters/src/catalog.ts`
+- Create `packages/client-adapters/src/vscode-json.ts`
+- Create `packages/client-adapters/src/vscode.ts`
+- Create `packages/client-adapters/src/__tests__/vscode.test.ts`
+- Modify `packages/client-adapters/src/index.ts`
+
+**Interfaces:**
+
+- Extends the authoritative `SupportedClientId` contract with `vscode` and advertises VS Code's factual stdio, streamable HTTP, header, environment-variable, and remote-variable capabilities.
+- Produces `interface VsCodeConfigDocument { readonly servers?: Readonly<Record<string, unknown>>; readonly inputs?: readonly unknown[]; }`.
+- Produces `function resolveVsCodeScopePaths(runtime: AdapterRuntime, scope: ClientScope): { readonly rootPath: string; readonly configPath: string }` using `.vscode/mcp.json` for project scope and `~/.copilot/mcp-config.json` for user scope; global scope is unsupported.
+- Produces a `vscodeAdapter` that writes the documented `servers` entries for stdio and HTTP, uses `${input:<id>}` plus password input definitions for sensitive values, and performs root-contained symlink-safe atomic JSON mutation with backup and rollback.
+
+- [ ] Extend existing contract and catalogue assertions so `vscode` is accepted by the public schema and appears in the supported-client catalogue.
+- [ ] Write at most five top-level tests in `packages/client-adapters/src/__tests__/vscode.test.ts` covering both scope paths and both server shapes, preservation plus atomic mutation and symlink refusal, secret-safe input references with no raw secret persistence, and idempotent removal.
+- [ ] Implement inspection, install planning/execution/verification, removal, diagnosis, and the adapter safety descriptor without invoking undocumented `code` CLI flags.
+- [ ] Run focused verification only:
+
+```bash
+pnpm --filter @themcpdirectory/api-contract exec vitest run src/__tests__/servers-contract.test.ts
+pnpm --filter @themcpdirectory/client-adapters exec vitest run src/__tests__/catalog.test.ts src/__tests__/vscode.test.ts
+pnpm --filter @themcpdirectory/client-adapters typecheck
+pnpm --filter @themcpdirectory/client-adapters lint
+```
+
+- [ ] Commit:
+
+```bash
+git add packages/api-contract/src/public-api/servers.ts packages/api-contract/src/public-api/install.ts packages/api-contract/src/public-api/client-parsers.ts packages/api-contract/src/__tests__/servers-contract.test.ts packages/client-adapters/src/catalog.ts packages/client-adapters/src/vscode-json.ts packages/client-adapters/src/vscode.ts packages/client-adapters/src/__tests__/catalog.test.ts packages/client-adapters/src/__tests__/vscode.test.ts packages/client-adapters/src/index.ts docs/superpowers/plans/2026-09-01-phase-e-cli-installation.md
+git commit -m "feat(client-adapters): add vscode adapter"
+```
+
 ### Task 9: CLI Runtime, Receipts, State Paths, And Built Binary Packaging
 
 **Files:**

@@ -51,7 +51,27 @@ export {
   type CursorJsonErrorCode,
   type CursorScopePaths,
 } from "./cursor-json.js";
+export {
+  VsCodeJsonError,
+  applyVsCodeConfigMutation,
+  createVsCodeConfigMutation,
+  getVsCodeServerEntry,
+  readVsCodeConfigDocument,
+  removeVsCodeServerEntry,
+  resolveVsCodeScopePaths,
+  setVsCodeInputs,
+  setVsCodeServerEntry,
+  type VsCodeConfigDocument,
+  type VsCodeConfigMutation,
+  type VsCodeJsonErrorCode,
+  type VsCodeScopePaths,
+} from "./vscode-json.js";
 export { createCursorDeeplink } from "./cursor-deeplink.js";
+export {
+  VsCodeAdapterError,
+  createVsCodeAdapter,
+  type VsCodeAdapterErrorCode,
+} from "./vscode.js";
 export type {
   AdapterRegistry,
   AdapterRollbackResult,

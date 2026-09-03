@@ -9,7 +9,7 @@ import {
   uuidSchema,
 } from "./shared.js";
 
-export const supportedClientIdSchema = z.enum(["claude-code", "codex", "cursor"]);
+export const supportedClientIdSchema = z.enum(["claude-code", "codex", "cursor", "vscode"]);
 export type SupportedClientId = z.infer<typeof supportedClientIdSchema>;
 
 export const listingStatusSchema = z.enum([
@@ -218,6 +218,7 @@ const serverDetailServerSchema = strictObject({
     "claude-code": compatibilityStatusSchema.optional(),
     codex: compatibilityStatusSchema.optional(),
     cursor: compatibilityStatusSchema.optional(),
+    vscode: compatibilityStatusSchema.optional(),
   }),
   trustProfile: trustProfileServerSchema,
   timestamps: serverTimestampsSchema,

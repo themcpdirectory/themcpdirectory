@@ -3,7 +3,14 @@ import {
   parseResolvedServerResponse,
   parseServerCollectionResponse,
   serverCollectionQuerySchema,
+  supportedClientIdSchema,
 } from "../index.js";
+
+describe("supportedClientIdSchema", () => {
+  it("accepts VS Code as a supported client", () => {
+    expect(supportedClientIdSchema.parse("vscode")).toBe("vscode");
+  });
+});
 
 describe("serverCollectionQuerySchema", () => {
   it("rejects relevance without q and clamps limit semantics to the contract", () => {
