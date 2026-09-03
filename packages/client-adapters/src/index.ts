@@ -32,6 +32,26 @@ export {
   type ClaudeCapabilityProbeResult,
   type ClaudeCodeAdapterErrorCode,
 } from "./claude-code.js";
+export {
+  CursorAdapterError,
+  createCursorAdapter,
+  type CursorAdapterErrorCode,
+} from "./cursor.js";
+export {
+  CursorJsonError,
+  applyCursorConfigMutation,
+  createCursorConfigMutation,
+  getCursorServerEntry,
+  readCursorConfigDocument,
+  removeCursorServerEntry,
+  resolveCursorScopePaths,
+  setCursorServerEntry,
+  type CursorConfigDocument,
+  type CursorConfigMutation,
+  type CursorJsonErrorCode,
+  type CursorScopePaths,
+} from "./cursor-json.js";
+export { createCursorDeeplink } from "./cursor-deeplink.js";
 export type {
   AdapterRegistry,
   AdapterRollbackResult,
