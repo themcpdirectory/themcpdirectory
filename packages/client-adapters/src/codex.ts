@@ -44,6 +44,7 @@ export type CodexAdapterErrorCode =
   | "CODEX_NOT_INSTALLED"
   | "CODEX_UNSUPPORTED_CAPABILITY"
   | "CODEX_INVALID_INPUT"
+  | "CODEX_INVALID_PLAN"
   | "CODEX_COMMAND_FAILED"
   | "CODEX_INVALID_LIST_OUTPUT";
 
@@ -82,11 +83,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function getPathEnvironmentValue(runtime: AdapterRuntime): string {
+  if (runtime.platform !== "win32") {
+    return runtime.env.PATH ?? "";
+  }
+
+  const entry = Object.entries(runtime.env).find(([key]) => key.toLowerCase() === "path");
+  return entry?.[1] ?? "";
+}
+
 function getExecutableCandidates(runtime: AdapterRuntime): readonly string[] {
   const pathModule = runtime.platform === "win32" ? win32 : posix;
   const delimiter = runtime.platform === "win32" ? ";" : ":";
-  const executableName = runtime.platform === "win32" ? "codex.cmd" : "codex";
-  const pathCandidates = (runtime.env.PATH ?? "")
+  const executableName = runtime.platform === "win32" ? "codex.exe" : "codex";
+  const pathCandidates = getPathEnvironmentValue(runtime)
     .split(delimiter)
     .filter((directory) => directory.length > 0 && directory !== ".")
     .filter((directory) => pathModule.isAbsolute(directory))
@@ -94,10 +104,24 @@ function getExecutableCandidates(runtime: AdapterRuntime): readonly string[] {
   const standardCandidates =
     runtime.platform === "win32"
       ? [
-          runtime.env.APPDATA ? win32.join(runtime.env.APPDATA, "npm", "codex.cmd") : undefined,
           runtime.env.LOCALAPPDATA
             ? win32.join(runtime.env.LOCALAPPDATA, "Programs", "codex", "codex.exe")
             : undefined,
+          ...["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"].map((target) =>
+            runtime.env.APPDATA
+              ? win32.join(
+                  runtime.env.APPDATA,
+                  "npm",
+                  "node_modules",
+                  "@openai",
+                  "codex",
+                  "vendor",
+                  target,
+                  "codex",
+                  "codex.exe",
+                )
+              : undefined,
+          ),
         ]
       : runtime.platform === "darwin"
         ? ["/opt/homebrew/bin/codex", "/usr/local/bin/codex", "/usr/bin/codex"]
@@ -234,6 +258,15 @@ function requireUserScope(scope: ClientScope): void {
     throw new CodexAdapterError(
       "CODEX_UNSUPPORTED_CAPABILITY",
       `Codex CLI does not prove support for ${scope} scope`,
+    );
+  }
+}
+
+function requireCodexIntent(options: PlanInstallOptions): void {
+  if (options.intent.client !== "codex") {
+    throw new CodexAdapterError(
+      "CODEX_INVALID_INPUT",
+      "Codex adapter requires an intent resolved for Codex",
     );
   }
 }
@@ -380,6 +413,12 @@ function expandRemoteUrl(
     url = url.replaceAll(
       `{${variable.name}}`,
       encodeURIComponent(getTextInput(inputs, definition.key)),
+    );
+  }
+  if (/\{[^{}]+\}/u.test(url)) {
+    throw new CodexAdapterError(
+      "CODEX_INVALID_INPUT",
+      "Remote URL contains an unresolved variable",
     );
   }
   return url;
@@ -558,6 +597,90 @@ function createSafetyDescriptor(probe: CodexCapabilityProbeResult): AdapterSafet
   };
 }
 
+function isSafeRemoteUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === "https:" || url.protocol === "http:") &&
+      url.username.length === 0 &&
+      url.password.length === 0 &&
+      url.hash.length === 0 &&
+      !/\{[^{}]+\}/u.test(value)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function assertCodexInstallPlan(plan: InstallPlan): void {
+  requireUserScope(plan.scope);
+  if (plan.client !== "codex" || plan.operations.length !== 1) {
+    throw new CodexAdapterError(
+      "CODEX_INVALID_PLAN",
+      "Codex install plan must contain exactly one Codex operation",
+    );
+  }
+
+  const operation = plan.operations[0];
+  if (!operation || operation.type !== "client-command") {
+    throw new CodexAdapterError(
+      "CODEX_INVALID_PLAN",
+      "Codex install plan must contain one client command",
+    );
+  }
+
+  const { args } = operation;
+  const commonPrefixIsValid = args[0] === "mcp" && args[1] === "add" && args[2] === plan.serverSlug;
+  const stdioIsValid =
+    operation.capability === "native-add-stdio" &&
+    commonPrefixIsValid &&
+    args[3] === "--" &&
+    args.length >= 5;
+  const remoteIsValid =
+    operation.capability === "native-add-remote" &&
+    commonPrefixIsValid &&
+    args[3] === "--url" &&
+    typeof args[4] === "string" &&
+    isSafeRemoteUrl(args[4]) &&
+    (args.length === 5 ||
+      (args.length === 7 &&
+        args[5] === "--bearer-token-env-var" &&
+        typeof args[6] === "string" &&
+        /^[A-Za-z_][A-Za-z0-9_]*$/u.test(args[6])));
+  if (!stdioIsValid && !remoteIsValid) {
+    throw new CodexAdapterError(
+      "CODEX_INVALID_PLAN",
+      "Codex install operation does not match its declared capability",
+    );
+  }
+}
+
+function assertCodexRemovalPlan(plan: RemovalPlan): void {
+  requireUserScope(plan.scope);
+  if (plan.client !== "codex" || plan.operations.length !== 1) {
+    throw new CodexAdapterError(
+      "CODEX_INVALID_PLAN",
+      "Codex removal plan must contain exactly one Codex operation",
+    );
+  }
+
+  const operation = plan.operations[0];
+  if (
+    !operation ||
+    operation.type !== "client-command" ||
+    operation.capability !== "native-remove" ||
+    operation.args.length !== 3 ||
+    operation.args[0] !== "mcp" ||
+    operation.args[1] !== "remove" ||
+    operation.args[2] !== plan.serverSlug
+  ) {
+    throw new CodexAdapterError(
+      "CODEX_INVALID_PLAN",
+      "Codex removal operation does not match native remove syntax",
+    );
+  }
+}
+
 async function executeCommand(
   runtime: AdapterRuntime,
   executable: string,
@@ -603,11 +726,13 @@ export function createCodexAdapter(runtime: AdapterRuntime): McpClientAdapter {
       return parseCodexList(commandResult.stdout, scope);
     },
     async planInstall(options) {
+      requireCodexIntent(options);
       return buildInstallPlan(await probe(), options);
     },
     async executePlan(plan) {
       const result = await probe();
       const validated = validateInstallPlan(plan, createSafetyDescriptor(result));
+      assertCodexInstallPlan(validated);
       for (const operation of validated.operations) {
         if (operation.type !== "client-command") {
           throw new CodexAdapterError(
@@ -651,6 +776,7 @@ export function createCodexAdapter(runtime: AdapterRuntime): McpClientAdapter {
     async executeRemove(plan) {
       const result = await probe();
       const validated = validateRemovalPlan(plan, createSafetyDescriptor(result));
+      assertCodexRemovalPlan(validated);
       for (const operation of validated.operations) {
         if (operation.type !== "client-command") {
           throw new CodexAdapterError(

@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { CodexAdapterError, createCodexAdapter, probeCodexCapabilities } from "../index.js";
 
 const CODEX_PATH = "/usr/local/bin/codex";
+const WINDOWS_CODEX_PATH = "C:\\Tools\\codex.exe";
 const VARIANT_ID = "11111111-1111-4111-8111-111111111111";
 const MANIFEST_HASH = "a".repeat(64);
 const INTENT_HASH = "b".repeat(64);
@@ -229,6 +230,25 @@ describe("probeCodexCapabilities", () => {
     });
     expect(fake.spawnCalls).toEqual([]);
   });
+
+  it("discovers a directly executable Windows binary from Path without accepting cmd shims", async () => {
+    const fake = createFakeProcessRuntime({
+      platform: "win32",
+      env: { Path: "C:\\Tools;C:\\Windows\\System32" },
+      entries: {
+        [WINDOWS_CODEX_PATH]: { type: "file", content: "", mode: 0o755 },
+        "C:\\Tools\\codex.cmd": { type: "file", content: "", mode: 0o755 },
+      },
+      execResults: makeProbeResults(),
+    });
+
+    await expect(probeCodexCapabilities(fake.runtime)).resolves.toMatchObject({
+      detection: { installed: true, executable: WINDOWS_CODEX_PATH },
+    });
+    expect(fake.spawnCalls).toHaveLength(5);
+    expect(fake.spawnCalls.every((call) => call.executable === WINDOWS_CODEX_PATH)).toBe(true);
+    expect(fake.spawnCalls.every((call) => call.options.shell === false)).toBe(true);
+  });
 });
 
 describe("createCodexAdapter", () => {
@@ -347,6 +367,67 @@ describe("createCodexAdapter", () => {
     ).rejects.toMatchObject({ code: "CODEX_UNSUPPORTED_CAPABILITY" });
   });
 
+  it("rejects intents resolved for another client and unresolved remote URL placeholders", async () => {
+    const clientFake = createCodexRuntime();
+    const clientAdapter = createCodexAdapter(clientFake.runtime);
+
+    await expect(
+      clientAdapter.planInstall({
+        intent: { ...makePackageIntent(), client: "claude-code" },
+        inputs: new Map(),
+        noninteractive: true,
+        manifestHash: MANIFEST_HASH,
+        intentHash: INTENT_HASH,
+      }),
+    ).rejects.toMatchObject({ code: "CODEX_INVALID_INPUT" });
+    expect(clientFake.spawnCalls).toEqual([]);
+
+    const placeholderFake = createCodexRuntime();
+    const placeholderAdapter = createCodexAdapter(placeholderFake.runtime);
+    const remoteIntent = makeRemoteIntent();
+    if (remoteIntent.variant.kind !== "remote") {
+      throw new Error("Expected remote intent fixture");
+    }
+    const intentWithOptionalPlaceholder: ResolvedInstallIntent = {
+      ...remoteIntent,
+      variant: {
+        ...remoteIntent.variant,
+        urlTemplate: "https://example.com/mcp/{region}",
+        headers: [],
+        variables: [
+          {
+            name: "region",
+            description: "Region.",
+            required: false,
+            defaultValue: null,
+          },
+        ],
+      },
+      inputs: [
+        {
+          key: "region",
+          source: "remote-variable",
+          name: "region",
+          description: "Region.",
+          required: false,
+          accepts: ["text"],
+        },
+      ],
+      remoteAuth: { kind: "none" },
+      requiredEnvReferences: [],
+    };
+
+    await expect(
+      placeholderAdapter.planInstall({
+        intent: intentWithOptionalPlaceholder,
+        inputs: new Map(),
+        noninteractive: true,
+        manifestHash: MANIFEST_HASH,
+        intentHash: INTENT_HASH,
+      }),
+    ).rejects.toMatchObject({ code: "CODEX_INVALID_INPUT" });
+  });
+
   it("uses JSON listing only when the installed CLI proves the flag", async () => {
     const fake = createCodexRuntime([
       ...makeProbeResults(),
@@ -456,5 +537,55 @@ describe("createCodexAdapter", () => {
     await expect(createCodexAdapter(malformedFake.runtime).inspect()).rejects.toMatchObject({
       code: "CODEX_INVALID_LIST_OUTPUT",
     });
+  });
+
+  it("rejects altered install arguments immediately before mutation", async () => {
+    const fake = createCodexRuntime([...makeProbeResults(), ...makeProbeResults()]);
+    const adapter = createCodexAdapter(fake.runtime);
+    const plan = await adapter.planInstall({
+      intent: makePackageIntent(),
+      inputs: new Map([
+        ["registry", { kind: "text", value: "https://registry.example" } as const],
+        ["workspace", { kind: "text", value: "acme/platform" } as const],
+      ]),
+      noninteractive: true,
+      manifestHash: MANIFEST_HASH,
+      intentHash: INTENT_HASH,
+    });
+
+    await expect(
+      adapter.executePlan({
+        ...plan,
+        operations: [
+          {
+            type: "client-command",
+            executable: CODEX_PATH,
+            args: ["mcp", "remove", "github"],
+            capability: "native-add-stdio",
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: "CODEX_INVALID_PLAN" });
+    expect(fake.spawnCalls).toHaveLength(10);
+  });
+
+  it("rejects altered install scope immediately before mutation", async () => {
+    const fake = createCodexRuntime([...makeProbeResults(), ...makeProbeResults()]);
+    const adapter = createCodexAdapter(fake.runtime);
+    const plan = await adapter.planInstall({
+      intent: makePackageIntent(),
+      inputs: new Map([
+        ["registry", { kind: "text", value: "https://registry.example" } as const],
+        ["workspace", { kind: "text", value: "acme/platform" } as const],
+      ]),
+      noninteractive: true,
+      manifestHash: MANIFEST_HASH,
+      intentHash: INTENT_HASH,
+    });
+
+    await expect(adapter.executePlan({ ...plan, scope: "project" })).rejects.toMatchObject({
+      code: "CODEX_UNSUPPORTED_CAPABILITY",
+    });
+    expect(fake.spawnCalls).toHaveLength(10);
   });
 });
