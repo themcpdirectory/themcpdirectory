@@ -47,7 +47,6 @@ const VSCODE_CAPABILITIES = Object.freeze([
   "native-scope-user",
   "native-scope-project",
   "env-reference",
-  "persisted-secret",
 ] satisfies readonly AdapterCapability[]);
 
 export type VsCodeAdapterErrorCode =
@@ -209,7 +208,10 @@ function buildPackageServerConfig(
   definitions: readonly InstallInputDefinition[],
   inputs: ValidatedInstallInputMap,
 ): BuiltVsCodeServerConfig {
-  if (variant.registryType !== "npm" || (variant.runtimeHint !== null && variant.runtimeHint !== "npx")) {
+  if (
+    variant.registryType !== "npm" ||
+    (variant.runtimeHint !== null && variant.runtimeHint !== "npx")
+  ) {
     throw new VsCodeAdapterError(
       "VSCODE_UNSUPPORTED_CAPABILITY",
       "VS Code adapter supports exact npm package variants through npx only",
@@ -219,14 +221,22 @@ function buildPackageServerConfig(
 
   const version = assertExactPinnedVersion(variant.version);
   const args: string[] = ["--yes"];
-  appendPackageArguments(args, variant.runtimeArguments, "package-runtime-argument", definitions, inputs);
+  appendPackageArguments(
+    args,
+    variant.runtimeArguments,
+    "package-runtime-argument",
+    definitions,
+    inputs,
+  );
   args.push(`${variant.identifier}@${version}`);
   appendPackageArguments(args, variant.packageArguments, "package-argument", definitions, inputs);
 
   const envObject: Record<string, string> = {};
   for (const variable of variant.environmentVariables) {
     const definition = definitions.find(
-      (candidate): candidate is Extract<InstallInputDefinition, { source: "environment-variable" }> =>
+      (
+        candidate,
+      ): candidate is Extract<InstallInputDefinition, { source: "environment-variable" }> =>
         candidate.source === "environment-variable" && candidate.name === variable.name,
     );
     if (!definition) {
@@ -267,7 +277,10 @@ function buildPackageServerConfig(
   };
 }
 
-function applyRemoteTemplate(template: string, variables: Readonly<Record<string, string>>): string {
+function applyRemoteTemplate(
+  template: string,
+  variables: Readonly<Record<string, string>>,
+): string {
   return template.replace(/\{([A-Za-z0-9_-]+)\}/gu, (segment, token: string) => {
     const replacement = variables[token];
     return replacement === undefined ? segment : replacement;
@@ -280,7 +293,10 @@ function sanitizeInputSegment(value: string): string {
   return collapsed.length > 0 ? collapsed : "value";
 }
 
-function buildSecretInputId(serverSlug: string, definition: Extract<InstallInputDefinition, { source: "remote-header" }>): string {
+function buildSecretInputId(
+  serverSlug: string,
+  definition: Extract<InstallInputDefinition, { source: "remote-header" }>,
+): string {
   const digest = createHash("sha256")
     .update(`${serverSlug}:${definition.headerName}:${definition.placeholder}`)
     .digest("hex")
@@ -403,10 +419,7 @@ function buildVsCodeServerConfig(options: PlanInstallOptions): BuiltVsCodeServer
     );
   }
 
-  throw new VsCodeAdapterError(
-    "VSCODE_UNSUPPORTED_CAPABILITY",
-    "Unsupported VS Code variant type",
-  );
+  throw new VsCodeAdapterError("VSCODE_UNSUPPORTED_CAPABILITY", "Unsupported VS Code variant type");
 }
 
 function createSafetyDescriptor(runtime: AdapterRuntime): AdapterSafetyDescriptor {
@@ -584,7 +597,11 @@ function removePromptInputsById(
   existingInputs: readonly unknown[] | undefined,
   inputIdsToRemove: readonly string[],
 ): readonly JsonValue[] {
-  if (!Array.isArray(existingInputs) || existingInputs.length === 0 || inputIdsToRemove.length === 0) {
+  if (
+    !Array.isArray(existingInputs) ||
+    existingInputs.length === 0 ||
+    inputIdsToRemove.length === 0
+  ) {
     return (existingInputs as readonly JsonValue[] | undefined) ?? [];
   }
 
@@ -821,7 +838,9 @@ export function createVsCodeAdapter(runtime: AdapterRuntime): McpClientAdapter {
           }
           const seenIds = new Set(
             document.inputs
-              .filter((item): item is { id: string } => isRecord(item) && typeof item.id === "string")
+              .filter(
+                (item): item is { id: string } => isRecord(item) && typeof item.id === "string",
+              )
               .map((item) => item.id),
           );
           return promptInputs.every((item) => seenIds.has(item.id));
@@ -947,7 +966,9 @@ export function createVsCodeAdapter(runtime: AdapterRuntime): McpClientAdapter {
 
           const remainingInputIds = new Set(
             document.inputs
-              .filter((item): item is { id: string } => isRecord(item) && typeof item.id === "string")
+              .filter(
+                (item): item is { id: string } => isRecord(item) && typeof item.id === "string",
+              )
               .map((item) => item.id),
           );
 

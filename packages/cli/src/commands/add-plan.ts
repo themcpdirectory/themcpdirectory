@@ -1,5 +1,11 @@
 import { DirectoryClientError } from "@themcpdirectory/directory-client";
-import type { ClientDetection } from "@themcpdirectory/client-adapters";
+import {
+  ClaudeCodeAdapterError,
+  CodexAdapterError,
+  CursorAdapterError,
+  VsCodeAdapterError,
+  type ClientDetection,
+} from "@themcpdirectory/client-adapters";
 import {
   createResolvedInstallIntent,
   hashInstallManifest,
@@ -190,11 +196,45 @@ function toAddPlanningFailure(error: unknown): CommandResult<AddPlanningResult> 
     }) as CommandResult<AddPlanningResult>;
   }
 
+  const adapterFailure = mapAdapterPlanningError(error);
+  if (adapterFailure) {
+    return createFailureResult(COMMAND_NAME, {
+      exitCode: 1,
+      code: adapterFailure.code,
+      message: adapterFailure.message,
+    }) as CommandResult<AddPlanningResult>;
+  }
+
   return createFailureResult(COMMAND_NAME, {
     exitCode: 1,
     code: "COMMAND_FAILED",
     message: error instanceof Error ? error.message : "Add planning failed",
   }) as CommandResult<AddPlanningResult>;
+}
+
+function mapAdapterPlanningError(
+  error: unknown,
+): { readonly code: string; readonly message: string } | null {
+  if (!(
+    error instanceof CodexAdapterError ||
+    error instanceof ClaudeCodeAdapterError ||
+    error instanceof CursorAdapterError ||
+    error instanceof VsCodeAdapterError
+  )) {
+    return null;
+  }
+
+  if (error.code.endsWith("_UNSUPPORTED_CAPABILITY")) {
+    return { code: "UNSUPPORTED_CLIENT", message: error.message };
+  }
+  if (error.code.endsWith("_NOT_INSTALLED")) {
+    return { code: "CLIENT_UNAVAILABLE", message: error.message };
+  }
+  if (error.code.includes("_INVALID_")) {
+    return { code: "UNSAFE_CONFIGURATION", message: error.message };
+  }
+
+  return { code: "EXECUTION_FAILED", message: error.message };
 }
 
 function assertPlanDoesNotExposeSecrets(

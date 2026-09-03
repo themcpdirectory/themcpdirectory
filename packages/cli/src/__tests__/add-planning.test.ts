@@ -6,6 +6,7 @@ import type {
   McpClientAdapter,
   RemoveVerificationResult,
 } from "@themcpdirectory/client-adapters";
+import { CodexAdapterError } from "@themcpdirectory/client-adapters";
 import type {
   AdapterCapability,
   AdapterSafetyDescriptor,
@@ -15,7 +16,6 @@ import type {
   ResolvedInstallIntent,
   ValidatedInstallInputMap,
 } from "@themcpdirectory/install-engine";
-import { UnsupportedVariantError } from "@themcpdirectory/install-engine";
 import { describe, expect, it } from "vitest";
 import type { CliDependencies, PromptIO } from "../dependencies.js";
 import { planAddCommand } from "../commands/add-plan.js";
@@ -512,10 +512,10 @@ function createFakeAdapter(options: {
       const requiredCapability: AdapterCapability =
         planOptions.intent.variant.kind === "remote" ? "native-add-remote" : "native-add-stdio";
       if (!options.detection.capabilities.includes(requiredCapability)) {
-        throw new UnsupportedVariantError(
-          "CLIENT_INCOMPATIBLE",
-          options.id,
+        throw new CodexAdapterError(
+          "CODEX_UNSUPPORTED_CAPABILITY",
           `${options.id} is not compatible with ${requiredCapability}`,
+          { capability: requiredCapability },
         );
       }
 

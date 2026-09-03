@@ -108,15 +108,26 @@ async function collectEnvironmentReference(
     );
   }
 
+  return await promptForExistingEnvironmentReference(definition, promptIO, env);
+}
+
+async function promptForExistingEnvironmentReference(
+  definition: InstallInputDefinition,
+  promptIO: PromptIO,
+  env: Readonly<NodeJS.ProcessEnv>,
+): Promise<{ readonly value: InstallInputValue; readonly summary: string }> {
+  const label = `Environment variable for ${describeInput(definition)}`;
+  let message = label;
+
   while (true) {
-    const envName = (
-      await promptIO.input(`Environment variable for ${describeInput(definition)}`)
-    ).trim();
+    const envName = (await promptIO.input(message)).trim();
     if (envName.length === 0) {
+      message = `An environment variable name is required. ${label}`;
       continue;
     }
 
     if (!hasEnvironmentValue(env, envName)) {
+      message = `${envName} is not set. ${label}`;
       continue;
     }
 
@@ -190,23 +201,7 @@ async function promptForSecretEnvReference(
   promptIO: PromptIO,
   env: Readonly<NodeJS.ProcessEnv>,
 ): Promise<{ readonly value: InstallInputValue; readonly summary: string }> {
-  while (true) {
-    const envName = (
-      await promptIO.input(`Environment variable for ${describeInput(definition)}`)
-    ).trim();
-    if (envName.length === 0) {
-      continue;
-    }
-
-    if (!hasEnvironmentValue(env, envName)) {
-      continue;
-    }
-
-    return {
-      value: { kind: "env-reference", envName },
-      summary: `Use environment variable $${envName} for ${describeInput(definition)}.`,
-    };
-  }
+  return await promptForExistingEnvironmentReference(definition, promptIO, env);
 }
 
 async function promptForPersistedSecret(
@@ -235,20 +230,24 @@ async function promptForPersistedSecret(
 }
 
 async function promptForNonEmptySecret(promptIO: PromptIO, message: string): Promise<string> {
+  let prompt = message;
   while (true) {
-    const value = (await promptIO.secretInput(message)).trim();
+    const value = (await promptIO.secretInput(prompt)).trim();
     if (value.length > 0) {
       return value;
     }
+    prompt = `A secret value is required. ${message}`;
   }
 }
 
 async function promptForNonEmptyValue(promptIO: PromptIO, message: string): Promise<string> {
+  let prompt = message;
   while (true) {
-    const value = (await promptIO.input(message)).trim();
+    const value = (await promptIO.input(prompt)).trim();
     if (value.length > 0) {
       return value;
     }
+    prompt = `A value is required. ${message}`;
   }
 }
 
