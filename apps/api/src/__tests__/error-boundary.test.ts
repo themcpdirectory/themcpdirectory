@@ -23,6 +23,7 @@ const errors = {
         title: "Server A",
         version: "1.0.0",
         matchedValue: "shared",
+        listingStatus: "active",
       },
       {
         id: crypto.randomUUID(),
@@ -30,6 +31,7 @@ const errors = {
         title: "Server B",
         version: "1.0.0",
         matchedValue: "shared",
+        listingStatus: "active",
       },
     ]),
   missing: () => new ServerNotFoundError("missing-server"),

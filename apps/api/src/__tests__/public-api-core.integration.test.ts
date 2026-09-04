@@ -2,10 +2,13 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   registrySources,
+  serverHealthChecks,
   serverAliases,
   serverPackages,
+  serverRemotes,
   serverVersions,
   servers,
+  trustSignals,
   type Database,
 } from "@themcpdirectory/db";
 import { createServerSearchCursorCodec } from "@themcpdirectory/search";
@@ -94,14 +97,45 @@ beforeAll(async () => {
     packageIdentifier: "@github/mcp-server",
   });
   const [github] = await temp.db
-    .select({ id: servers.id })
+    .select({ id: servers.id, currentVersionId: servers.currentVersionId })
     .from(servers)
     .where(eq(servers.slug, "github"));
-  if (!github) throw new Error("Expected GitHub server row");
+  if (!github?.currentVersionId) throw new Error("Expected GitHub server row");
   await temp.db.insert(serverAliases).values({
     serverId: github.id,
     alias: "github-server",
     kind: "manual",
+  });
+  const [remote] = await temp.db
+    .insert(serverRemotes)
+    .values({
+      serverVersionId: github.currentVersionId,
+      transportType: "streamable-http",
+      urlTemplate: "https://api.github.example/mcp",
+    })
+    .returning({ id: serverRemotes.id });
+  if (!remote) throw new Error("Expected GitHub remote row");
+  await temp.db.insert(trustSignals).values({
+    serverId: github.id,
+    serverVersionId: github.currentVersionId,
+    signalKey: "remote_reachable",
+    status: "positive",
+    source: "remote_probe",
+    summary: "The endpoint responded successfully.",
+    checkedAt: new Date("2026-09-01T12:30:00.000Z"),
+  });
+  await temp.db.insert(serverHealthChecks).values({
+    serverId: github.id,
+    serverVersionId: github.currentVersionId,
+    remoteId: remote.id,
+    checkType: "remote_probe",
+    status: "healthy",
+    latencyMs: 42,
+    httpStatus: 200,
+    finalOrigin: "https://api.github.example",
+    redirectCount: 0,
+    methodUsed: "HEAD",
+    checkedAt: new Date("2026-09-01T12:30:00.000Z"),
   });
   await seedServer(temp.db, source.id, {
     slug: "second-server",
@@ -127,6 +161,11 @@ beforeAll(async () => {
     publishedAt: new Date("2026-08-28T10:00:00.000Z"),
     listingStatus: "deleted_upstream",
     packageIdentifier: "@example/deleted",
+  });
+  await seedServer(temp.db, source.id, {
+    slug: "install-unavailable",
+    title: "Install Unavailable",
+    publishedAt: new Date("2026-08-27T10:00:00.000Z"),
   });
 
   app = createApiApp({
@@ -158,12 +197,33 @@ describe("public API core routes", () => {
     const search = await app.request("/api/v1/search?q=GitHub&sort=relevance");
     expect(search.status).toBe(200);
     await expect(search.json()).resolves.toMatchObject({
-      data: [expect.objectContaining({ slug: "github" })],
+      data: [
+        expect.objectContaining({
+          slug: "github",
+          latestHealthOutcome: "healthy",
+          installAvailability: "available",
+        }),
+      ],
     });
 
     const resolved = await app.request("/api/v1/resolve/github");
     expect(resolved.status).toBe(200);
-    await expect(resolved.json()).resolves.toMatchObject({ data: { slug: "github" } });
+    await expect(resolved.json()).resolves.toMatchObject({
+      data: { slug: "github", installAvailability: "available" },
+    });
+
+    const detail = await app.request("/api/v1/servers/github");
+    expect(detail.status).toBe(200);
+    await expect(detail.json()).resolves.toMatchObject({
+      data: {
+        slug: "github",
+        trustProfile: {
+          signals: [expect.objectContaining({ key: "remote_reachable", status: "positive" })],
+        },
+        latestHealth: { schemaVersion: 1, outcome: "healthy" },
+        installAvailability: "available",
+      },
+    });
 
     const resolvedInstall = await app.request("/api/v1/resolve/github/install?client=cursor");
     expect(resolvedInstall.status).toBe(200);
@@ -257,5 +317,11 @@ describe("public API core routes", () => {
     const deleted = await app.request("/api/v1/servers/upstream-deleted-server/install");
     expect(deleted.status).toBe(410);
     await expect(deleted.json()).resolves.toMatchObject({ error: { code: "UPSTREAM_DELETED" } });
+
+    const unavailable = await app.request("/api/v1/servers/install-unavailable/install");
+    expect(unavailable.status).toBe(410);
+    await expect(unavailable.json()).resolves.toMatchObject({
+      error: { code: "INSTALL_UNAVAILABLE" },
+    });
   });
 });
