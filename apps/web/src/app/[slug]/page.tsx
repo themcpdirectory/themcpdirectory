@@ -1,7 +1,14 @@
 import type { Metadata, Route } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
-import { getServerByIdentifier, getServerDetail } from "@themcpdirectory/domain";
+import {
+  getServerByIdentifier,
+  getServerDetail,
+  getServerDetailBySlug,
+} from "@themcpdirectory/domain";
 import { normalizeHttpUrl } from "@themcpdirectory/security";
+import { DeletedUpstreamBanner } from "@/components/deleted-upstream-banner";
+import { HealthObservation } from "@/components/health-observation";
+import { TrustProfile } from "@/components/trust-profile";
 import { getDb } from "@/lib/db";
 import { getSiteOrigin } from "@/lib/site-url";
 import Link from "next/link";
@@ -107,10 +114,18 @@ export default async function ServerDetailPage({ params }: Props) {
     permanentRedirect(`/${match.canonicalSlug}`);
   }
 
-  const detail = await getServerDetail(db, match.canonicalSlug);
-  if (!detail) {
+  const snapshot = await db.transaction(
+    async (transaction) => {
+      const detail = await getServerDetail(transaction, match.canonicalSlug);
+      const publicDetail = await getServerDetailBySlug(transaction, match.canonicalSlug);
+      return detail && publicDetail ? { detail, publicDetail } : null;
+    },
+    { isolationLevel: "repeatable read", accessMode: "read only" },
+  );
+  if (!snapshot) {
     notFound();
   }
+  const { detail, publicDetail } = snapshot;
 
   const canonicalUrl = `${getSiteOrigin()}/${detail.slug}`;
   const repositoryUrl = normalizeStoredUrl(detail.repositoryUrl);
@@ -248,6 +263,20 @@ export default async function ServerDetailPage({ params }: Props) {
           )}
         </header>
 
+        <DeletedUpstreamBanner listingStatus={publicDetail.listingStatus} />
+
+        <div className="detail-observations">
+          <section className="detail-observation" aria-labelledby="trust-profile-heading">
+            <h2 id="trust-profile-heading">Trust profile</h2>
+            <TrustProfile trustProfile={publicDetail.trustProfile} />
+          </section>
+
+          <section className="detail-observation" aria-labelledby="health-observation-heading">
+            <h2 id="health-observation-heading">Latest remote health</h2>
+            <HealthObservation health={publicDetail.latestHealth} />
+          </section>
+        </div>
+
         {/* CLI unavailable note */}
         <section
           aria-labelledby="install-heading"
@@ -266,7 +295,11 @@ export default async function ServerDetailPage({ params }: Props) {
             Installation
           </h2>
           <p style={{ fontSize: "0.8125rem", color: "var(--fg-muted)", margin: 0 }}>
-            The CLI is not yet available. Installation instructions coming soon.
+            {publicDetail.installAvailability === "upstream_deleted"
+              ? "Installation is blocked because this listing was removed upstream."
+              : publicDetail.installAvailability === "install_unavailable"
+                ? "Installation details are currently unavailable."
+                : "Installation metadata is available. CLI installation instructions are coming soon."}
           </p>
         </section>
 

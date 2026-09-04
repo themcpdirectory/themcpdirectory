@@ -83,3 +83,36 @@ test("search input has a visible focus indicator", async ({ page }) => {
   expect(focusStyle.outlineStyle).not.toBe("none");
   expect(Number.parseFloat(focusStyle.outlineWidth)).toBeGreaterThanOrEqual(2);
 });
+
+test("keeps the deleted-upstream warning visible in forced colors", async ({ page }) => {
+  await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
+  await page.goto("/retired-notifier");
+
+  const warning = page.getByRole("alert").filter({ hasText: "removed upstream" });
+  await expect(warning).toBeVisible();
+
+  const warningStyle = await warning.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const paragraph = element.querySelector("p");
+    const icon = element.querySelector(".detail-status-alert__icon");
+    if (!paragraph || !icon) throw new Error("Warning content not found");
+
+    return {
+      backgroundColor: style.backgroundColor,
+      borderColor: style.borderTopColor,
+      borderWidth: Number.parseFloat(style.borderTopWidth),
+      iconColor: getComputedStyle(icon).color,
+      paragraphColor: getComputedStyle(paragraph).color,
+    };
+  });
+  expect(warningStyle.borderWidth).toBeGreaterThanOrEqual(1);
+  expect(
+    contrastRatio(warningStyle.borderColor, warningStyle.backgroundColor),
+  ).toBeGreaterThanOrEqual(3);
+  expect(
+    contrastRatio(warningStyle.iconColor, warningStyle.backgroundColor),
+  ).toBeGreaterThanOrEqual(3);
+  expect(
+    contrastRatio(warningStyle.paragraphColor, warningStyle.backgroundColor),
+  ).toBeGreaterThanOrEqual(4.5);
+});

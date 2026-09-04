@@ -155,7 +155,8 @@ test.describe("Server detail page", () => {
       `;
 
       await page.goto("/github");
-      await expect(page.getByText("Unknown", { exact: true })).toBeVisible();
+      const serverInfo = page.getByRole("region", { name: "Server info" });
+      await expect(serverInfo.getByText("Unknown", { exact: true })).toBeVisible();
       await expect(page.getByText("official registry", { exact: true })).toHaveCount(0);
 
       const sourceStates = [
@@ -174,7 +175,7 @@ test.describe("Server detail page", () => {
           where id = ${original.server_id}
         `;
         await page.goto("/github");
-        await expect(page.getByText(state.label, { exact: true })).toBeVisible();
+        await expect(serverInfo.getByText(state.label, { exact: true })).toBeVisible();
       }
 
       await page.goto("/");
@@ -279,5 +280,63 @@ test.describe("Server detail page", () => {
     const bodyWidth = await page.evaluate(() => document.body.scrollWidth);
     const viewportWidth = await page.evaluate(() => window.innerWidth);
     expect(bodyWidth).toBeLessThanOrEqual(viewportWidth + 1);
+  });
+
+  test("shows deleted-upstream warning before installation and reflows at 320px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 900 });
+    await page.goto("/retired-notifier");
+
+    const warning = page.getByRole("alert").filter({ hasText: "removed upstream" });
+    const installation = page.getByRole("heading", { name: "Installation" });
+    await expect(warning).toContainText("removed upstream");
+    await expect(installation).toBeVisible();
+    expect(
+      await warning.evaluate((element) => {
+        const heading = document.getElementById("install-heading");
+        return Boolean(
+          heading && element.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
+        );
+      }),
+    ).toBe(true);
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test("shows factual trust and health content without scores", async ({ page }) => {
+    const client = postgres(TEST_DATABASE_URL, { max: 1 });
+    const [healthCheck] = await client<{ id: string }[]>`
+      insert into server_health_checks (
+        server_id, server_version_id, remote_id, check_type, status, latency_ms,
+        http_status, final_origin, redirect_count, method_used, checked_at
+      )
+      select
+        s.id, sv.id, sr.id, 'remote_probe', 'healthy', 184,
+        204, 'https://mcp.playwright.dev', 0, 'HEAD', '2026-09-03T11:55:00.000Z'
+      from servers s
+      inner join server_versions sv on sv.id = s.current_version_id
+      inner join server_remotes sr on sr.server_version_id = sv.id
+      where s.slug = 'playwright'
+      returning id
+    `;
+    if (!healthCheck) throw new Error("Seeded Playwright remote not found");
+
+    try {
+      await page.goto("/playwright");
+      await expect(page.getByRole("heading", { name: "Trust profile" })).toBeVisible();
+      await expect(page.getByText(/Remote responded on.*UTC/i)).toBeVisible();
+      await expect(
+        page.getByText(
+          /score|stars?|grade|ratings?|confidence|\b\d+(?:\.\d+)?%|overall trust|trusted|certified|certification|ranking|weighted/i,
+        ),
+      ).toHaveCount(0);
+    } finally {
+      await client`delete from server_health_checks where id = ${healthCheck.id}`;
+      await client.end({ timeout: 0 });
+    }
   });
 });

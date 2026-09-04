@@ -45,6 +45,8 @@ const TRUST_SIGNAL_STATUSES = new Set<PublicTrustProfile["signals"][number]["sta
 ]);
 const ENVIRONMENT_VARIABLE_NAME_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 
+type ServerDetailReadDatabase = Pick<Database, "select">;
+
 type Argument = PublicServerDetail["packages"][number]["runtimeArguments"][number];
 type EnvironmentVariable = PublicServerDetail["packages"][number]["environmentVariables"][number];
 type RemoteHeader = PublicServerDetail["remotes"][number]["headers"][number];
@@ -179,7 +181,10 @@ function projectRemoteVariables(
   });
 }
 
-async function loadAliases(db: Database, serverId: string): Promise<readonly string[]> {
+async function loadAliases(
+  db: ServerDetailReadDatabase,
+  serverId: string,
+): Promise<readonly string[]> {
   const rows = await db
     .select({ alias: serverAliases.alias })
     .from(serverAliases)
@@ -189,7 +194,7 @@ async function loadAliases(db: Database, serverId: string): Promise<readonly str
 }
 
 async function loadPublicServerCategories(
-  db: Database,
+  db: ServerDetailReadDatabase,
   serverId: string,
 ): Promise<readonly PublicServerCategory[]> {
   return db
@@ -201,7 +206,7 @@ async function loadPublicServerCategories(
 }
 
 async function loadServerPackages(
-  db: Database,
+  db: ServerDetailReadDatabase,
   currentVersionId: string | null,
 ): Promise<readonly ServerPackageRow[]> {
   if (!currentVersionId) return [];
@@ -232,7 +237,7 @@ async function loadServerPackages(
 }
 
 async function loadServerRemotes(
-  db: Database,
+  db: ServerDetailReadDatabase,
   currentVersionId: string | null,
 ): Promise<readonly ServerRemoteRow[]> {
   if (!currentVersionId) return [];
@@ -257,7 +262,7 @@ async function loadServerRemotes(
 }
 
 async function loadCompatibilityMap(
-  db: Database,
+  db: ServerDetailReadDatabase,
   serverId: string,
 ): Promise<InstallManifestCompatibility> {
   const rows = await db
@@ -299,7 +304,7 @@ async function loadCompatibilityMap(
 }
 
 async function loadTrustProfile(
-  db: Database,
+  db: ServerDetailReadDatabase,
   serverId: string,
   currentVersionId: string | null,
   registryKind: string | null,
@@ -345,7 +350,7 @@ async function loadTrustProfile(
 }
 
 export async function loadServerDetailRow(
-  db: Database,
+  db: ServerDetailReadDatabase,
   slug: string,
 ): Promise<ServerDetailRow | null> {
   const normalized = slug.trim().toLowerCase();
@@ -472,7 +477,7 @@ export function projectPublicRemote(row: ServerRemoteRow): PublicServerDetail["r
 }
 
 export async function getServerDetailBySlug(
-  db: Database,
+  db: ServerDetailReadDatabase,
   slug: string,
 ): Promise<PublicServerDetail | null> {
   const server = await loadServerDetailRow(db, slug);
