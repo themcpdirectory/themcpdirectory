@@ -39,6 +39,8 @@ export interface PinnedDispatcherOptions {
 export interface PinnedProbeRequestOptions {
   readonly fetchImpl?: ProbeFetch;
   readonly resolve: DnsResolver;
+  readonly beforeRequest?: () => Promise<void>;
+  readonly withOriginLimit?: <T>(origin: string, request: () => Promise<T>) => Promise<T>;
   readonly dispatcherFactory?: (options: PinnedDispatcherOptions) => Dispatcher | undefined;
   readonly method: "HEAD" | "GET";
   readonly connectTimeoutMs: number;
@@ -72,6 +74,16 @@ interface HopValidationResult {
   readonly addresses: string[];
   readonly errorCode: string | null;
   readonly errorSummary: string | null;
+}
+
+class ProbeRequestPreconditionError extends Error {
+  readonly originalError: unknown;
+
+  constructor(originalError: unknown) {
+    super("Probe request precondition failed.");
+    this.name = "ProbeRequestPreconditionError";
+    this.originalError = originalError;
+  }
 }
 
 function durationSince(startedAt: number): number {
@@ -328,7 +340,8 @@ export async function performPinnedProbe(
         );
       }
 
-      const parsed = new URL(validation.url);
+      const validatedUrl = validation.url;
+      const parsed = new URL(validatedUrl);
       lastValidatedOrigin = parsed.origin;
       const pinnedAddress = pickDeterministicAddress(validation.addresses);
       const dispatcherOptions: PinnedDispatcherOptions = {
@@ -352,118 +365,155 @@ export async function performPinnedProbe(
             init
               ? undiciFetch(input, { ...init, headers: { ...init.headers } })
               : undiciFetch(input));
-        const response = await withTotalTimeout(
-          fetchImpl(validation.url, {
-            method: options.method,
-            redirect: "manual",
-            credentials: "omit",
-            headers: FIXED_PROBE_HEADERS,
+        const request = async (): Promise<
+          { readonly nextUrl: string } | { readonly result: PinnedProbeResponse }
+        > => {
+          if (options.beforeRequest) {
+            try {
+              await withTotalTimeout(options.beforeRequest(), signal);
+            } catch (error) {
+              if (signal.aborted) throw error;
+              throw new ProbeRequestPreconditionError(error);
+            }
+          }
+          const response = await withTotalTimeout(
+            fetchImpl(validatedUrl, {
+              method: options.method,
+              redirect: "manual",
+              credentials: "omit",
+              headers: FIXED_PROBE_HEADERS,
+              signal,
+              ...(dispatcher ? { dispatcher } : {}),
+            }),
             signal,
-            ...(dispatcher ? { dispatcher } : {}),
-          }),
+          );
+
+          if (countHeaderBytes(response.headers) > options.maxHeaderBytes) {
+            cancelBody(response);
+            return {
+              result: blocked(
+                options,
+                startedAt,
+                redirects,
+                "response_too_large",
+                "header_limit",
+                `response headers exceed ${options.maxHeaderBytes} bytes`,
+                parsed.origin,
+              ),
+            };
+          }
+
+          if (REDIRECT_STATUSES.has(response.status)) {
+            if (redirects >= options.maxRedirects) {
+              cancelBody(response);
+              return {
+                result: blocked(
+                  options,
+                  startedAt,
+                  redirects,
+                  "unsafe_destination",
+                  "redirect_limit",
+                  `probe exceeded ${options.maxRedirects} redirects`,
+                  parsed.origin,
+                ),
+              };
+            }
+            const location = response.headers.get("location");
+            cancelBody(response);
+            if (!location) {
+              return {
+                result: blocked(
+                  options,
+                  startedAt,
+                  redirects,
+                  "unsafe_destination",
+                  "invalid_redirect",
+                  "redirect response has no location",
+                  parsed.origin,
+                ),
+              };
+            }
+            try {
+              return { nextUrl: new URL(location, validatedUrl).href };
+            } catch {
+              return {
+                result: blocked(
+                  options,
+                  startedAt,
+                  redirects,
+                  "unsafe_destination",
+                  "invalid_redirect",
+                  "redirect location is invalid",
+                  parsed.origin,
+                ),
+              };
+            }
+          }
+
+          const encoding = response.headers.get("content-encoding")?.trim().toLowerCase();
+          const isCompressed = Boolean(encoding && encoding !== "identity");
+          const declaredLength = contentLength(response.headers);
+          if (declaredLength !== null && declaredLength > options.maxResponseBytes) {
+            cancelBody(response);
+            return {
+              result: blocked(
+                options,
+                startedAt,
+                redirects,
+                "response_too_large",
+                isCompressed ? "compressed_body_limit" : "body_limit",
+                `response exceeds ${options.maxResponseBytes} bytes`,
+                parsed.origin,
+              ),
+            };
+          }
+
+          const streamLimit = isCompressed
+            ? options.maxDecompressedBytes
+            : options.maxResponseBytes;
+          if (await withTotalTimeout(exceedsStreamLimit(response, streamLimit), signal)) {
+            return {
+              result: blocked(
+                options,
+                startedAt,
+                redirects,
+                "response_too_large",
+                isCompressed ? "decompressed_body_limit" : "body_limit",
+                `response exceeds ${streamLimit} bytes`,
+                parsed.origin,
+              ),
+            };
+          }
+
+          return {
+            result: {
+              outcome: response.ok ? "healthy" : "degraded",
+              methodUsed: options.method,
+              finalOrigin: parsed.origin,
+              httpStatus: response.status,
+              redirectCount: redirects,
+              durationMs: durationSince(startedAt),
+              errorCode: response.ok ? null : "http_error",
+              errorSummary: response.ok ? null : `remote returned HTTP ${response.status}`,
+            },
+          };
+        };
+        const hop = await withTotalTimeout(
+          options.withOriginLimit ? options.withOriginLimit(parsed.origin, request) : request(),
           signal,
         );
-
-        if (countHeaderBytes(response.headers) > options.maxHeaderBytes) {
-          cancelBody(response);
-          return blocked(
-            options,
-            startedAt,
-            redirects,
-            "response_too_large",
-            "header_limit",
-            `response headers exceed ${options.maxHeaderBytes} bytes`,
-            parsed.origin,
-          );
-        }
-
-        if (REDIRECT_STATUSES.has(response.status)) {
-          if (redirects >= options.maxRedirects) {
-            cancelBody(response);
-            return blocked(
-              options,
-              startedAt,
-              redirects,
-              "unsafe_destination",
-              "redirect_limit",
-              `probe exceeded ${options.maxRedirects} redirects`,
-              parsed.origin,
-            );
-          }
-          const location = response.headers.get("location");
-          cancelBody(response);
-          if (!location) {
-            return blocked(
-              options,
-              startedAt,
-              redirects,
-              "unsafe_destination",
-              "invalid_redirect",
-              "redirect response has no location",
-              parsed.origin,
-            );
-          }
-          try {
-            currentUrl = new URL(location, validation.url).href;
-          } catch {
-            return blocked(
-              options,
-              startedAt,
-              redirects,
-              "unsafe_destination",
-              "invalid_redirect",
-              "redirect location is invalid",
-              parsed.origin,
-            );
-          }
+        if ("nextUrl" in hop) {
+          currentUrl = hop.nextUrl;
           redirects += 1;
           continue;
         }
-
-        const encoding = response.headers.get("content-encoding")?.trim().toLowerCase();
-        const isCompressed = Boolean(encoding && encoding !== "identity");
-        const declaredLength = contentLength(response.headers);
-        if (declaredLength !== null && declaredLength > options.maxResponseBytes) {
-          cancelBody(response);
-          return blocked(
-            options,
-            startedAt,
-            redirects,
-            "response_too_large",
-            isCompressed ? "compressed_body_limit" : "body_limit",
-            `response exceeds ${options.maxResponseBytes} bytes`,
-            parsed.origin,
-          );
-        }
-
-        const streamLimit = isCompressed ? options.maxDecompressedBytes : options.maxResponseBytes;
-        if (await withTotalTimeout(exceedsStreamLimit(response, streamLimit), signal)) {
-          return blocked(
-            options,
-            startedAt,
-            redirects,
-            "response_too_large",
-            isCompressed ? "decompressed_body_limit" : "body_limit",
-            `response exceeds ${streamLimit} bytes`,
-            parsed.origin,
-          );
-        }
-
-        return {
-          outcome: response.ok ? "healthy" : "degraded",
-          methodUsed: options.method,
-          finalOrigin: parsed.origin,
-          httpStatus: response.status,
-          redirectCount: redirects,
-          durationMs: durationSince(startedAt),
-          errorCode: response.ok ? null : "http_error",
-          errorSummary: response.ok ? null : `remote returned HTTP ${response.status}`,
-        };
+        return hop.result;
       } finally {
         if (ownsDispatcher) destroyDispatcher(dispatcher);
       }
     }
   } catch (error) {
+    if (error instanceof ProbeRequestPreconditionError) throw error.originalError;
     const limitCode = responseLimitCode(error);
     if (limitCode) {
       return blocked(

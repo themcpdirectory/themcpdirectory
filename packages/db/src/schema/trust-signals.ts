@@ -32,6 +32,9 @@ export const trustSignals = pgTable(
       t.checkedAt,
     ),
     index("trust_signals_checked_at_idx").on(t.checkedAt),
+    index("trust_signals_unchecked_created_at_idx")
+      .on(t.createdAt)
+      .where(sql`${t.checkedAt} is null`),
     index("trust_signals_expires_at_idx").on(t.expiresAt),
     check(
       "trust_signals_status_check",

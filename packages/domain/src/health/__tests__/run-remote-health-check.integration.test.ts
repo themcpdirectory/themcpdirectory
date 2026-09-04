@@ -52,6 +52,7 @@ describe("runRemoteHealthCheck integration", () => {
       })
       .returning({ id: serverVersions.id });
     if (!version) throw new Error("expected version fixture");
+    await db.update(servers).set({ currentVersionId: version.id }).where(eq(servers.id, serverId));
 
     const remotes = await db
       .insert(serverRemotes)
@@ -203,6 +204,100 @@ describe("runRemoteHealthCheck integration", () => {
         ),
       ]),
     ).resolves.toMatchObject({ outcome: "timed_out", methodUsed: null });
+
+    await db
+      .update(serverRemotes)
+      .set({ urlTemplate: "https://changed.example.com/health" })
+      .where(eq(serverRemotes.id, remoteId));
+    const changedResolve = vi.fn(async () => ["93.184.216.34"]);
+    const changedFetch = vi.fn<ProbeFetch>();
+    await expect(
+      runRemoteHealthCheck(db, {
+        ...input,
+        expectedUrl: "https://origin.example.com/health",
+        checkedAt: new Date("2026-09-01T18:02:30.000Z"),
+        resolve: changedResolve,
+        fetchImpl: changedFetch,
+      }),
+    ).rejects.toThrow("Remote health-check target changed before execution.");
+    expect(changedResolve).not.toHaveBeenCalled();
+    expect(changedFetch).not.toHaveBeenCalled();
+
+    await db
+      .update(serverRemotes)
+      .set({ urlTemplate: "https://origin.example.com/health" })
+      .where(eq(serverRemotes.id, remoteId));
+    const racingResolve = vi.fn(async () => {
+      await db
+        .update(serverRemotes)
+        .set({ urlTemplate: "https://raced.example.com/health" })
+        .where(eq(serverRemotes.id, remoteId));
+      return ["93.184.216.34"];
+    });
+    const racingFetch = vi.fn<ProbeFetch>();
+    await expect(
+      runRemoteHealthCheck(db, {
+        ...input,
+        expectedUrl: "https://origin.example.com/health",
+        checkedAt: new Date("2026-09-01T18:02:45.000Z"),
+        resolve: racingResolve,
+        fetchImpl: racingFetch,
+      }),
+    ).rejects.toThrow("Remote health-check target changed before execution.");
+    expect(racingFetch).not.toHaveBeenCalled();
+
+    await db
+      .update(serverRemotes)
+      .set({ urlTemplate: "https://origin.example.com/health" })
+      .where(eq(serverRemotes.id, remoteId));
+    const inactiveResolve = vi.fn(async () => {
+      await db
+        .update(servers)
+        .set({ listingStatus: "deleted_upstream" })
+        .where(eq(servers.id, serverId));
+      return ["93.184.216.34"];
+    });
+    const inactiveFetch = vi.fn<ProbeFetch>();
+    await expect(
+      runRemoteHealthCheck(db, {
+        ...input,
+        expectedUrl: "https://origin.example.com/health",
+        checkedAt: new Date("2026-09-01T18:02:50.000Z"),
+        resolve: inactiveResolve,
+        fetchImpl: inactiveFetch,
+      }),
+    ).rejects.toThrow("Remote health-check target is no longer active.");
+    expect(inactiveFetch).not.toHaveBeenCalled();
+
+    const [nextVersion] = await db
+      .insert(serverVersions)
+      .values({
+        serverId,
+        version: "2.0.0",
+        upstreamStatus: "active",
+        firstSeenAt: checkedAt,
+        lastSeenAt: checkedAt,
+        normalizedPayload: {},
+      })
+      .returning({ id: serverVersions.id });
+    if (!nextVersion) throw new Error("expected next version fixture");
+    await db
+      .update(servers)
+      .set({ currentVersionId: nextVersion.id, listingStatus: "active" })
+      .where(eq(servers.id, serverId));
+
+    const staleResolve = vi.fn(async () => ["93.184.216.34"]);
+    const staleFetch = vi.fn<ProbeFetch>();
+    await expect(
+      runRemoteHealthCheck(db, {
+        ...input,
+        checkedAt: new Date("2026-09-01T18:03:00.000Z"),
+        resolve: staleResolve,
+        fetchImpl: staleFetch,
+      }),
+    ).rejects.toThrow("Remote health-check target was not found.");
+    expect(staleResolve).not.toHaveBeenCalled();
+    expect(staleFetch).not.toHaveBeenCalled();
   });
 
   it("persists stdio as unsupported before network, package, or process side effects", async () => {

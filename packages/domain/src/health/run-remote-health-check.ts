@@ -66,7 +66,7 @@ async function withDeadline<T>(promise: Promise<T>, deadlineAt: number): Promise
 
 export type RemoteHealthProbeOptions = Omit<
   PinnedProbeRequestOptions,
-  "fetchImpl" | "method" | "resolve"
+  "beforeRequest" | "fetchImpl" | "method" | "resolve" | "withOriginLimit"
 >;
 
 export interface ForbiddenStdioSideEffects {
@@ -81,8 +81,10 @@ export interface RunRemoteHealthCheckInput {
   readonly serverId: string;
   readonly remoteId: string;
   readonly checkedAt: Date;
+  readonly expectedUrl?: string;
   readonly resolve: DnsResolver;
   readonly fetchImpl?: ProbeFetch;
+  readonly withOriginLimit?: PinnedProbeRequestOptions["withOriginLimit"];
   readonly probeOptions: RemoteHealthProbeOptions;
   readonly forbiddenStdioSideEffects?: ForbiddenStdioSideEffects;
 }
@@ -130,11 +132,31 @@ async function loadHealthCheckTarget(
     .from(serverRemotes)
     .innerJoin(serverVersions, eq(serverVersions.id, serverRemotes.serverVersionId))
     .innerJoin(servers, eq(servers.id, serverVersions.serverId))
-    .where(and(eq(serverRemotes.id, remoteId), eq(servers.id, serverId)))
+    .where(
+      and(
+        eq(serverRemotes.id, remoteId),
+        eq(servers.id, serverId),
+        eq(servers.currentVersionId, serverVersions.id),
+      ),
+    )
     .limit(1);
 
   if (!target) throw new Error("Remote health-check target was not found.");
   return target;
+}
+
+async function assertHealthCheckTargetCurrent(
+  db: Database,
+  input: RunRemoteHealthCheckInput,
+  expectedUrl: string,
+): Promise<void> {
+  const current = await loadHealthCheckTarget(db, input.serverId, input.remoteId);
+  if (current.listingStatus !== "active") {
+    throw new Error("Remote health-check target is no longer active.");
+  }
+  if (current.urlTemplate !== expectedUrl) {
+    throw new Error("Remote health-check target changed before execution.");
+  }
 }
 
 async function persistHealthObservation(
@@ -201,6 +223,10 @@ export async function runRemoteHealthCheck(
   input: RunRemoteHealthCheckInput,
 ): Promise<PersistedRemoteHealthObservation> {
   const target = await loadHealthCheckTarget(db, input.serverId, input.remoteId);
+  if (input.expectedUrl !== undefined && target.urlTemplate !== input.expectedUrl) {
+    throw new Error("Remote health-check target changed before execution.");
+  }
+  const expectedUrl = input.expectedUrl ?? target.urlTemplate;
   const startedAt = Date.now();
   const deadlineAt = startedAt + Math.max(1, input.probeOptions.totalTimeoutMs);
   let eligibility;
@@ -235,6 +261,8 @@ export async function runRemoteHealthCheck(
   const sharedProbeOptions = {
     resolve: input.resolve,
     ...input.probeOptions,
+    beforeRequest: () => assertHealthCheckTargetCurrent(db, input, expectedUrl),
+    ...(input.withOriginLimit ? { withOriginLimit: input.withOriginLimit } : {}),
     ...(input.fetchImpl ? { fetchImpl: input.fetchImpl } : {}),
   };
   const headTimeoutMs = remainingTimeoutMs(deadlineAt);

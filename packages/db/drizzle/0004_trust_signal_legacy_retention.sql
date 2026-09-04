@@ -1,0 +1,1 @@
+CREATE INDEX "trust_signals_unchecked_created_at_idx" ON "trust_signals" USING btree ("created_at") WHERE "trust_signals"."checked_at" is null;

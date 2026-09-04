@@ -61,6 +61,7 @@ describe("performPinnedProbe", () => {
   });
 
   it("pins TLS dispatchers per redirect hop and rejects rebinding", async () => {
+    const limitedOrigins: string[] = [];
     const dispatcherFactory = vi.fn<NonNullable<PinnedProbeRequestOptions["dispatcherFactory"]>>(
       () => undefined,
     );
@@ -90,11 +91,16 @@ describe("performPinnedProbe", () => {
             resolve: async (hostname) => addresses[hostname] ?? [],
             dispatcherFactory,
             totalTimeoutMs: 25,
+            withOriginLimit: async (origin, request) => {
+              limitedOrigins.push(origin);
+              return request();
+            },
           }),
         ),
         new Promise((resolve) => setTimeout(() => resolve({ outcome: "cleanup_stalled" }), 100)),
       ]),
     ).resolves.toMatchObject({ outcome: "healthy", redirectCount: 1 });
+    expect(limitedOrigins).toEqual(["https://origin.example.com", "https://next.example.com"]);
     expect(dispatcherFactory).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
