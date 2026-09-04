@@ -55,6 +55,22 @@ export const TEST_DATABASE_NAME = testDatabaseConfig.databaseName;
 export const TEST_DATABASE_URL = databaseUrlFor(TEST_DATABASE_NAME);
 export const TEST_PORT = process.env.TEST_PORT ?? "3099";
 
+/**
+ * Fixture-only Better Auth/GitHub App configuration for `next dev` in e2e.
+ * `TEST_BETTER_AUTH_SECRET` must match the value fixtures use to sign the
+ * Better Auth session cookie (see `publisher-session-fixtures.ts`); the
+ * GitHub values are never exchanged with GitHub in these tests.
+ */
+export const TEST_BETTER_AUTH_SECRET = "e2e-fixture-secret-0123456789abcdef0123456789ab";
+export const TEST_GITHUB_APP_ENV = {
+  GITHUB_CLIENT_ID: "e2e-fixture-github-client-id",
+  GITHUB_CLIENT_SECRET: "e2e-fixture-github-client-secret",
+  GITHUB_APP_ID: "123456",
+  GITHUB_APP_PRIVATE_KEY:
+    "-----BEGIN RSA PRIVATE KEY-----\ne2e-fixture-not-a-real-key\n-----END RSA PRIVATE KEY-----",
+  GITHUB_APP_SLUG: "themcpdirectory-e2e-fixture",
+} as const;
+
 async function withAdminClient<T>(callback: (client: postgres.Sql) => Promise<T>): Promise<T> {
   const client = postgres(testDatabaseConfig.adminUrl, { max: 1 });
   try {

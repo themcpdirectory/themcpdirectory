@@ -11,7 +11,7 @@ import {
   servers,
   type Database,
 } from "@themcpdirectory/db";
-import { asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
 
 const PUBLISHER_CAPABILITIES: readonly PublisherCapability[] = [
   "publisher.read",
@@ -71,13 +71,34 @@ export interface PublisherDashboard {
     readonly displayName: string;
     readonly role: PublisherRole;
     readonly capabilities: readonly PublisherCapability[];
+    readonly claimableListings: readonly {
+      readonly serverId: string;
+      readonly serverTitle: string;
+      readonly verificationMethods: readonly (
+        | "github_repository"
+        | "github_organization"
+      )[];
+    }[];
     readonly claims: readonly {
       readonly claimId: string;
+      readonly serverId: string;
       readonly status: string;
       readonly serverTitle: string;
+      readonly requiresManualReview: boolean;
     }[];
     readonly members: readonly PublisherMemberSummary[];
   } | null;
+}
+
+function repositoryOwner(repositoryUrl: string): string | null {
+  try {
+    const url = new URL(repositoryUrl);
+    if (url.hostname.toLowerCase() !== "github.com") return null;
+    const [owner, repository, ...extra] = url.pathname.replace(/^\//, "").split("/");
+    return owner && repository && extra.length === 0 ? decodeURIComponent(owner) : null;
+  } catch {
+    return null;
+  }
 }
 
 function toPublisherRole(value: string): PublisherRole {
@@ -160,16 +181,64 @@ async function loadMemberships(
 }
 
 async function loadActivePublisherClaims(db: Database, publisherId: string) {
-  return db
+  const rows = await db
     .select({
       claimId: publisherClaims.id,
+      serverId: publisherClaims.serverId,
       status: publisherClaims.status,
       serverTitle: servers.title,
+      conflictClaimId: publisherClaims.conflictClaimId,
     })
     .from(publisherClaims)
     .innerJoin(servers, eq(servers.id, publisherClaims.serverId))
     .where(eq(publisherClaims.publisherId, publisherId))
     .orderBy(desc(publisherClaims.createdAt), asc(servers.title));
+
+  return rows.map(({ conflictClaimId, ...claim }) => ({
+    ...claim,
+    requiresManualReview: conflictClaimId !== null,
+  }));
+}
+
+async function loadClaimableListings(db: Database, publisherId: string) {
+  const [publisher, listings] = await Promise.all([
+    db
+      .select({ githubOrg: publishers.githubOrg, githubOrgId: publishers.githubOrgId })
+      .from(publishers)
+      .where(eq(publishers.id, publisherId))
+      .limit(1),
+    db
+      .select({
+        serverId: servers.id,
+        serverTitle: servers.title,
+        repositoryUrl: servers.repositoryUrl,
+      })
+      .from(servers)
+      .where(
+        and(
+          eq(servers.listingStatus, "active"),
+          eq(servers.moderationStatus, "normal"),
+          isNotNull(servers.repositoryExternalId),
+          isNotNull(servers.repositoryUrl),
+        ),
+      )
+      .orderBy(asc(servers.title)),
+  ]);
+
+  const organisation = publisher[0];
+  const canUseOrganisation = Boolean(organisation?.githubOrg && organisation.githubOrgId);
+
+  return listings.flatMap((listing) => {
+    if (!listing.repositoryUrl || !repositoryOwner(listing.repositoryUrl)) return [];
+    const methods: ("github_repository" | "github_organization")[] = ["github_repository"];
+    if (
+      canUseOrganisation &&
+      repositoryOwner(listing.repositoryUrl)?.toLowerCase() === organisation?.githubOrg?.toLowerCase()
+    ) {
+      methods.push("github_organization");
+    }
+    return [{ serverId: listing.serverId, serverTitle: listing.serverTitle, verificationMethods: methods }];
+  });
 }
 
 async function loadActivePublisherMembers(
@@ -214,9 +283,10 @@ export async function getPublisherDashboard(
     };
   }
 
-  const [claims, members] = await Promise.all([
+  const [claims, members, claimableListings] = await Promise.all([
     loadActivePublisherClaims(db, activeMembership.publisherId),
     loadActivePublisherMembers(db, activeMembership.publisherId),
+    loadClaimableListings(db, activeMembership.publisherId),
   ]);
 
   return {
@@ -228,6 +298,7 @@ export async function getPublisherDashboard(
       displayName: activeMembership.publisherDisplayName,
       role: activeMembership.role,
       capabilities: activeMembership.capabilities,
+      claimableListings,
       claims,
       members,
     },

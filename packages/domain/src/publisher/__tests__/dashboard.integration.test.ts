@@ -51,6 +51,8 @@ async function seedDashboardFixture(db: Database): Promise<void> {
       id: PRIMARY_PUBLISHER_ID,
       slug: "allowed-publisher",
       displayName: "Allowed Publisher",
+      githubOrg: "allowed-org",
+      githubOrgId: "87654321",
       verificationState: "verified",
       ownershipState: "unlocked",
       createdAt: FIXTURE_TIME,
@@ -102,6 +104,9 @@ async function seedDashboardFixture(db: Database): Promise<void> {
     publisherId: PRIMARY_PUBLISHER_ID,
     listingStatus: "active",
     moderationStatus: "normal",
+    repositorySource: "github",
+    repositoryExternalId: "12345678",
+    repositoryUrl: "https://github.com/allowed-org/claimed-server",
     firstSeenAt: FIXTURE_TIME,
     lastSeenAt: FIXTURE_TIME,
     createdAt: FIXTURE_TIME,
@@ -183,7 +188,22 @@ describe("getPublisherDashboard integration", () => {
         "ownership.transfer",
         "publisher.destroy",
       ],
-      claims: [{ claimId: CLAIM_ID, status: "verified", serverTitle: "Claimed Server" }],
+      claimableListings: [
+        {
+          serverId: SERVER_ID,
+          serverTitle: "Claimed Server",
+          verificationMethods: ["github_repository", "github_organization"],
+        },
+      ],
+      claims: [
+        {
+          claimId: CLAIM_ID,
+          serverId: SERVER_ID,
+          status: "verified",
+          serverTitle: "Claimed Server",
+          requiresManualReview: false,
+        },
+      ],
       members: [
         {
           membershipId: OWNER_MEMBERSHIP_ID,

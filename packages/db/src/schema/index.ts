@@ -1,5 +1,13 @@
 export { citext, tsvector } from "./column-types.js";
-export { authAccounts, authSessions, authUsers, authVerification } from "./better-auth.js";
+export {
+  authAccounts,
+  authAccountsRelations,
+  authSessions,
+  authSessionsRelations,
+  authUsers,
+  authUsersRelations,
+  authVerification,
+} from "./better-auth.js";
 export { accountErasureRequests } from "./account-erasure-requests.js";
 export { auditEvents } from "./audit-events.js";
 export { claimVerificationNonces } from "./claim-verification-nonces.js";

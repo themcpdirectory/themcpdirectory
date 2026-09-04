@@ -563,6 +563,10 @@ describe("publisher claims", () => {
       id: String(ORGANISATION_ID),
     });
     await seedServer(db, serverId, String(REPOSITORY_ID));
+    await db
+      .update(servers)
+      .set({ repositoryUrl: "https://github.com/community-labs/repo-tool" })
+      .where(eq(servers.id, serverId));
 
     const created = await createPublisherClaim(db, {
       requesterUserId,
@@ -650,6 +654,10 @@ describe("publisher claims", () => {
     await seedRequester(db, requesterUserId, String(REPOSITORY_ID));
     await seedPublisher(db, publisherId, { login: "community-labs", id: String(ORGANISATION_ID) });
     await seedServer(db, serverId, String(REPOSITORY_ID));
+    await db
+      .update(servers)
+      .set({ repositoryUrl: "https://github.com/community-labs/repo-tool" })
+      .where(eq(servers.id, serverId));
 
     const created = await createPublisherClaim(db, {
       requesterUserId,
@@ -1021,11 +1029,17 @@ describe("publisher claims", () => {
     const publisherId = "22222222-2222-4222-8222-222222222230";
     const anonymousServerId = "11111111-1111-4111-8111-111111111170";
     const foreignServerId = "11111111-1111-4111-8111-111111111171";
+    const matchingServerId = "11111111-1111-4111-8111-111111111172";
 
     await seedRequester(db, requesterUserId, String(REPOSITORY_ID));
     await seedPublisher(db, publisherId, { login: "community-labs", id: String(ORGANISATION_ID) });
     await seedServer(db, anonymousServerId);
     await seedServer(db, foreignServerId, String(REPOSITORY_ID));
+    await seedServer(db, matchingServerId, String(REPOSITORY_ID + 1));
+    await db
+      .update(servers)
+      .set({ repositoryUrl: "https://github.com/community-labs/repo-tool" })
+      .where(eq(servers.id, matchingServerId));
 
     await expect(
       createPublisherClaim(db, {
@@ -1036,9 +1050,18 @@ describe("publisher claims", () => {
       }),
     ).rejects.toThrow(/SERVER_GITHUB_REPOSITORY_IDENTITY/i);
 
+    await expect(
+      createPublisherClaim(db, {
+        requesterUserId,
+        serverId: foreignServerId,
+        publisherId,
+        verificationMethod: "github_organization",
+      }),
+    ).rejects.toThrow(/ORGANISATION_REPOSITORY/i);
+
     const created = await createPublisherClaim(db, {
       requesterUserId,
-      serverId: foreignServerId,
+      serverId: matchingServerId,
       publisherId,
       verificationMethod: "github_organization",
     });
@@ -1059,7 +1082,7 @@ describe("publisher claims", () => {
       installationId: 96,
       userToken: "ghu_foreign_repo",
       installationToken: "ghs_foreign_repo",
-      userFacts: { repositoryOwnerId: 55_555_555 },
+      userFacts: { repositoryId: REPOSITORY_ID + 1, repositoryOwnerId: 55_555_555 },
     });
 
     await expect(
@@ -1124,6 +1147,65 @@ describe("publisher claims", () => {
 
     const claims = await db.select().from(publisherClaims);
     expect(claims).toHaveLength(1);
+  });
+
+  it("uses current claim-manager capability for verification and withdrawal", async () => {
+    const requesterUserId = "33333333-3333-4333-8333-333333333333";
+    const adminUserId = "44444444-4444-4444-8444-444444444444";
+    const publisherId = "22222222-2222-4222-8222-222222222234";
+    const serverId = "11111111-1111-4111-8111-111111111182";
+
+    await seedRequester(db, requesterUserId, String(REPOSITORY_ID));
+    await seedRequester(db, adminUserId);
+    await seedPublisher(db, publisherId);
+    await seedServer(db, serverId, String(REPOSITORY_ID));
+    await db.insert(publisherMemberships).values([
+      { publisherId, userId: requesterUserId, role: "owner" },
+      { publisherId, userId: adminUserId, role: "admin" },
+    ]);
+
+    const created = await createPublisherClaim(db, {
+      requesterUserId,
+      serverId,
+      publisherId,
+      verificationMethod: "github_repository",
+    });
+    await db
+      .update(publisherMemberships)
+      .set({ role: "viewer" })
+      .where(eq(publisherMemberships.userId, requesterUserId));
+
+    await expect(
+      beginPublisherClaimVerification(
+        db,
+        {
+          claimId: created.claimId,
+          requesterUserId,
+          returnTo: "/dashboard",
+          now: new Date("2026-09-01T12:00:00.000Z"),
+        },
+        makeStartDeps("state-demoted", "nonce-demoted", "pkce-demoted"),
+      ),
+    ).rejects.toThrow(/FORBIDDEN/i);
+    await expect(
+      withdrawPublisherClaim(db, { claimId: created.claimId, requesterUserId }),
+    ).rejects.toThrow(/FORBIDDEN/i);
+
+    await expect(
+      beginPublisherClaimVerification(
+        db,
+        {
+          claimId: created.claimId,
+          requesterUserId: adminUserId,
+          returnTo: "/dashboard",
+          now: new Date("2026-09-01T12:01:00.000Z"),
+        },
+        makeStartDeps("state-admin", "nonce-admin", "pkce-admin"),
+      ),
+    ).resolves.toMatchObject({ claimId: created.claimId });
+    await expect(
+      withdrawPublisherClaim(db, { claimId: created.claimId, requesterUserId: adminUserId }),
+    ).resolves.toMatchObject({ status: "withdrawn" });
   });
 
   it("re-derives publisher verification on revoke and only unlinks the server it still owns", async () => {

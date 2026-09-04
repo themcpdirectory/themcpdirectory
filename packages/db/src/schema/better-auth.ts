@@ -1,3 +1,4 @@
+import { relations } from "drizzle-orm";
 import { boolean, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 export const authUsers = pgTable(
@@ -69,3 +70,18 @@ export const authVerification = pgTable(
   },
   (t) => [index("verification_identifier_idx").on(t.identifier)],
 );
+
+// Better Auth's adapter traverses these relations for session lookup and OAuth
+// account linking. Missing either direction makes its relational queries fail.
+export const authUsersRelations = relations(authUsers, ({ many }) => ({
+  accounts: many(authAccounts),
+  sessions: many(authSessions),
+}));
+
+export const authSessionsRelations = relations(authSessions, ({ one }) => ({
+  user: one(authUsers, { fields: [authSessions.userId], references: [authUsers.id] }),
+}));
+
+export const authAccountsRelations = relations(authAccounts, ({ one }) => ({
+  user: one(authUsers, { fields: [authAccounts.userId], references: [authUsers.id] }),
+}));

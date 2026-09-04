@@ -1,7 +1,14 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import type { GithubProfile } from "better-auth/social-providers";
-import { createDatabase, type Database } from "@themcpdirectory/db";
+import {
+  authAccounts,
+  authSessions,
+  authUsers,
+  authVerification,
+  createDatabase,
+  type Database,
+} from "@themcpdirectory/db";
 import { loadWebEnv, resolveWebUrls, type WebEnv } from "@themcpdirectory/config";
 
 interface GitHubEmailRecord {
@@ -55,7 +62,19 @@ export function createAuth({ db, env, fetchImpl = fetch }: CreateAuthInput) {
     basePath: "/api/auth",
     trustedOrigins: [...trustedOrigins],
     secret: env.BETTER_AUTH_SECRET,
-    database: drizzleAdapter(db, { provider: "pg", camelCase: false }),
+    // This package's table export names (authUsers, authSessions, ...) don't match Better
+    // Auth's internal model names (user, session, ...); without an explicit mapping, every
+    // adapter lookup throws "model was not found in the schema object" at request time.
+    database: drizzleAdapter(db, {
+      provider: "pg",
+      camelCase: false,
+      schema: {
+        user: authUsers,
+        session: authSessions,
+        account: authAccounts,
+        verification: authVerification,
+      },
+    }),
     advanced: {
       database: {
         generateId: "uuid",

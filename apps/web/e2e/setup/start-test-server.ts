@@ -1,6 +1,12 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { prepareTestDatabase, TEST_DATABASE_URL, TEST_PORT } from "./test-database";
+import {
+  prepareTestDatabase,
+  TEST_BETTER_AUTH_SECRET,
+  TEST_DATABASE_URL,
+  TEST_GITHUB_APP_ENV,
+  TEST_PORT,
+} from "./test-database";
 
 async function main(): Promise<void> {
   await prepareTestDatabase();
@@ -15,6 +21,10 @@ async function main(): Promise<void> {
       MCP_REGISTRY_BASE_URL: "https://registry.modelcontextprotocol.io",
       WEB_PORT: TEST_PORT,
       API_PORT: "3001",
+      // Required by @themcpdirectory/config's loadWebEnv() so the dashboard/auth
+      // routes (getAuth()) don't throw at request time; never sent to GitHub here.
+      BETTER_AUTH_SECRET: TEST_BETTER_AUTH_SECRET,
+      ...TEST_GITHUB_APP_ENV,
     },
   });
 

@@ -296,12 +296,15 @@ async function resolveClaimSubjectId(
   }
 
   const [publisher] = await db
-    .select({ githubOrgId: publishers.githubOrgId })
+    .select({ githubOrg: publishers.githubOrg, githubOrgId: publishers.githubOrgId })
     .from(publishers)
     .where(eq(publishers.id, input.publisherId))
     .limit(1);
-  if (!publisher?.githubOrgId) {
+  if (!publisher?.githubOrg || !publisher.githubOrgId) {
     throw new Error("PUBLISHER_GITHUB_ORGANISATION_IDENTITY_MISSING");
+  }
+  if (repository.owner.toLowerCase() !== publisher.githubOrg.toLowerCase()) {
+    throw new Error("GITHUB_ORGANISATION_REPOSITORY_MISMATCH");
   }
   parseStableGitHubId(publisher.githubOrgId, "PUBLISHER_GITHUB_ORGANISATION_IDENTITY_INVALID");
   return publisher.githubOrgId;
@@ -333,6 +336,32 @@ async function assertRequesterMayClaimForPublisher(
   const role = own && PUBLISHER_ROLES.includes(own.role as PublisherRole) ? own.role : null;
   if (!role || !roleHasCapability(role as PublisherRole, "claims.manage")) {
     throw new PublisherClaimAuthorityError(input.publisherId);
+  }
+}
+
+async function assertUserMayManagePublisherClaims(
+  store: Pick<Database, "select">,
+  input: {
+    claimId: string;
+    publisherId: string;
+    originalRequesterUserId: string;
+    userId: string;
+  },
+): Promise<void> {
+  const memberships = await store
+    .select({ userId: publisherMemberships.userId, role: publisherMemberships.role })
+    .from(publisherMemberships)
+    .where(eq(publisherMemberships.publisherId, input.publisherId));
+
+  if (memberships.length === 0 && input.originalRequesterUserId === input.userId) return;
+
+  const membership = memberships.find(({ userId }) => userId === input.userId);
+  const role =
+    membership && PUBLISHER_ROLES.includes(membership.role as PublisherRole)
+      ? (membership.role as PublisherRole)
+      : null;
+  if (!role || !roleHasCapability(role, "claims.manage")) {
+    throw new PublisherClaimTransitionError(input.claimId, null, "FORBIDDEN");
   }
 }
 
@@ -517,8 +546,13 @@ export async function beginPublisherClaimVerification(
     const current = await lockClaimForTransition(tx, {
       claimId: input.claimId,
       allowed: OPEN_CLAIM_STATUSES,
-      requesterUserId: input.requesterUserId,
       requireUnexpired: true,
+    });
+    await assertUserMayManagePublisherClaims(tx, {
+      claimId: current.id,
+      publisherId: current.publisherId,
+      originalRequesterUserId: current.requesterUserId,
+      userId: input.requesterUserId,
     });
 
     // Only one live callback state may exist per claim.
@@ -1335,7 +1369,12 @@ export async function withdrawPublisherClaim(
     const current = await lockClaimForTransition(tx, {
       claimId: input.claimId,
       allowed: OPEN_CLAIM_STATUSES,
-      requesterUserId: input.requesterUserId,
+    });
+    await assertUserMayManagePublisherClaims(tx, {
+      claimId: current.id,
+      publisherId: current.publisherId,
+      originalRequesterUserId: current.requesterUserId,
+      userId: input.requesterUserId,
     });
 
     await tx

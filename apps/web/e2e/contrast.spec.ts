@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { seedPublisherSession } from "./setup/publisher-session-fixtures";
 
 interface Rgb {
   readonly red: number;
@@ -115,4 +116,26 @@ test("keeps the deleted-upstream warning visible in forced colors", async ({ pag
   expect(
     contrastRatio(warningStyle.paragraphColor, warningStyle.backgroundColor),
   ).toBeGreaterThanOrEqual(4.5);
+});
+
+test("keeps publisher controls visible and focused in forced colors", async ({ page, context }) => {
+  const session = await seedPublisherSession({ role: "owner" });
+  await context.addCookies([session.cookie]);
+  await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
+  await page.goto("/dashboard");
+
+  const submit = page.getByRole("button", { name: "Submit claim" });
+  await submit.focus();
+  const style = await submit.evaluate((element) => {
+    const computed = getComputedStyle(element);
+    return {
+      borderWidth: Number.parseFloat(computed.borderTopWidth),
+      outlineColor: computed.outlineColor,
+      outlineWidth: Number.parseFloat(computed.outlineWidth),
+    };
+  });
+
+  expect(style.borderWidth).toBeGreaterThanOrEqual(1);
+  expect(style.outlineWidth).toBeGreaterThanOrEqual(2);
+  expect(style.outlineColor).not.toBe("transparent");
 });
