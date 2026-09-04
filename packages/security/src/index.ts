@@ -1,4 +1,4 @@
-export { normalizeHttpUrl, validatePublicHttpUrl } from "./url.js";
+export { isPublicIpAddress, normalizeHttpUrl, validatePublicHttpUrl } from "./url.js";
 export type {
   DnsResolver,
   ValidateUrlOptions,
@@ -6,3 +6,12 @@ export type {
   UrlValidationOk,
   UrlValidationFail,
 } from "./url.js";
+export { performPinnedProbe } from "./remote-probe.js";
+export type {
+  PinnedDispatcherOptions,
+  PinnedProbeRequestOptions,
+  PinnedProbeResponse,
+  ProbeFetch,
+  ProbeRequestInit,
+  ProbeResponse,
+} from "./remote-probe.js";

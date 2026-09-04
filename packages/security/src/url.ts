@@ -1,5 +1,5 @@
 import { lookup } from "node:dns/promises";
-import { isIPv4, isIPv6 } from "node:net";
+import ipaddr from "ipaddr.js";
 
 export type DnsResolver = (hostname: string) => Promise<string[]>;
 
@@ -14,6 +14,8 @@ export interface ValidateUrlOptions {
 const fail = (reason: string): UrlValidationFail => ({ ok: false, reason });
 
 const LOCAL_SUFFIXES = [".local", ".localhost"];
+const GLOBAL_IPV6_UNICAST = ipaddr.parseCIDR("2000::/3");
+const FORMER_6BONE = ipaddr.parseCIDR("3ffe::/16");
 
 export function normalizeHttpUrl(value: string): string | null {
   let parsed: URL;
@@ -49,55 +51,22 @@ const defaultResolve: DnsResolver = async (hostname: string) => {
   return results;
 };
 
-function isBlockedIpv4(ip: string): boolean {
-  const parts = ip.split(".");
-  if (parts.length !== 4) return true;
-  const octets = parts.map(Number);
-  if (octets.some((o) => Number.isNaN(o) || o < 0 || o > 255)) return true;
+export function isPublicIpAddress(value: string): boolean {
+  const normalized = value.toLowerCase().replace(/^\[|\]$/g, "");
+  if (!ipaddr.isValid(normalized)) return false;
 
-  const [a, b] = octets as [number, number];
-
-  if (a === 127) return true; // loopback
-  if (a === 10) return true; // 10.0.0.0/8
-  if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
-  if (a === 192 && b === 168) return true; // 192.168.0.0/16
-  if (a === 169 && b === 254) return true; // link-local
-  if (a === 0) return true; // unspecified/current-network
-  if (a >= 224) return true; // multicast + reserved + broadcast
-  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT 100.64.0.0/10
-
-  return false;
-}
-
-function isBlockedIpv6(ip: string): boolean {
-  const normalized = ip.toLowerCase().replace(/^\[|\]$/g, "");
-
-  if (normalized === "::1") return true;
-  if (normalized === "::") return true;
-
-  // fc00::/7 (unique-local)
-  if (/^f[cd][0-9a-f]{2}:/.test(normalized)) return true;
-
-  // fe80::/10 (link-local)
-  if (/^fe[89ab][0-9a-f]:/.test(normalized)) return true;
-
-  // ::ffff:x.x.x.x (IPv4-mapped IPv6 — dotted-decimal form)
-  const v4mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-  if (v4mapped) return isBlockedIpv4(v4mapped[1]!);
-
-  // ::ffff:HHHH:HHHH (IPv4-mapped IPv6 — hex form, e.g. ::ffff:c0a8:101)
-  const v4hex = normalized.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
-  if (v4hex) {
-    const hi = parseInt(v4hex[1]!, 16);
-    const lo = parseInt(v4hex[2]!, 16);
-    const mapped = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
-    return isBlockedIpv4(mapped);
+  const address = ipaddr.parse(normalized);
+  if (address instanceof ipaddr.IPv6 && address.isIPv4MappedAddress()) {
+    return isPublicIpAddress(address.toIPv4Address().toString());
   }
-
-  // multicast ff00::/8
-  if (normalized.startsWith("ff")) return true;
-
-  return false;
+  if (address instanceof ipaddr.IPv6) {
+    return (
+      address.range() === "unicast" &&
+      address.match(GLOBAL_IPV6_UNICAST) &&
+      !address.match(FORMER_6BONE)
+    );
+  }
+  return address.range() === "unicast";
 }
 
 function tryParseObfuscatedIp(hostname: string): string | null {
@@ -176,20 +145,15 @@ export async function validatePublicHttpUrl(
   // Check for bracket-stripped IPv6
   const rawHost = hostname.replace(/^\[|\]$/g, "");
 
-  if (isIPv6(rawHost) || rawHost.startsWith("::")) {
-    if (isBlockedIpv6(rawHost)) return fail("blocked IPv6 address");
-    return { ok: true, url: parsed.href };
-  }
-
-  if (isIPv4(rawHost)) {
-    if (isBlockedIpv4(rawHost)) return fail("blocked IPv4 address");
+  if (ipaddr.isValid(rawHost)) {
+    if (!isPublicIpAddress(rawHost)) return fail("blocked IP address");
     return { ok: true, url: parsed.href };
   }
 
   // Obfuscated IP detection
   const obfuscated = tryParseObfuscatedIp(hostname);
   if (obfuscated !== null) {
-    if (isBlockedIpv4(obfuscated)) return fail("blocked obfuscated IP address");
+    if (!isPublicIpAddress(obfuscated)) return fail("blocked obfuscated IP address");
     return { ok: true, url: parsed.href };
   }
 
@@ -202,13 +166,10 @@ export async function validatePublicHttpUrl(
     return fail("DNS resolution failed");
   }
 
+  if (addresses.length === 0) return fail("DNS resolution returned no addresses");
+
   for (const addr of addresses) {
-    if (isIPv4(addr) && isBlockedIpv4(addr)) {
-      return fail("hostname resolves to blocked address");
-    }
-    if (isIPv6(addr) && isBlockedIpv6(addr)) {
-      return fail("hostname resolves to blocked IPv6 address");
-    }
+    if (!isPublicIpAddress(addr)) return fail("hostname resolves to blocked address");
   }
 
   return { ok: true, url: parsed.href };

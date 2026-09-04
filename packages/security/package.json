@@ -18,5 +18,9 @@
     "eslint": "9.39.5",
     "typescript": "5.9.3",
     "vitest": "4.1.11"
+  },
+  "dependencies": {
+    "ipaddr.js": "2.2.0",
+    "undici": "8.10.1"
   }
 }
