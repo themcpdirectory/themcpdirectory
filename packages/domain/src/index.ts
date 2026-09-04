@@ -102,3 +102,13 @@ export {
   type RemoteProbeEligibilityOptions,
   type RemoteProbeEligibilityResult,
 } from "./health/remote-probe-eligibility.js";
+
+export { getLatestRemoteHealthObservation } from "./health/get-latest-remote-health.js";
+
+export {
+  runRemoteHealthCheck,
+  type ForbiddenStdioSideEffects,
+  type PersistedRemoteHealthObservation,
+  type RemoteHealthProbeOptions,
+  type RunRemoteHealthCheckInput,
+} from "./health/run-remote-health-check.js";
