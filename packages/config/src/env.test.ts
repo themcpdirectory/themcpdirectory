@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { loadApiEnv, loadEnv } from "./env.js";
+import { loadApiEnv, loadEnv, loadWebEnv, resolveWebUrls } from "./env.js";
 
 const BASE_ENV = {
   DATABASE_URL: "postgresql://user:pass@localhost:5432/db",
@@ -98,5 +98,43 @@ describe("loadEnv", () => {
 
   it("throws when DATABASE_URL is not a URL", () => {
     expect(() => loadEnv({ ...BASE_ENV, DATABASE_URL: "not-a-url" })).toThrow();
+  });
+});
+
+describe("loadWebEnv", () => {
+  it("keeps web/auth variables out of loadEnv and requires them in loadWebEnv", () => {
+    const shared = loadEnv({
+      DATABASE_URL: "postgresql://localhost:5432/themcpdirectory",
+      MCP_REGISTRY_BASE_URL: "https://registry.modelcontextprotocol.io",
+    });
+
+    expect(shared).not.toHaveProperty("NEXT_PUBLIC_BASE_URL");
+
+    expect(() =>
+      loadWebEnv({
+        DATABASE_URL: "postgresql://localhost:5432/themcpdirectory",
+        MCP_REGISTRY_BASE_URL: "https://registry.modelcontextprotocol.io",
+        NEXT_PUBLIC_BASE_URL: "http://localhost:3000",
+      }),
+    ).toThrow(/BETTER_AUTH_SECRET/);
+  });
+
+  it("rejects a Better Auth URL with a different origin than the canonical site origin", () => {
+    expect(() =>
+      resolveWebUrls(
+        loadWebEnv({
+          DATABASE_URL: "postgresql://localhost:5432/themcpdirectory",
+          MCP_REGISTRY_BASE_URL: "https://registry.modelcontextprotocol.io",
+          NEXT_PUBLIC_BASE_URL: "http://localhost:3000",
+          BETTER_AUTH_URL: "https://auth.example.com/api/auth",
+          BETTER_AUTH_SECRET: "01234567890123456789012345678901",
+          GITHUB_CLIENT_ID: "github-client-id",
+          GITHUB_CLIENT_SECRET: "github-client-secret",
+          GITHUB_APP_ID: "12345",
+          GITHUB_APP_PRIVATE_KEY: "test-private-key",
+          GITHUB_APP_SLUG: "themcpdirectory",
+        }),
+      ),
+    ).toThrow(/same origin/i);
   });
 });

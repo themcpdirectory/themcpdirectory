@@ -13,11 +13,13 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@themcpdirectory/auth": "workspace:*",
     "@themcpdirectory/config": "workspace:*",
     "@themcpdirectory/db": "workspace:*",
     "@themcpdirectory/domain": "workspace:*",
     "@themcpdirectory/security": "workspace:*",
     "@themcpdirectory/ui": "workspace:*",
+    "better-auth": "1.7.2",
     "next": "16.3.4",
     "postgres": "3.4.7",
     "react": "19.2.8",

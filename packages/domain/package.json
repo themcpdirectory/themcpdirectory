@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@themcpdirectory/api-contract": "workspace:*",
+    "@themcpdirectory/auth": "workspace:*",
     "@themcpdirectory/client-adapters": "workspace:*",
     "@themcpdirectory/db": "workspace:*",
     "@themcpdirectory/search": "workspace:*",
