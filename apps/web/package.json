@@ -20,10 +20,12 @@
     "@themcpdirectory/security": "workspace:*",
     "@themcpdirectory/ui": "workspace:*",
     "better-auth": "1.7.2",
+    "drizzle-orm": "0.45.2",
     "next": "16.3.4",
     "postgres": "3.4.7",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",
