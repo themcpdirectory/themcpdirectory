@@ -120,3 +120,18 @@ export {
   refreshTrustProfile,
   type RefreshTrustProfileInput,
 } from "./trust/refresh-trust-profile.js";
+
+export {
+  getPublisherDashboard,
+  type PublisherDashboard,
+  type PublisherMemberSummary,
+  type PublisherMembershipSummary,
+} from "./publisher/dashboard.js";
+
+export {
+  removePublisherMembership,
+  requirePublisherAccess,
+  updatePublisherMembershipRole,
+} from "./publisher/memberships.js";
+
+export { appendAuditEvent, type AuditEventInput } from "./publisher/audit.js";
