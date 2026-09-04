@@ -1,5 +1,6 @@
 import type { ClientId, ClientScope } from "@themcpdirectory/install-engine";
 import type { CliDependencies } from "../dependencies.js";
+import { sanitizeTerminalText } from "../output/render.js";
 import { executeAddCommand, type AddExecutionResult } from "./add-execute.js";
 import { planAddCommand, type AddCommandOptions, type TargetInstallPreview } from "./add-plan.js";
 import type { CommandResult } from "./result.js";
@@ -29,7 +30,9 @@ export async function runAddCliCommand(
   }
 
   const { previews, confirmationMessage } = planning.stdout.data;
-  const warnings = [...new Set(previews.flatMap((preview) => preview.warnings))];
+  const warnings = [
+    ...new Set([...planning.warnings, ...previews.flatMap((preview) => preview.warnings)]),
+  ];
   if (parsed.options.dryRun) {
     return success(
       previews.map((preview) => skippedTarget(preview, preview.plan.previewLines.join(" "))),
@@ -52,7 +55,7 @@ export async function runAddCliCommand(
       );
     }
 
-    if (!(await deps.promptIO.confirm(confirmationMessage))) {
+    if (!(await deps.promptIO.confirm(sanitizeTerminalText(confirmationMessage)))) {
       const targets = previews.map((preview) =>
         skippedTarget(preview, "Installation was cancelled."),
       );

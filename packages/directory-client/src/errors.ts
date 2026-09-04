@@ -3,7 +3,8 @@ export type DirectoryClientErrorCode =
   | "DIRECTORY_TIMEOUT"
   | "DIRECTORY_INVALID_RESPONSE"
   | "DIRECTORY_AMBIGUOUS"
-  | "DIRECTORY_INSTALL_UNAVAILABLE";
+  | "DIRECTORY_INSTALL_UNAVAILABLE"
+  | "DIRECTORY_UPSTREAM_DELETED";
 
 export class DirectoryClientError extends Error {
   constructor(

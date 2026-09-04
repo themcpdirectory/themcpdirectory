@@ -367,6 +367,18 @@ async function checkServerDetail(
         recoveryHint: `Review current listing details with: mcpdir info ${receipt.slug}`,
       });
     }
+
+    if (detail.latestHealth) {
+      const health = detail.latestHealth;
+      checks.push({
+        name: `Remote health: ${receipt.slug}`,
+        status: health.outcome === "healthy" ? "ok" : "warning",
+        message: `Latest remote health: ${health.outcome} (checked ${health.checkedAt}${health.httpStatus === null ? "" : `, HTTP ${health.httpStatus}`}).`,
+        ...(health.outcome === "healthy"
+          ? {}
+          : { recoveryHint: `Review current listing details with: mcpdir info ${receipt.slug}` }),
+      });
+    }
   } catch (error) {
     checks.push({
       name: `Upstream: ${receipt.slug}`,
@@ -502,7 +514,11 @@ function hasEnvironmentValue(environment: Readonly<NodeJS.ProcessEnv>, name: str
 }
 
 function isInstallUnavailable(error: unknown): boolean {
-  return errorCode(error) === "DIRECTORY_INSTALL_UNAVAILABLE" || errorStatus(error) === 410;
+  return (
+    errorCode(error) === "DIRECTORY_INSTALL_UNAVAILABLE" ||
+    errorCode(error) === "DIRECTORY_UPSTREAM_DELETED" ||
+    errorStatus(error) === 410
+  );
 }
 
 function errorCode(error: unknown): string | undefined {

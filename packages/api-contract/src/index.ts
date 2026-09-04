@@ -50,6 +50,7 @@ export {
   type SupportedClientId,
 } from "./public-api/servers.js";
 export {
+  parseApiErrorResponse,
   parseCategoriesCollectionResponse,
   parseCategoryDetailResponse,
   parseClientDetailResponse,

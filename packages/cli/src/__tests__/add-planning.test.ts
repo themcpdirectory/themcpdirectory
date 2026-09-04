@@ -7,6 +7,7 @@ import type {
   RemoveVerificationResult,
 } from "@themcpdirectory/client-adapters";
 import { CodexAdapterError } from "@themcpdirectory/client-adapters";
+import { DirectoryClientError } from "@themcpdirectory/directory-client";
 import type {
   AdapterCapability,
   AdapterSafetyDescriptor,
@@ -102,6 +103,43 @@ describe("planAddCommand", () => {
     expect(adapter.state.planCalls).toHaveLength(1);
     expect(adapter.state.executeCalls.current).toBe(0);
     expect(adapter.state.verifyCalls.current).toBe(0);
+  });
+
+  it("blocks a deleted-upstream install before detection, prompts, or adapter planning", async () => {
+    const adapter = createFakeAdapter({
+      id: "codex",
+      detection: createDetection("codex", { installed: true }),
+    });
+    const deps = createCliDependencies({
+      manifest: makePackageManifest(),
+      adapters: [adapter],
+      resolveInstallError: new DirectoryClientError(
+        "DIRECTORY_UPSTREAM_DELETED",
+        "HTTP 410 for deleted install",
+        410,
+      ),
+    });
+
+    const result = await planAddCommand(
+      {
+        identifier: "deleted",
+        targetClients: ["codex"],
+        dryRun: false,
+        yes: false,
+        json: false,
+      },
+      deps,
+    );
+
+    expect(result.stdout?.error).toEqual({
+      code: "UPSTREAM_DELETED",
+      message: "Installation blocked: Listing deleted upstream.",
+    });
+    expect(adapter.state.detectCalls.current).toBe(0);
+    expect(adapter.state.planCalls).toEqual([]);
+    expect(deps.prompt.selectCalls).toEqual([]);
+    expect(deps.prompt.inputCalls).toEqual([]);
+    expect(deps.prompt.secretInputCalls).toEqual([]);
   });
 
   it("resolves aliases and plans every explicitly requested client", async () => {
@@ -300,6 +338,15 @@ describe("planAddCommand", () => {
     });
     const deps = createCliDependencies({
       manifest: makeRemoteManifest({
+        latestHealth: {
+          schemaVersion: 1,
+          outcome: "degraded",
+          checkedAt: "2026-09-03T11:55:00.000Z",
+          durationMs: 840,
+          httpStatus: 503,
+          finalOrigin: "https://example.com",
+          redirectCount: 0,
+        },
         variants: [
           makeRemoteVariant({
             headers: [{ name: "Authorization", value: "Bearer {token}" }],
@@ -315,11 +362,67 @@ describe("planAddCommand", () => {
     expect(result.exitCode).toBe(0);
     expect(prompt.inputCalls).toEqual([]);
     expect(prompt.secretInputCalls).toHaveLength(1);
-    expect(result.warnings).toEqual([expect.stringContaining("persisted secret")]);
+    expect(result.warnings).toEqual([
+      "Latest remote health: degraded (checked 2026-09-03T11:55:00.000Z).",
+      expect.stringContaining("persisted secret"),
+    ]);
     expect(renderHumanEnvelope(result.stdout!)).toEqual(
       expect.arrayContaining([expect.stringContaining("Warning: Remote auth")]),
     );
     expect(JSON.stringify(result.stdout)).not.toContain("raw_persisted_secret");
+  });
+
+  it("sanitizes Directory text before variant and confirmation prompts", async () => {
+    const adapter = createFakeAdapter({
+      id: "codex",
+      detection: createDetection("codex", {
+        installed: true,
+        capabilities: ["native-add-stdio", "env-reference", "native-scope-user"],
+      }),
+    });
+    const prompt = createPromptIoDouble({
+      isInteractive: true,
+      selectResponses: ["safe?package@1.2.3 (stdio) [33333333-3333-4333-8333-333333333333]"],
+      confirmResponses: [false],
+    });
+    const result = await runAddCliCommand(
+      ["github", "--to", "codex"],
+      createCliDependencies({
+        manifest: makePackageManifest({
+          server: {
+            id: "6c82758f-ec36-40f8-9a86-88d9f5410c4a",
+            slug: "github",
+            title: "GitHub\u202eDirectory",
+            version: "1.2.3",
+          },
+          variants: [
+            makePackageVariant({ identifier: "safe\u001bpackage" }),
+            makePackageVariant({
+              id: "33333333-3333-4333-8333-333333333333",
+              identifier: "safe?package",
+            }),
+          ],
+        }),
+        adapters: [adapter],
+        environment: { GITHUB_TOKEN: "ghs_available" },
+        prompt,
+      }),
+    );
+
+    expect(result.stdout?.error?.code).toBe("USER_CANCELLED");
+    expect(prompt.selectCalls[0]).toEqual({
+      message: "Select an install variant for GitHub?Directory in codex.",
+      options: [
+        "safe?package@1.2.3 (stdio) [11111111-1111-4111-8111-111111111111]",
+        "safe?package@1.2.3 (stdio) [33333333-3333-4333-8333-333333333333]",
+      ],
+    });
+    expect(adapter.state.planCalls[0]?.intent.variant.id).toBe(
+      "33333333-3333-4333-8333-333333333333",
+    );
+    expect(prompt.confirmCalls).toEqual([
+      "Ready to install GitHub?Directory for 1 target: Codex (user).",
+    ]);
   });
 
   it("blocks unsupported capability-gated remote variants without executing mutations", async () => {
@@ -670,6 +773,7 @@ function createCliDependencies(options: {
   readonly adapters: readonly (McpClientAdapter & { readonly state: FakeAdapterState })[];
   readonly prompt?: PromptIoDouble;
   readonly environment?: Readonly<NodeJS.ProcessEnv>;
+  readonly resolveInstallError?: Error;
 }): CliDependencies & {
   readonly resolveInstallCalls: string[];
   readonly prompt: PromptIoDouble;
@@ -687,6 +791,7 @@ function createCliDependencies(options: {
     directoryClient: {
       resolveInstall: async (identifier: string) => {
         resolveInstallCalls.push(identifier);
+        if (options.resolveInstallError) throw options.resolveInstallError;
         return manifestResponse;
       },
     } as unknown as CliDependencies["directoryClient"],

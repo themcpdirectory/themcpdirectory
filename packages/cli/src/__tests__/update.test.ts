@@ -84,6 +84,7 @@ function preview(slug: string, client: ClientId, version: string): TargetInstall
 function dependencies(
   receipts: InstallationReceipt[],
   confirmations: boolean[] = [],
+  deletedSlugs: readonly string[] = [],
 ): CliDependencies & {
   readonly stdoutLines: string[];
   readonly confirmationMessages: string[];
@@ -93,6 +94,16 @@ function dependencies(
   return {
     stdoutLines,
     confirmationMessages,
+    directoryClient: {
+      async getServer(slug: string) {
+        return {
+          data: {
+            listingStatus: deletedSlugs.includes(slug) ? "deleted_upstream" : "active",
+          },
+          meta: { requestId: `req_${slug}` },
+        };
+      },
+    } as unknown as CliDependencies["directoryClient"],
     receiptStore: {
       async list() {
         return receipts;
@@ -151,6 +162,10 @@ describe("runUpdateCommand", () => {
     mocks.planAddCommand.mockImplementation(
       async (options: { identifier: string; targetClients: readonly ClientId[] }) => {
         const target = preview(options.identifier, options.targetClients[0]!, "1.0.0-rc.1+build.7");
+        const warnings =
+          options.identifier === "github"
+            ? ["Latest remote health: degraded (checked 2026-09-03T11:55:00.000Z)."]
+            : [];
         return {
           exitCode: 0,
           stdout: {
@@ -158,10 +173,10 @@ describe("runUpdateCommand", () => {
             command: "add",
             ok: true,
             data: { previews: [target], confirmationMessage: "unused" },
-            warnings: [],
+            warnings,
           },
           stderrLines: [],
-          warnings: [],
+          warnings,
         };
       },
     );
@@ -183,8 +198,12 @@ describe("runUpdateCommand", () => {
       },
     });
     expect(mocks.executeAddCommand).not.toHaveBeenCalled();
+    expect(dryRun.warnings).toEqual([
+      "Latest remote health: degraded (checked 2026-09-03T11:55:00.000Z).",
+    ]);
     expect(renderHumanEnvelope(dryRun.stdout!)).toEqual([
       expect.stringContaining("github (codex, user): dry run."),
+      "Warning: Latest remote health: degraded (checked 2026-09-03T11:55:00.000Z).",
     ]);
     expect(mocks.planAddCommand).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -283,6 +302,19 @@ describe("runUpdateCommand", () => {
       skipped: ["No Directory-managed installations matched."],
     });
     expect(mocks.planAddCommand).not.toHaveBeenCalled();
+
+    mocks.planAddCommand.mockClear();
+    mocks.executeAddCommand.mockClear();
+    const deleted = await runUpdateCommand(
+      { yes: true, dryRun: false, json: true },
+      dependencies([receipt("alpha", "cursor"), receipt("z-deleted", "codex")], [], ["z-deleted"]),
+    );
+    expect(deleted.stdout?.error).toEqual({
+      code: "UPSTREAM_DELETED",
+      message: "Update blocked: Listing deleted upstream; no changes were made.",
+    });
+    expect(mocks.planAddCommand).not.toHaveBeenCalled();
+    expect(mocks.executeAddCommand).not.toHaveBeenCalled();
 
     const cliDeps = dependencies([]);
     await expect(runCli(["update", "--json"], cliDeps)).resolves.toBe(0);

@@ -1,4 +1,5 @@
 import { parseSemVer, type ClientId } from "@themcpdirectory/install-engine";
+import { DirectoryClientError } from "@themcpdirectory/directory-client";
 import type { InstallationReceipt } from "../config/receipt-store.js";
 import type { CliDependencies } from "../dependencies.js";
 import { sanitizeTerminalText } from "../output/render.js";
@@ -81,6 +82,11 @@ export async function runUpdateCommand(
     });
   }
 
+  const listingPreflight = await preflightUpdateListings(receipts, deps);
+  if (!listingPreflight.ok) {
+    return failure([], [], listingPreflight.code, listingPreflight.message);
+  }
+
   const candidates: UpdateCandidate[] = [];
   const skipped: string[] = [];
   const planningFailures: string[] = [];
@@ -103,6 +109,15 @@ export async function runUpdateCommand(
 
     const preview = planned.stdout?.data?.previews[0];
     if (planned.exitCode !== 0 || !preview) {
+      if (planned.stdout?.error?.code === "UPSTREAM_DELETED") {
+        return failure(
+          [],
+          skipped,
+          "UPSTREAM_DELETED",
+          "Update blocked: Listing deleted upstream; no changes were made.",
+          warnings,
+        );
+      }
       const reason = planned.stdout?.error?.message ?? "Update planning failed.";
       planningFailures.push(`${targetLabel(receipt)}: ${reason}`);
       continue;
@@ -219,6 +234,47 @@ export async function runUpdateCommand(
   }
 
   return createSuccessResult(COMMAND_NAME, { exitCode: 0, updated, skipped }, warnings);
+}
+
+async function preflightUpdateListings(
+  receipts: readonly InstallationReceipt[],
+  deps: CliDependencies,
+): Promise<
+  { readonly ok: true } | { readonly ok: false; readonly code: string; readonly message: string }
+> {
+  const checkedSlugs = new Set<string>();
+  for (const receipt of receipts) {
+    if (checkedSlugs.has(receipt.slug)) continue;
+    checkedSlugs.add(receipt.slug);
+
+    try {
+      const detail = (await deps.directoryClient.getServer(receipt.slug)).data;
+      if (
+        detail.listingStatus === "deleted_upstream" ||
+        detail.installAvailability === "upstream_deleted"
+      ) {
+        return {
+          ok: false,
+          code: "UPSTREAM_DELETED",
+          message: "Update blocked: Listing deleted upstream; no changes were made.",
+        };
+      }
+    } catch (error) {
+      if (error instanceof DirectoryClientError && error.code === "DIRECTORY_UPSTREAM_DELETED") {
+        return {
+          ok: false,
+          code: "UPSTREAM_DELETED",
+          message: "Update blocked: Listing deleted upstream; no changes were made.",
+        };
+      }
+      return {
+        ok: false,
+        code: "UPDATE_PLANNING_FAILED",
+        message: "Update listings could not be checked; no changes were made.",
+      };
+    }
+  }
+  return { ok: true };
 }
 
 function parseUpdateArgs(

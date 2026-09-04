@@ -4,6 +4,7 @@ import {
   parseResolvedServerResponse,
   parseServerCollectionResponse,
   parseServerDetailResponse,
+  parseApiErrorResponse,
   UnsupportedManifestVersionError,
   type ClientsCollectionResponse,
   type InstallManifestResponse,
@@ -20,6 +21,8 @@ export interface DirectoryClientOptions {
   readonly fetchImpl?: typeof fetch;
   readonly userAgent?: string;
 }
+
+const MAX_ERROR_BODY_BYTES = 64 * 1024;
 
 export interface SearchServersParams {
   readonly q?: string;
@@ -89,8 +92,7 @@ export class DirectoryClient {
       });
 
       if (!response.ok) {
-        response.body?.cancel().catch(() => {});
-        throw this.#httpErrorFor(path, response.status);
+        throw await this.#httpErrorFor(path, response);
       }
 
       try {
@@ -137,9 +139,15 @@ export class DirectoryClient {
     }
   }
 
-  #httpErrorFor(path: string, status: number): DirectoryClientError {
+  async #httpErrorFor(path: string, response: Response): Promise<DirectoryClientError> {
+    const status = response.status;
+    const apiErrorCode = await readApiErrorCode(response);
     if (status === 409) {
       return new DirectoryClientError("DIRECTORY_AMBIGUOUS", `HTTP 409 for ${path}`, status);
+    }
+
+    if (status === 410 && apiErrorCode === "UPSTREAM_DELETED") {
+      return new DirectoryClientError("DIRECTORY_UPSTREAM_DELETED", `HTTP 410 for ${path}`, status);
     }
 
     if (status === 410 && path.includes("/install")) {
@@ -151,6 +159,40 @@ export class DirectoryClient {
     }
 
     return new DirectoryClientError("DIRECTORY_HTTP_ERROR", `HTTP ${status} for ${path}`, status);
+  }
+}
+
+async function readApiErrorCode(response: Response) {
+  try {
+    const body = await readBoundedErrorBody(response);
+    if (body === undefined) return undefined;
+    return parseApiErrorResponse(JSON.parse(body) as unknown).error.code;
+  } catch (error) {
+    if (isAbortError(error)) throw error;
+    return undefined;
+  }
+}
+
+async function readBoundedErrorBody(response: Response): Promise<string | undefined> {
+  const reader = response.body?.getReader();
+  if (!reader) return undefined;
+
+  const decoder = new TextDecoder();
+  let byteCount = 0;
+  let body = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) return body + decoder.decode();
+      byteCount += value.byteLength;
+      if (byteCount > MAX_ERROR_BODY_BYTES) {
+        await reader.cancel();
+        return undefined;
+      }
+      body += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    reader.releaseLock();
   }
 }
 

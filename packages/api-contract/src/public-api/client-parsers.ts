@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { apiErrorCodeSchema, type ApiErrorCode } from "./errors.js";
 import type {
   CategoriesCollectionResponse,
   CategoryDetailResponse,
@@ -43,6 +44,21 @@ export class UnsupportedManifestVersionError extends Error {
     );
     this.name = "UnsupportedManifestVersionError";
   }
+}
+
+const errorResponseClientSchema = clientObject({
+  error: clientObject({
+    code: apiErrorCodeSchema,
+    message: z.string().min(1),
+    requestId: requestIdSchema,
+    details: z.array(clientObject({ path: z.string(), message: z.string() })).optional(),
+  }),
+});
+
+export function parseApiErrorResponse(input: unknown): {
+  readonly error: { readonly code: ApiErrorCode };
+} {
+  return errorResponseClientSchema.parse(input);
 }
 
 const publisherSummaryClientSchema = clientObject({
@@ -416,6 +432,7 @@ const installManifestClientSchema = clientObject({
     "claude-code": compatibilityStatusSchema.optional(),
     codex: compatibilityStatusSchema.optional(),
     cursor: compatibilityStatusSchema.optional(),
+    vscode: compatibilityStatusSchema.optional(),
   }),
 });
 

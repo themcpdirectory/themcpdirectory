@@ -168,6 +168,29 @@ function renderInfoEnvelope(response: ServerDetailResponse): readonly string[] {
     lines.push(`  Version: ${data.version}`);
   }
 
+  lines.push(`  Listing status: ${data.listingStatus}`);
+  if (data.installAvailability) {
+    lines.push(`  Install availability: ${data.installAvailability}`);
+  }
+
+  for (const signal of data.trustProfile.signals) {
+    lines.push(
+      `  Trust signal: ${signal.key}=${signal.status}${signal.summary ? ` - ${signal.summary}` : ""}`,
+    );
+  }
+
+  if (data.latestHealth) {
+    const health = data.latestHealth;
+    const observations = [
+      `checked ${health.checkedAt}`,
+      `${health.durationMs}ms`,
+      ...(health.httpStatus === null ? [] : [`HTTP ${health.httpStatus}`]),
+      `${health.redirectCount} redirect${health.redirectCount === 1 ? "" : "s"}`,
+      ...(health.finalOrigin === null ? [] : [`origin ${health.finalOrigin}`]),
+    ];
+    lines.push(`  Latest remote health: ${health.outcome} (${observations.join(", ")})`);
+  }
+
   if (data.categories.length > 0) {
     lines.push(
       `  Categories: ${data.categories.map((category: { readonly name: string }) => category.name).join(", ")}`,

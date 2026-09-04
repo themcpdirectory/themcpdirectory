@@ -1,6 +1,11 @@
 import { createFixtureDirectoryApiServer } from "@themcpdirectory/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
-import { clientsResponseFixture, searchServersResponseFixture } from "../fixtures.js";
+import {
+  clientsResponseFixture,
+  resolveServerResponseFixture,
+  searchServersResponseFixture,
+  serverDetailResponseFixture,
+} from "../fixtures.js";
 import { DirectoryClient, DirectoryClientError, type DirectoryClientErrorCode } from "../index.js";
 
 describe("DirectoryClient", () => {
@@ -145,6 +150,42 @@ describe("DirectoryClient", () => {
 
   it("returns full validated envelopes and preserves additive manifest fields", async () => {
     const additiveServer = await startServer({
+      resolveServerBody: {
+        ...resolveServerResponseFixture,
+        data: {
+          ...resolveServerResponseFixture.data,
+          installAvailability: "available",
+          futureResolveField: "preserved",
+        },
+      },
+      serverDetailBody: {
+        ...serverDetailResponseFixture,
+        data: {
+          ...serverDetailResponseFixture.data,
+          trustProfile: {
+            ...serverDetailResponseFixture.data.trustProfile,
+            signals: [
+              {
+                key: "official_registry",
+                status: "positive",
+                summary: "Listed in the official MCP registry.",
+                checkedAt: "2026-09-01T12:00:00Z",
+              },
+            ],
+          },
+          latestHealth: {
+            schemaVersion: 1,
+            outcome: "healthy",
+            checkedAt: "2026-09-01T12:00:00Z",
+            durationMs: 42,
+            httpStatus: 200,
+            finalOrigin: "https://api.example.com",
+            redirectCount: 0,
+          },
+          installAvailability: "available",
+          futureDetailField: "preserved",
+        },
+      },
       resolveInstallBody: {
         data: {
           schemaVersion: 1,
@@ -191,7 +232,25 @@ describe("DirectoryClient", () => {
             codex: "supported",
             "claude-code": "supported_with_configuration",
             cursor: "unknown",
+            vscode: "supported",
           },
+          trustProfile: {
+            officialRegistry: true,
+            publisherVerified: true,
+            sourceAvailable: true,
+            openSource: true,
+            signals: [],
+          },
+          latestHealth: {
+            schemaVersion: 1,
+            outcome: "healthy",
+            checkedAt: "2026-09-01T12:00:00Z",
+            durationMs: 42,
+            httpStatus: 200,
+            finalOrigin: "https://api.example.com",
+            redirectCount: 0,
+          },
+          installAvailability: "available",
           futureTopLevelField: "preserved",
         },
         meta: { requestId: "req_directory_client_006", futureMetaField: "preserved" },
@@ -200,9 +259,23 @@ describe("DirectoryClient", () => {
 
     const additiveClient = createClient(additiveServer.baseUrl);
 
+    const resolvedResponse = await additiveClient.resolveServer("github/server");
+    expect(resolvedResponse.data.installAvailability).toBe("available");
+    expect((resolvedResponse.data as Record<string, unknown>).futureResolveField).toBe("preserved");
+
+    const detailResponse = await additiveClient.getServer("github-server");
+    expect(detailResponse.data.trustProfile.signals[0]?.key).toBe("official_registry");
+    expect(detailResponse.data.latestHealth?.outcome).toBe("healthy");
+    expect(detailResponse.data.installAvailability).toBe("available");
+    expect((detailResponse.data as Record<string, unknown>).futureDetailField).toBe("preserved");
+
     const manifestResponse = await additiveClient.resolveInstall("github/server");
 
     expect(manifestResponse.meta.requestId).toBe("req_directory_client_006");
+    expect(manifestResponse.data.trustProfile?.officialRegistry).toBe(true);
+    expect(manifestResponse.data.latestHealth?.outcome).toBe("healthy");
+    expect(manifestResponse.data.installAvailability).toBe("available");
+    expect(manifestResponse.data.compatibility.vscode).toBe("supported");
     expect((manifestResponse.meta as Record<string, unknown>).futureMetaField).toBe("preserved");
     expect((manifestResponse.data as Record<string, unknown>).futureTopLevelField).toBe(
       "preserved",
@@ -276,6 +349,23 @@ describe("DirectoryClient", () => {
       message: /search/,
     });
 
+    const deletedServer = await startServer({
+      statusOverrides: { resolveInstall: 410 },
+      resolveInstallBody: {
+        error: {
+          code: "UPSTREAM_DELETED",
+          message: "Listing was deleted upstream",
+          requestId: "req_directory_client_deleted",
+          futureErrorField: "preserved",
+        },
+        futureEnvelopeField: "preserved",
+      },
+    });
+    await expectDirectoryError(createClient(deletedServer.baseUrl).resolveInstall("deleted"), {
+      code: "DIRECTORY_UPSTREAM_DELETED",
+      status: 410,
+    });
+
     expect(requestPaths).toEqual([
       "/api/v1/resolve/github%2Fserver%20ambiguity%3Fvalue%3Dtwo",
       "/api/v1/resolve/github%2Fserver%20unavailable%3Finstall%3D1/install",
@@ -331,6 +421,26 @@ describe("DirectoryClient", () => {
     const client = createClient(server.baseUrl, 10);
 
     await expectDirectoryError(client.resolveInstall("github/server slow"), {
+      code: "DIRECTORY_TIMEOUT",
+      status: undefined,
+      message: /10ms/,
+    });
+
+    const stalledBodyClient = new DirectoryClient({
+      baseUrl: "https://directory.example/api/v1",
+      timeoutMs: 10,
+      fetchImpl: async (_input, init) =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode('{"error":'));
+              init?.signal?.addEventListener("abort", () => controller.error(init.signal!.reason));
+            },
+          }),
+          { status: 410, headers: { "content-type": "application/json" } },
+        ),
+    });
+    await expectDirectoryError(stalledBodyClient.resolveInstall("github/server stalled"), {
       code: "DIRECTORY_TIMEOUT",
       status: undefined,
       message: /10ms/,

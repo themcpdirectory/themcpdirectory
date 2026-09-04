@@ -1,6 +1,11 @@
 import type { InstallManifestV1 } from "@themcpdirectory/api-contract";
-import { selectInstallVariant, type ClientId, UnsupportedVariantError } from "@themcpdirectory/install-engine";
+import {
+  selectInstallVariant,
+  type ClientId,
+  UnsupportedVariantError,
+} from "@themcpdirectory/install-engine";
 import type { PromptIO } from "../dependencies.js";
+import { sanitizeTerminalText } from "../output/render.js";
 import { AddPlanningPromptError } from "./types.js";
 
 export async function selectVariantForClient(
@@ -34,9 +39,18 @@ export async function selectVariantForClient(
     );
   }
 
-  const labels = supportedVariants.map((variant) => describeVariant(variant));
+  const descriptions = supportedVariants.map((variant) =>
+    sanitizeTerminalText(describeVariant(variant)),
+  );
+  const labels = descriptions.map((description, index) =>
+    descriptions.indexOf(description) === descriptions.lastIndexOf(description)
+      ? description
+      : `${description} [${supportedVariants[index]!.id}]`,
+  );
   const selectedLabel = await promptIO.select(
-    `Select an install variant for ${options.manifest.server.title} in ${options.client}.`,
+    sanitizeTerminalText(
+      `Select an install variant for ${options.manifest.server.title} in ${options.client}.`,
+    ),
     labels,
   );
   const selectedIndex = labels.indexOf(selectedLabel);

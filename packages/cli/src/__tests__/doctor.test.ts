@@ -158,6 +158,18 @@ describe("runDoctorCommand", () => {
                       ]
                     : [],
               },
+              latestHealth:
+                slug === "github"
+                  ? {
+                      schemaVersion: 1,
+                      outcome: "degraded",
+                      checkedAt: "2026-09-03T11:55:00.000Z",
+                      durationMs: 840,
+                      httpStatus: 503,
+                      finalOrigin: "https://api.github.example",
+                      redirectCount: 1,
+                    }
+                  : undefined,
             },
             meta: { requestId: `req_${slug}` },
           };
@@ -243,6 +255,11 @@ describe("runDoctorCommand", () => {
           message: expect.stringContaining("1.0.0-beta.1+old -> 1.1.0-rc.1+build.7"),
         }),
         expect.objectContaining({ name: "Upstream: deleted", status: "error" }),
+        expect.objectContaining({
+          name: "Remote health: github",
+          status: "warning",
+          message: expect.stringContaining("Latest remote health: degraded"),
+        }),
         expect.objectContaining({
           name: "Directory warning: github/package-maintenance",
           status: "warning",

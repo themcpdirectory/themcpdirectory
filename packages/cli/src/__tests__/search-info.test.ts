@@ -97,6 +97,16 @@ const INFO_RESPONSE = {
         },
       ],
     },
+    latestHealth: {
+      schemaVersion: 1,
+      outcome: "degraded",
+      checkedAt: "2026-09-03T11:55:00.000Z",
+      durationMs: 840,
+      httpStatus: 503,
+      finalOrigin: "https://api.github.example",
+      redirectCount: 1,
+    },
+    installAvailability: "available",
     timestamps: {
       firstSeenAt: "2026-08-01T00:00:00.000Z",
       lastSeenAt: "2026-09-03T10:00:00.000Z",
@@ -337,6 +347,18 @@ describe("Task 10 search and info command runner", () => {
         "Next cursor: cursor:next:github-mcp\n",
       ].join(""),
     );
+
+    context.stdout.length = 0;
+    expect(await runCli(["info", "github-mcp"], context.deps)).toBe(0);
+    const infoOutput = context.stdout.join("");
+    expect(infoOutput).toContain("Listing status: active");
+    expect(infoOutput).toContain("Install availability: available");
+    expect(infoOutput).toContain(
+      "Trust signal: official_registry=positive - Listed in the official MCP registry.",
+    );
+    expect(infoOutput).toContain("Latest remote health: degraded");
+    expect(infoOutput).toContain("HTTP 503");
+    expect(infoOutput).not.toMatch(/\b(score|stars|grade|confidence)\b/i);
   });
 
   it("reports usage failures through runCli with machine-safe stderr and schema-versioned JSON", async () => {

@@ -66,6 +66,7 @@ export async function planAddCommand(
 ): Promise<CommandResult<AddPlanningResult>> {
   try {
     const manifestResponse = await deps.directoryClient.resolveInstall(options.identifier);
+    const commandWarnings = remoteHealthWarnings(manifestResponse.data);
     const selectedTargets = await selectTargetClients(
       {
         ...(options.targetClients === undefined ? {} : { targetClients: options.targetClients }),
@@ -125,15 +126,19 @@ export async function planAddCommand(
       });
     }
 
-    return createSuccessResult(COMMAND_NAME, {
-      previews,
-      confirmationMessage: buildAddConfirmationMessage({
-        serverTitle: manifestResponse.data.server.title,
-        dryRun: options.dryRun,
-        yes: options.yes,
-        targets: previews.map((preview) => ({ client: preview.client, scope: preview.scope })),
-      }),
-    });
+    return createSuccessResult(
+      COMMAND_NAME,
+      {
+        previews,
+        confirmationMessage: buildAddConfirmationMessage({
+          serverTitle: manifestResponse.data.server.title,
+          dryRun: options.dryRun,
+          yes: options.yes,
+          targets: previews.map((preview) => ({ client: preview.client, scope: preview.scope })),
+        }),
+      },
+      commandWarnings,
+    );
   } catch (error) {
     return toAddPlanningFailure(error);
   }
@@ -300,8 +305,21 @@ function mapDirectoryError(error: DirectoryClientError): {
     };
   }
 
+  if (error.code === "DIRECTORY_UPSTREAM_DELETED") {
+    return {
+      code: "UPSTREAM_DELETED",
+      message: "Installation blocked: Listing deleted upstream.",
+    };
+  }
+
   return {
     code: error.code,
     message: error.message,
   };
+}
+
+function remoteHealthWarnings(manifest: InstallManifestV1): readonly string[] {
+  const health = manifest.latestHealth;
+  if (!health || health.outcome === "healthy") return [];
+  return [`Latest remote health: ${health.outcome} (checked ${health.checkedAt}).`];
 }
