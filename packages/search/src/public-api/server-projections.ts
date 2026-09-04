@@ -18,6 +18,14 @@ export function mapServerSummaryRow(row: SearchServersPageRow): PublicServerSumm
     version: row.currentVersion,
     repository: row.repositoryUrl ? { url: row.repositoryUrl } : null,
     listingStatus: row.listingStatus,
+    publisherVerified: row.publisherVerified,
+    latestHealthOutcome: row.latestHealthOutcome,
+    installAvailability:
+      row.listingStatus === "deleted_upstream"
+        ? "upstream_deleted"
+        : row.currentVersionId === null
+          ? "install_unavailable"
+          : "available",
     signals: {
       officialRegistry: row.officialRegistry,
       publisherVerified: row.publisherVerified,

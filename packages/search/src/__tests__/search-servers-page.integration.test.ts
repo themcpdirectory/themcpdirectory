@@ -7,6 +7,7 @@ import {
   registrySources,
   repositorySnapshots,
   serverCategories,
+  serverHealthChecks,
   serverPackages,
   serverRemotes,
   serverVersions,
@@ -38,6 +39,16 @@ interface SeedSearchPageServerInput {
   repositorySnapshot?: { stars: number; lastPushAt: string };
   openSource?: boolean | null;
   officialSource?: boolean;
+  healthOutcomes?: readonly (
+    | "healthy"
+    | "degraded"
+    | "unreachable"
+    | "timed_out"
+    | "unsafe_destination"
+    | "response_too_large"
+    | "unsupported"
+    | "unknown"
+  )[];
 }
 
 async function seedSearchPageServer(
@@ -102,6 +113,18 @@ async function seedSearchPageServer(
   if (!version) throw new Error("expected version row");
 
   await db.update(servers).set({ currentVersionId: version.id }).where(eq(servers.id, server.id));
+
+  if (input.healthOutcomes?.length) {
+    await db.insert(serverHealthChecks).values(
+      input.healthOutcomes.map((status, index) => ({
+        serverId: server.id,
+        serverVersionId: version.id,
+        checkType: "remote_probe",
+        status,
+        checkedAt: new Date(`2026-09-01T12:30:0${index}.000Z`),
+      })),
+    );
+  }
 
   if (input.packageIdentifier) {
     await db.insert(serverPackages).values({
@@ -238,6 +261,7 @@ describe("searchServersPage", () => {
       category: { slug: "developer-tools", name: "Developer Tools" },
       publisher: { slug: "github", displayName: "GitHub", verified: true },
       officialSource: true,
+      healthOutcomes: ["healthy", "timed_out"],
     });
     await seedSearchPageServer(db, sourceIds, {
       slug: "noise",
@@ -255,7 +279,12 @@ describe("searchServersPage", () => {
     );
 
     expect(page.items.map((item) => item.slug)).toEqual(["github"]);
-    expect(page.items[0]?.publisher).toEqual({ slug: "github", name: "GitHub", verified: true });
+    expect(page.items[0]).toMatchObject({
+      publisher: { slug: "github", name: "GitHub", verified: true },
+      publisherVerified: true,
+      latestHealthOutcome: "timed_out",
+      installAvailability: "available",
+    });
   });
 
   it("filters by client, transport, and registryType through current install data", async () => {

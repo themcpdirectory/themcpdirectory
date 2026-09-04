@@ -1,4 +1,5 @@
 import type {
+  HealthCheckOutcome,
   PublicServerSort,
   PublicServerSummary,
   serverCollectionQuerySchema,
@@ -27,11 +28,13 @@ export interface SearchServersPageRow {
   readonly title: string;
   readonly shortDescription: string;
   readonly currentVersion: string | null;
+  readonly currentVersionId: string | null;
   readonly listingStatus: "active" | "deprecated" | "deleted_upstream" | "unavailable";
   readonly repositoryUrl: string | null;
   readonly publisherSlug: string | null;
   readonly publisherDisplayName: string | null;
   readonly publisherVerified: boolean;
+  readonly latestHealthOutcome: HealthCheckOutcome | null;
   readonly officialRegistry: boolean;
   readonly sourceAvailable: boolean | null;
   readonly openSource: boolean | null;

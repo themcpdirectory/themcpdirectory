@@ -1,4 +1,4 @@
-import { and, sql, type SQL } from "drizzle-orm";
+import { and, eq, sql, type SQL } from "drizzle-orm";
 import {
   serverCollectionQuerySchema,
   type PublicServerSort,
@@ -10,6 +10,7 @@ import {
   publishers,
   registrySources,
   repositorySnapshots,
+  serverHealthChecks,
   serverAliases,
   serverCategories,
   serverPackages,
@@ -55,6 +56,28 @@ function latestRepositoryLastPushAtSql() {
     from ${repositorySnapshots} rs
     where rs.server_id = ${servers.id}
     order by rs.checked_at desc, rs.id desc
+    limit 1
+  )`;
+}
+
+function latestHealthOutcomeSql() {
+  return sql<SearchServersPageRow["latestHealthOutcome"]>`(
+    select sh.status
+    from ${serverHealthChecks} sh
+    where sh.server_id = ${servers.id}
+      and sh.server_version_id = ${serverVersions.id}
+      and sh.check_type = 'remote_probe'
+      and sh.status in (
+        'healthy',
+        'degraded',
+        'unreachable',
+        'timed_out',
+        'unsafe_destination',
+        'response_too_large',
+        'unsupported',
+        'unknown'
+      )
+    order by sh.checked_at desc, sh.created_at desc, sh.id desc
     limit 1
   )`;
 }
@@ -300,11 +323,13 @@ export async function runSearchServersPageQuery(
       title: servers.title,
       shortDescription: servers.shortDescription,
       currentVersion: serverVersions.version,
+      currentVersionId: serverVersions.id,
       listingStatus: sql<SearchServersPageRow["listingStatus"]>`${servers.listingStatus}`,
       repositoryUrl: servers.repositoryUrl,
       publisherSlug: sql<string | null>`${publishers.slug}::text`,
       publisherDisplayName: publishers.displayName,
       publisherVerified: sql<boolean>`coalesce(${publishers.verificationState} = 'verified', false)`,
+      latestHealthOutcome: latestHealthOutcomeSql(),
       officialRegistry: sql<boolean>`coalesce(${registrySources.key} = 'official', false)`,
       sourceAvailable: servers.sourceAvailable,
       openSource: servers.openSource,
@@ -316,7 +341,10 @@ export async function runSearchServersPageQuery(
     })
     .from(servers)
     .leftJoin(publishers, sql`${publishers.id} = ${servers.publisherId}`)
-    .leftJoin(serverVersions, sql`${serverVersions.id} = ${servers.currentVersionId}`)
+    .leftJoin(
+      serverVersions,
+      and(eq(serverVersions.id, servers.currentVersionId), eq(serverVersions.serverId, servers.id)),
+    )
     .leftJoin(registrySources, sql`${registrySources.id} = ${serverVersions.registrySourceId}`)
     .where(and(...where))
     .orderBy(...buildOrderBy(input.sort, score))
