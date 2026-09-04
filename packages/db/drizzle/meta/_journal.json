@@ -43,6 +43,13 @@
       "when": 1788530580132,
       "tag": "0005_phase_g_publisher_platform",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788541194254,
+      "tag": "0006_publisher_github_org_id",
+      "breakpoints": true
     }
   ]
 }

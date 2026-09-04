@@ -1,0 +1,2 @@
+ALTER TABLE "publishers" ADD COLUMN "github_org_id" text;--> statement-breakpoint
+ALTER TABLE "publishers" ADD CONSTRAINT "publishers_github_org_id_check" CHECK ("publishers"."github_org_id" is null or "publishers"."github_org_id" ~ '^[0-9]+$');

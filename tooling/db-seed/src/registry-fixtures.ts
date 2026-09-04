@@ -6,6 +6,7 @@ interface PublisherSeed {
   readonly description: string;
   readonly websiteUrl: string;
   readonly githubOrg: string;
+  readonly githubOrgId: string;
   readonly verificationState: "verified" | "unverified";
 }
 
@@ -398,6 +399,7 @@ export const SEED_FIXTURES: SeedFixtureBundle = {
       description: "Source hosting and collaboration platform.",
       websiteUrl: "https://github.com",
       githubOrg: "github",
+      githubOrgId: "9919",
       verificationState: "verified",
     },
     {
@@ -406,6 +408,7 @@ export const SEED_FIXTURES: SeedFixtureBundle = {
       description: "Independent maintainers publishing practical MCP integrations.",
       websiteUrl: "https://community.example.dev",
       githubOrg: "community-labs",
+      githubOrgId: "87654321",
       verificationState: "unverified",
     },
   ],

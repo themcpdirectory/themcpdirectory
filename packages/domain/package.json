@@ -16,6 +16,7 @@
     "@themcpdirectory/api-contract": "workspace:*",
     "@themcpdirectory/auth": "workspace:*",
     "@themcpdirectory/client-adapters": "workspace:*",
+    "@themcpdirectory/config": "workspace:*",
     "@themcpdirectory/db": "workspace:*",
     "@themcpdirectory/search": "workspace:*",
     "@themcpdirectory/registry-client": "workspace:*",

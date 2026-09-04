@@ -135,3 +135,31 @@ export {
 } from "./publisher/memberships.js";
 
 export { appendAuditEvent, type AuditEventInput } from "./publisher/audit.js";
+
+export {
+  PublisherClaimAuthorityError,
+  PublisherClaimConflictError,
+  PublisherClaimTransitionError,
+  beginPublisherClaimVerification,
+  completePublisherClaimVerification,
+  createPublisherClaim,
+  rejectPublisherClaim,
+  revokePublisherClaim,
+  withdrawPublisherClaim,
+  type ClaimVerificationDeps,
+  type CompleteClaimVerificationDeps,
+  type CreatePublisherClaimInput,
+  type CreatePublisherClaimResult,
+} from "./publisher/claims.js";
+
+export {
+  createGitHubAppClient,
+  GitHubAppRequestError,
+  GitHubAppResponseError,
+  type GitHubAppClient,
+  type GitHubInstallationFacts,
+  type GitHubOrganisationMembershipState,
+  type GitHubOrganisationRole,
+  type GitHubRepositoryCoordinates,
+  type GitHubUserPermissionFacts,
+} from "./publisher/github-app-client.js";

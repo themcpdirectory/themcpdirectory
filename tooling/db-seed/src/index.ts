@@ -128,6 +128,7 @@ async function upsertPublishers(
         description: publisher.description,
         websiteUrl: publisher.websiteUrl,
         githubOrg: publisher.githubOrg,
+        githubOrgId: publisher.githubOrgId,
         verificationState: publisher.verificationState,
       })
       .onConflictDoUpdate({
@@ -137,6 +138,7 @@ async function upsertPublishers(
           description: publisher.description,
           websiteUrl: publisher.websiteUrl,
           githubOrg: publisher.githubOrg,
+          githubOrgId: publisher.githubOrgId,
           verificationState: publisher.verificationState,
         },
       })

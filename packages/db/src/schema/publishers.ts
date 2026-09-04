@@ -11,6 +11,7 @@ export const publishers = pgTable(
     description: text(),
     websiteUrl: text("website_url"),
     githubOrg: text("github_org"),
+    githubOrgId: text("github_org_id"),
     logoUrl: text("logo_url"),
     verificationState: text("verification_state").notNull().default("unverified"),
     ownershipState: text("ownership_state").notNull().default("unlocked"),
@@ -27,6 +28,10 @@ export const publishers = pgTable(
     check(
       "publishers_ownership_state_check",
       sql`${t.ownershipState} in ('unlocked', 'manual_review')`,
+    ),
+    check(
+      "publishers_github_org_id_check",
+      sql`${t.githubOrgId} is null or ${t.githubOrgId} ~ '^[0-9]+$'`,
     ),
   ],
 );
