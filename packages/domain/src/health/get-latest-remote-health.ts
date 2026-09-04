@@ -5,9 +5,12 @@ import {
 } from "@themcpdirectory/api-contract";
 import { serverHealthChecks, type Database } from "@themcpdirectory/db";
 
+type HealthReadDatabase = Pick<Database, "select">;
+
 export async function getLatestRemoteHealthObservation(
-  db: Database,
+  db: HealthReadDatabase,
   serverId: string,
+  serverVersionId?: string,
 ): Promise<RemoteHealthObservationV1 | null> {
   const [row] = await db
     .select({
@@ -24,6 +27,7 @@ export async function getLatestRemoteHealthObservation(
       and(
         eq(serverHealthChecks.serverId, serverId),
         eq(serverHealthChecks.checkType, "remote_probe"),
+        serverVersionId ? eq(serverHealthChecks.serverVersionId, serverVersionId) : undefined,
       ),
     )
     .orderBy(

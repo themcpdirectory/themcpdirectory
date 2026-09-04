@@ -112,3 +112,11 @@ export {
   type RemoteHealthProbeOptions,
   type RunRemoteHealthCheckInput,
 } from "./health/run-remote-health-check.js";
+
+export { getCurrentTrustProfile } from "./trust/get-current-trust-profile.js";
+
+export {
+  TRUST_SIGNAL_ORDER,
+  refreshTrustProfile,
+  type RefreshTrustProfileInput,
+} from "./trust/refresh-trust-profile.js";
