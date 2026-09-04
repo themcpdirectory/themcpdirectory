@@ -41,6 +41,7 @@ export class InstallManifestUnavailableError extends Error {
 }
 
 export class UpstreamDeletedError extends Error {
+  readonly code = "UPSTREAM_DELETED" as const;
   readonly identifier: string;
 
   constructor(identifier: string) {

@@ -30,6 +30,7 @@ describe("resolveServerIdentifier", () => {
       matchedBy: "slug",
       matchedValue: "github",
       needsRedirect: false,
+      installAvailability: "available",
     });
   });
 

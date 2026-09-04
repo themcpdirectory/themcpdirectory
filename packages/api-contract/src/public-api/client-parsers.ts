@@ -6,10 +6,7 @@ import type {
   ClientsCollectionResponse,
   PublisherDetailResponse,
 } from "./discovery.js";
-import {
-  HealthCheckOutcomeSchema,
-  RemoteHealthObservationV1ClientSchema,
-} from "./health.js";
+import { HealthCheckOutcomeSchema, RemoteHealthObservationV1ClientSchema } from "./health.js";
 import {
   compatibilityStatusSchema,
   listingStatusSchema,
@@ -184,6 +181,7 @@ const resolveServerIdentifierClientResponseSchema = clientObject({
     matchedBy: z.enum(["slug", "alias", "canonical_registry_name", "package_identifier"]),
     matchedValue: z.string().min(1),
     needsRedirect: z.boolean(),
+    installAvailability: InstallAvailabilitySchema.optional(),
   }),
   meta: clientObject({ requestId: requestIdSchema }),
 });

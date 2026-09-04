@@ -1,8 +1,5 @@
 import { z } from "zod";
-import {
-  HealthCheckOutcomeSchema,
-  RemoteHealthObservationV1Schema,
-} from "./health.js";
+import { HealthCheckOutcomeSchema, RemoteHealthObservationV1Schema } from "./health.js";
 import {
   createCollectionResponseSchema,
   createResourceResponseSchema,
@@ -41,6 +38,7 @@ export const InstallAvailabilitySchema = z.enum(installAvailabilityValues).meta(
   id: "InstallAvailability",
   example: "available",
 });
+export type InstallAvailability = z.infer<typeof InstallAvailabilitySchema>;
 
 export const serverSortSchema = z.enum(["relevance", "recent", "updated", "popular", "name"]);
 export type PublicServerSort = z.infer<typeof serverSortSchema>;
@@ -231,8 +229,7 @@ const serverDetailServerSchema = strictObject({
   timestamps: serverTimestampsSchema,
 });
 
-export const serverDetailResponseSchema =
-  createResourceResponseSchema(serverDetailServerSchema);
+export const serverDetailResponseSchema = createResourceResponseSchema(serverDetailServerSchema);
 export type ServerDetailResponse = z.infer<typeof serverDetailResponseSchema>;
 export type PublicServerDetail = z.infer<typeof serverDetailResponseSchema>["data"];
 
@@ -245,9 +242,12 @@ const resolvedServerSchema = strictObject({
   matchedBy: z.enum(["slug", "alias", "canonical_registry_name", "package_identifier"]),
   matchedValue: z.string().min(1),
   needsRedirect: z.boolean(),
+  installAvailability: InstallAvailabilitySchema.optional(),
 });
 
 export const resolveServerIdentifierResponseSchema =
   createResourceResponseSchema(resolvedServerSchema);
 export type ResolvedServerResponse = z.infer<typeof resolveServerIdentifierResponseSchema>;
-export type ResolvedServerIdentifier = z.infer<typeof resolveServerIdentifierResponseSchema>["data"];
+export type ResolvedServerIdentifier = z.infer<
+  typeof resolveServerIdentifierResponseSchema
+>["data"];

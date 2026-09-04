@@ -49,6 +49,11 @@ describe("getServerDetailBySlug", () => {
           },
         ],
       },
+      latestHealth: {
+        schemaVersion: 1,
+        outcome: "healthy",
+      },
+      installAvailability: "available",
     });
     expect(detail).not.toHaveProperty("provenance");
     expect(

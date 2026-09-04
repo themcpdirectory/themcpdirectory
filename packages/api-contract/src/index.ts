@@ -42,6 +42,7 @@ export {
   type PublicServerSummary,
   type PublicServerTimestamps,
   type PublicTrustProfile,
+  type InstallAvailability,
   type ResolvedServerIdentifier,
   type ResolvedServerResponse,
   type ServerCollectionResponse,

@@ -7,6 +7,7 @@ import type {
   PublicServerDetail,
   PublicServerTimestamps,
   PublicTrustProfile,
+  InstallAvailability,
   SupportedClientId,
 } from "@themcpdirectory/api-contract";
 import { httpUrlSchema } from "@themcpdirectory/api-contract";
@@ -24,6 +25,7 @@ import {
   trustSignals,
   type Database,
 } from "@themcpdirectory/db";
+import { getLatestRemoteHealthObservation } from "../health/get-latest-remote-health.js";
 
 const SUPPORTED_CLIENT_IDS = new Set<SupportedClientId>([
   "claude-code",
@@ -87,6 +89,7 @@ export interface ServerDetailRow {
   readonly publisher: PublicPublisherSummary | null;
   readonly repository: PublicRepositorySummary | null;
   readonly currentVersion: string | null;
+  readonly currentVersionId: string | null;
   readonly categories: readonly PublicServerCategory[];
   readonly packages: readonly ServerPackageRow[];
   readonly remotes: readonly ServerRemoteRow[];
@@ -94,6 +97,17 @@ export interface ServerDetailRow {
   readonly trustProfile: PublicTrustProfile;
   readonly timestamps: PublicServerTimestamps;
   readonly provenance: InstallManifestV1["provenance"] | null;
+}
+
+export function deriveInstallAvailability(
+  listingStatus: string,
+  currentVersionId: string | null,
+): InstallAvailability {
+  return listingStatus === "deleted_upstream"
+    ? "upstream_deleted"
+    : currentVersionId === null
+      ? "install_unavailable"
+      : "available";
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -391,6 +405,7 @@ export async function loadServerDetailRow(
         : null,
     repository: server.repositoryUrl ? { url: server.repositoryUrl } : null,
     currentVersion: server.currentVersion,
+    currentVersionId: server.currentVersionId,
     categories: await loadPublicServerCategories(db, server.id),
     packages: await loadServerPackages(db, server.currentVersionId),
     remotes: await loadServerRemotes(db, server.currentVersionId),
@@ -462,6 +477,9 @@ export async function getServerDetailBySlug(
 ): Promise<PublicServerDetail | null> {
   const server = await loadServerDetailRow(db, slug);
   if (!server) return null;
+  const latestHealth = server.currentVersionId
+    ? await getLatestRemoteHealthObservation(db, server.id, server.currentVersionId)
+    : null;
 
   return {
     id: server.id,
@@ -484,6 +502,8 @@ export async function getServerDetailBySlug(
       ...server.trustProfile,
       signals: [...server.trustProfile.signals],
     },
+    ...(latestHealth ? { latestHealth } : {}),
+    installAvailability: deriveInstallAvailability(server.listingStatus, server.currentVersionId),
     timestamps: server.timestamps,
   };
 }

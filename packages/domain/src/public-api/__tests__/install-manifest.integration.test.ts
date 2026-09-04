@@ -100,7 +100,7 @@ describe("buildInstallManifest", () => {
     ).rejects.toMatchObject({ name: "InstallManifestUnavailableError" });
     await expect(
       buildInstallManifest(context.db, { identifier: "upstream-deleted-server" }),
-    ).rejects.toMatchObject({ name: "UpstreamDeletedError" });
+    ).rejects.toMatchObject({ name: "UpstreamDeletedError", code: "UPSTREAM_DELETED" });
     await expect(
       buildInstallManifest(context.db, { identifier: "mismatched-current-version" }),
     ).rejects.toMatchObject({ name: "InstallManifestUnavailableError" });

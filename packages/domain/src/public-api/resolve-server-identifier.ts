@@ -1,5 +1,5 @@
 import { and, asc, eq, sql } from "drizzle-orm";
-import type { ResolvedServerIdentifier } from "@themcpdirectory/api-contract";
+import type { InstallAvailability, ResolvedServerIdentifier } from "@themcpdirectory/api-contract";
 import {
   serverAliases,
   serverPackages,
@@ -7,6 +7,7 @@ import {
   servers,
   type Database,
 } from "@themcpdirectory/db";
+import { deriveInstallAvailability } from "./server-detail.js";
 
 const IDENTIFIER_PRECEDENCE = [
   "slug",
@@ -24,6 +25,7 @@ export interface IdentifierMatchRow {
   readonly title: string;
   readonly version: string | null;
   readonly matchedValue: string;
+  readonly listingStatus: string;
 }
 
 export interface AmbiguousServerMatchSummary {
@@ -31,6 +33,7 @@ export interface AmbiguousServerMatchSummary {
   readonly title: string;
   readonly matchedBy: AmbiguousIdentifierMatchType;
   readonly matchedValue: string;
+  readonly installAvailability: InstallAvailability;
 }
 
 export class AmbiguousServerIdentifierError extends Error {
@@ -52,6 +55,7 @@ export class AmbiguousServerIdentifierError extends Error {
       title: match.title,
       matchedBy,
       matchedValue: match.matchedValue,
+      installAvailability: deriveInstallAvailability(match.listingStatus, match.version),
     }));
   }
 }
@@ -76,6 +80,7 @@ export async function lookupIdentifierMatches(
         title: servers.title,
         version: serverVersions.version,
         matchedValue: sql<string>`${servers.slug}::text`,
+        listingStatus: servers.listingStatus,
       })
       .from(servers)
       .leftJoin(
@@ -98,6 +103,7 @@ export async function lookupIdentifierMatches(
         title: servers.title,
         version: serverVersions.version,
         matchedValue: serverAliases.alias,
+        listingStatus: servers.listingStatus,
       })
       .from(serverAliases)
       .innerJoin(servers, eq(servers.id, serverAliases.serverId))
@@ -121,6 +127,7 @@ export async function lookupIdentifierMatches(
         title: servers.title,
         version: serverVersions.version,
         matchedValue: sql<string>`${servers.canonicalRegistryName}`,
+        listingStatus: servers.listingStatus,
       })
       .from(servers)
       .leftJoin(
@@ -144,6 +151,7 @@ export async function lookupIdentifierMatches(
       title: servers.title,
       version: serverVersions.version,
       matchedValue: sql<string>`min(${serverPackages.identifier})`,
+      listingStatus: servers.listingStatus,
     })
     .from(servers)
     .innerJoin(
@@ -152,7 +160,7 @@ export async function lookupIdentifierMatches(
     )
     .innerJoin(serverPackages, eq(serverPackages.serverVersionId, serverVersions.id))
     .where(sql`lower(${serverPackages.identifier}) = ${identifier} and ${publicServerPredicate()}`)
-    .groupBy(servers.id, servers.slug, servers.title, serverVersions.version)
+    .groupBy(servers.id, servers.slug, servers.title, servers.listingStatus, serverVersions.version)
     .orderBy(asc(servers.slug))
     .limit(boundedLimit);
 }
@@ -182,6 +190,7 @@ export async function resolveServerIdentifier(
       matchedBy,
       matchedValue: match.matchedValue,
       needsRedirect: matchedBy !== "slug",
+      installAvailability: deriveInstallAvailability(match.listingStatus, match.version),
     };
   }
 

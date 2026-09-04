@@ -6,6 +6,7 @@ import {
   registrySources,
   serverAliases,
   serverCategories,
+  serverHealthChecks,
   serverPackages,
   serverRemotes,
   serverVersions,
@@ -192,17 +193,33 @@ export async function createPublicApiTestContext(): Promise<PublicApiTestContext
     clientId: "cursor",
     status: "supported",
   });
-  await db.insert(serverRemotes).values({
+  const [githubRemote] = await db
+    .insert(serverRemotes)
+    .values({
+      serverVersionId: github.versionId,
+      transportType: "streamable-http",
+      urlTemplate: "https://api.githubcopilot.com/mcp",
+      headers: [
+        { name: "Authorization", value: "Bearer {token}" },
+        { name: "X-Registry-Secret", value: "literal-secret", isSecret: true },
+      ],
+      variables: {
+        token: { description: "GitHub token", isRequired: true, isSecret: true },
+      },
+    })
+    .returning({ id: serverRemotes.id });
+  if (!githubRemote) throw new Error("expected GitHub remote");
+  await db.insert(serverHealthChecks).values({
+    serverId: github.serverId,
     serverVersionId: github.versionId,
-    transportType: "streamable-http",
-    urlTemplate: "https://api.githubcopilot.com/mcp",
-    headers: [
-      { name: "Authorization", value: "Bearer {token}" },
-      { name: "X-Registry-Secret", value: "literal-secret", isSecret: true },
-    ],
-    variables: {
-      token: { description: "GitHub token", isRequired: true, isSecret: true },
-    },
+    remoteId: githubRemote.id,
+    checkType: "remote_probe",
+    status: "healthy",
+    latencyMs: 120,
+    httpStatus: 200,
+    finalOrigin: "https://api.githubcopilot.com",
+    redirectCount: 0,
+    checkedAt: new Date("2026-09-01T12:30:00.000Z"),
   });
   await db.insert(clientCompatibility).values([
     { serverId: github.serverId, clientId: "cursor", status: "supported" },
