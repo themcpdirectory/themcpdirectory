@@ -116,7 +116,21 @@ export function createAuth({ db, env, fetchImpl = fetch }: CreateAuthInput) {
   } satisfies BetterAuthOptions);
 }
 
-const env = loadWebEnv();
-const db = createDatabase(env.DATABASE_URL);
+export type Auth = ReturnType<typeof createAuth>;
 
-export const auth = createAuth({ db, env });
+let cachedAuth: Auth | undefined;
+
+// Explicit accessor: memoizes a real Better Auth instance on first call so
+// importing this module (for `roleHasCapability`, error classes, or the
+// request guard) never forces `loadWebEnv()` / `createDatabase()` to run.
+// Returning a genuine object — rather than a lazy Proxy — keeps `"handler"
+// in getAuth()` truthy for `toNextJsHandler`, preserves iterable own keys,
+// and lets Better Auth plugins introspect the surface normally.
+export function getAuth(): Auth {
+  if (!cachedAuth) {
+    const env = loadWebEnv();
+    const db = createDatabase(env.DATABASE_URL);
+    cachedAuth = createAuth({ db, env });
+  }
+  return cachedAuth;
+}
