@@ -13,6 +13,9 @@ export const publishers = pgTable(
     githubOrg: text("github_org"),
     logoUrl: text("logo_url"),
     verificationState: text("verification_state").notNull().default("unverified"),
+    ownershipState: text("ownership_state").notNull().default("unlocked"),
+    ownershipLockedAt: timestamp("ownership_locked_at", { withTimezone: true }),
+    ownershipLockReason: text("ownership_lock_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -20,6 +23,10 @@ export const publishers = pgTable(
     check(
       "publishers_verification_state_check",
       sql`${t.verificationState} in ('unverified', 'pending', 'verified', 'rejected', 'revoked')`,
+    ),
+    check(
+      "publishers_ownership_state_check",
+      sql`${t.ownershipState} in ('unlocked', 'manual_review')`,
     ),
   ],
 );

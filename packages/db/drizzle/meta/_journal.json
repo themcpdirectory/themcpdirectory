@@ -36,6 +36,13 @@
       "when": 1788521578390,
       "tag": "0004_trust_signal_legacy_retention",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788530580132,
+      "tag": "0005_phase_g_publisher_platform",
+      "breakpoints": true
     }
   ]
 }

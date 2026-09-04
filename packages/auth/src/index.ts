@@ -1,2 +1,2 @@
-// Not yet implemented — placeholder for future phases
-export {};
+export { auth, createAuth } from "./better-auth.js";
+export type { CreateAuthInput } from "./better-auth.js";
