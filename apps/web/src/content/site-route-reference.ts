@@ -142,3 +142,29 @@ export const PUBLIC_SITE_ROUTE_REFERENCE: readonly PublicSiteRouteReference[] = 
     availability: "available",
   },
 ];
+
+export const INDEXABLE_ROUTE_REFERENCE = Object.freeze(
+  PUBLIC_SITE_ROUTE_REFERENCE.filter(
+    (route) => route.availability === "available" && route.auth === "anonymous" && route.index,
+  ),
+);
+
+export function buildIndexableSitemapPaths(input: {
+  readonly categorySlugs: readonly string[];
+  readonly serverSlugs: readonly string[];
+}): readonly string[] {
+  const concreteRoutePaths = new Set(
+    PUBLIC_SITE_ROUTE_REFERENCE.filter((route) => !route.path.includes("[")).map(
+      (route) => route.path,
+    ),
+  );
+  const staticPaths = INDEXABLE_ROUTE_REFERENCE.filter((route) => !route.path.includes("[")).map(
+    (route) => route.path,
+  );
+  const categoryPaths = input.categorySlugs.map((slug) => `/categories/${slug}`);
+  const serverPaths = input.serverSlugs
+    .map((slug) => `/${slug}`)
+    .filter((path) => !concreteRoutePaths.has(path));
+
+  return Object.freeze([...new Set([...staticPaths, ...categoryPaths, ...serverPaths])]);
+}

@@ -1,18 +1,16 @@
 import type { MetadataRoute } from "next";
 import { getPublicSitemapEntries } from "@themcpdirectory/domain";
+import { buildIndexableSitemapPaths } from "@/content/site-route-reference";
 import { getDb } from "@/lib/db";
-import { getSiteOrigin } from "@/lib/site-url";
+import { buildCanonicalUrl } from "@/lib/metadata";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = getSiteOrigin();
   const { serverSlugs, categorySlugs } = await getPublicSitemapEntries(getDb());
+  const paths = buildIndexableSitemapPaths({ serverSlugs, categorySlugs });
 
-  return [
-    { url: baseUrl },
-    { url: `${baseUrl}/categories` },
-    ...categorySlugs.map((slug) => ({ url: `${baseUrl}/categories/${slug}` })),
-    ...serverSlugs.map((slug) => ({ url: `${baseUrl}/${slug}` })),
-  ];
+  return paths.map((path) => ({
+    url: buildCanonicalUrl(path),
+  }));
 }
