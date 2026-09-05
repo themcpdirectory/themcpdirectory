@@ -79,6 +79,19 @@ export function SiteNav() {
             Search
           </Link>
           <Link
+            href="/docs"
+            style={{
+              fontSize: "0.875rem",
+              color: "var(--fg-muted)",
+              textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
+              minHeight: "2.75rem",
+            }}
+          >
+            Docs
+          </Link>
+          <Link
             href="/dashboard"
             style={{
               fontSize: "0.875rem",
@@ -152,6 +165,20 @@ export function SiteNav() {
           }}
         >
           Search
+        </Link>
+        <Link
+          href="/docs"
+          onClick={() => setMenuOpen(false)}
+          style={{
+            color: "var(--fg)",
+            textDecoration: "none",
+            fontSize: "0.9375rem",
+            display: "flex",
+            alignItems: "center",
+            minHeight: "2.75rem",
+          }}
+        >
+          Docs
         </Link>
         <Link
           href="/dashboard"

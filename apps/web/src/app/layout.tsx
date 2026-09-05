@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Link from "next/link";
+import type { Route } from "next";
 import "./globals.css";
 import { SiteNav } from "@/components/site-nav";
+import { RELEASE_DOCUMENT_LINKS } from "@/content/release-nav";
 import { getSiteOrigin } from "@/lib/site-url";
 
 const geistSans = Geist({
@@ -49,17 +52,49 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             fontSize: "0.875rem",
           }}
         >
-          <div style={{ maxWidth: "72rem", margin: "0 auto" }}>
-            <span>© 2026 The MCP Directory</span>
-            {" · "}
-            <a
-              href="https://modelcontextprotocol.io"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: "var(--accent)" }}
-            >
-              MCP Protocol
-            </a>
+          <div
+            style={{
+              maxWidth: "72rem",
+              margin: "0 auto",
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "1rem 2rem",
+            }}
+          >
+            <div>
+              <span>© 2026 The MCP Directory</span>
+              {" · "}
+              <a
+                href="https://modelcontextprotocol.io"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "var(--accent)" }}
+              >
+                MCP Protocol
+              </a>
+            </div>
+            <nav aria-label="Release information">
+              <ul
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "0.5rem 1rem",
+                  margin: 0,
+                  padding: 0,
+                  listStyle: "none",
+                }}
+              >
+                {RELEASE_DOCUMENT_LINKS.map((link) => (
+                  <li key={link.href}>
+                    <Link href={link.href as Route} style={{ color: "var(--fg-muted)" }}>
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
           </div>
         </footer>
       </body>
