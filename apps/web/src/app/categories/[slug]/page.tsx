@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCategoryServers, getCategories } from "@themcpdirectory/domain";
 import { getDb } from "@/lib/db";
+import { buildDocumentMetadata } from "@/lib/metadata";
 import { ServerCard } from "@/components/server-card";
 import Link from "next/link";
 
@@ -15,10 +16,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const cats = await getCategories(db);
   const cat = cats.find((c) => c.slug === slug);
   if (!cat) return { title: "Category not found" };
-  return {
+  return buildDocumentMetadata({
     title: cat.name,
     description: cat.description ?? `MCP servers in the ${cat.name} category.`,
-  };
+    path: `/categories/${cat.slug}`,
+    index: true,
+  });
 }
 
 export default async function CategoryDetailPage({ params }: Props) {

@@ -1,14 +1,17 @@
 import type { Metadata, Route } from "next";
 import { getCategories } from "@themcpdirectory/domain";
 import { getDb } from "@/lib/db";
+import { buildDocumentMetadata } from "@/lib/metadata";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildDocumentMetadata({
   title: "Categories",
   description: "Browse MCP servers by category.",
-};
+  path: "/categories",
+  index: true,
+});
 
 export default async function CategoriesPage() {
   const db = getDb();

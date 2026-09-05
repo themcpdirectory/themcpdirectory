@@ -10,7 +10,12 @@ import { DeletedUpstreamBanner } from "@/components/deleted-upstream-banner";
 import { HealthObservation } from "@/components/health-observation";
 import { TrustProfile } from "@/components/trust-profile";
 import { getDb } from "@/lib/db";
-import { getSiteOrigin } from "@/lib/site-url";
+import { buildDocumentMetadata, buildCanonicalUrl } from "@/lib/metadata";
+import {
+  buildBreadcrumbJsonLd,
+  buildSoftwareApplicationJsonLd,
+  serializeJsonLd,
+} from "@/lib/structured-data";
 import Link from "next/link";
 
 interface Props {
@@ -27,20 +32,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const detail = await getServerDetail(db, match.canonicalSlug);
   if (!detail) return { title: "Server not found" };
 
-  const canonicalUrl = `${getSiteOrigin()}/${detail.slug}`;
-  return {
+  return buildDocumentMetadata({
     title: detail.title,
     description: detail.shortDescription,
-    alternates: {
-      canonical: canonicalUrl,
-    },
-    openGraph: {
-      title: detail.title,
-      description: detail.shortDescription,
-      url: canonicalUrl,
-      type: "website",
-    },
-  };
+    path: `/${detail.slug}`,
+    index: true,
+  });
 }
 
 interface EnvVar {
@@ -83,10 +80,6 @@ function isRemoteHeaderArray(val: unknown): val is RemoteHeader[] {
   );
 }
 
-function serializeJsonLd(value: unknown): string {
-  return JSON.stringify(value).replaceAll("<", "\\u003c");
-}
-
 function getSourceAvailabilityLabel(
   openSource: boolean | null,
   sourceAvailable: boolean | null,
@@ -127,21 +120,20 @@ export default async function ServerDetailPage({ params }: Props) {
   }
   const { detail, publicDetail } = snapshot;
 
-  const canonicalUrl = `${getSiteOrigin()}/${detail.slug}`;
+  const canonicalUrl = buildCanonicalUrl(`/${detail.slug}`);
   const repositoryUrl = normalizeStoredUrl(detail.repositoryUrl);
   const homepageUrl = normalizeStoredUrl(detail.homepageUrl);
   const publisherWebsiteUrl = normalizeStoredUrl(detail.publisherWebsiteUrl);
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    name: detail.title,
-    description: detail.shortDescription,
-    applicationCategory: "DeveloperApplication",
-    url: canonicalUrl,
-    ...(repositoryUrl ? { codeRepository: repositoryUrl } : {}),
-    ...(detail.licenseSpdx ? { license: detail.licenseSpdx } : {}),
-  };
+  const softwareJsonLd = buildSoftwareApplicationJsonLd({
+    slug: canonicalUrl,
+    title: detail.title,
+    shortDescription: detail.shortDescription,
+  });
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: "The MCP Directory", path: buildCanonicalUrl("/") },
+    { name: detail.title, path: canonicalUrl },
+  ]);
 
   const formattedLastSeen = detail.lastSeenAt.toLocaleDateString("en-US", {
     year: "numeric",
@@ -153,7 +145,11 @@ export default async function ServerDetailPage({ params }: Props) {
     <main id="main-content" tabIndex={-1} style={{ minHeight: "100vh" }}>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(softwareJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
 
       <div style={{ maxWidth: "60rem", margin: "0 auto", padding: "2rem 1rem" }}>

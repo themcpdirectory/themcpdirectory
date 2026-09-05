@@ -4,20 +4,19 @@ import { getDb } from "@/lib/db";
 import { SearchForm } from "@/components/search-form";
 import { ServerCard } from "@/components/server-card";
 import { LoadingState } from "@/components/loading-state";
+import { buildDocumentMetadata } from "@/lib/metadata";
 import Link from "next/link";
 import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildDocumentMetadata({
   title: "The MCP Directory — Find it. Trust it. Install it.",
   description:
     "The open directory for the MCP ecosystem. Discover MCP servers, inspect their metadata, and understand what they require.",
-  openGraph: {
-    title: "The MCP Directory",
-    description: "Find it. Trust it. Install it.",
-  },
-};
+  path: "/",
+  index: true,
+});
 
 export default function HomePage() {
   return (
