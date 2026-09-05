@@ -805,13 +805,17 @@ importers:
         version: 8.69.0(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
 
   tooling/release:
+    dependencies:
+      '@themcpdirectory/test-utils':
+        specifier: workspace:*
+        version: link:../../packages/test-utils
+      postgres:
+        specifier: 3.4.7
+        version: 3.4.7
     devDependencies:
       '@themcpdirectory/eslint-config':
         specifier: workspace:*
         version: link:../eslint
-      '@themcpdirectory/test-utils':
-        specifier: workspace:*
-        version: link:../../packages/test-utils
       '@themcpdirectory/typescript-config':
         specifier: workspace:*
         version: link:../typescript

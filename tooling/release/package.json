@@ -9,9 +9,12 @@
     "typecheck": "tsc --noEmit",
     "verify:prerequisites": "tsx src/verify-phase-prerequisites.ts"
   },
+  "dependencies": {
+    "@themcpdirectory/test-utils": "workspace:*",
+    "postgres": "3.4.7"
+  },
   "devDependencies": {
     "@themcpdirectory/eslint-config": "workspace:*",
-    "@themcpdirectory/test-utils": "workspace:*",
     "@themcpdirectory/typescript-config": "workspace:*",
     "@types/node": "^20",
     "chrome-launcher": "1.2.1",

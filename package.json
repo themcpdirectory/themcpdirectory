@@ -18,6 +18,7 @@
     "format:check": "prettier --check .",
     "lint": "turbo lint",
     "release:dependency-audit": "pnpm --filter @themcpdirectory/release-tools exec tsx src/verify-dependency-audit.ts",
+    "release:database": "pnpm --filter @themcpdirectory/release-tools exec tsx src/verify-database-release.ts",
     "release:lockfile-integrity": "pnpm --filter @themcpdirectory/release-tools exec tsx src/verify-lockfile-integrity.ts",
     "release:secret-scan": "pnpm --filter @themcpdirectory/release-tools exec tsx src/verify-secret-scanning.ts",
     "test": "turbo test",

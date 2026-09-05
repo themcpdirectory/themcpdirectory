@@ -68,8 +68,8 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Validate migrations
-        run: pnpm db:migrate
+      - name: Database release gate
+        run: pnpm release:database
 
       - name: Test
         run: pnpm test
