@@ -74,7 +74,7 @@ export async function runAddCliCommand(
   return withWarnings(await executeAddCommand(previews, deps), warnings);
 }
 
-function parseAddArgs(
+export function parseAddArgs(
   argv: readonly string[],
 ):
   | { readonly ok: true; readonly options: AddCommandOptions }

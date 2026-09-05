@@ -33,7 +33,7 @@ export async function runSearchCommand(
   }
 }
 
-function parseSearchArgs(
+export function parseSearchArgs(
   argv: readonly string[],
 ):
   | { readonly ok: true; readonly params: SearchServersParams }

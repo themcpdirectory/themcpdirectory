@@ -6,6 +6,10 @@ import {
   CLI_REPOSITORY_INVOCATION,
   CLI_SUPPORTED_CLIENTS,
 } from "../index.js";
+import { parseAddArgs } from "../commands/add.js";
+import { parseRemoveArgs } from "../commands/remove.js";
+import { parseSearchArgs } from "../commands/search.js";
+import { parseUpdateArgs } from "../commands/update.js";
 
 describe("CLI command metadata", () => {
   it("is the complete exported source for command help and supported clients", () => {
@@ -104,5 +108,21 @@ describe("CLI command metadata", () => {
         expect.stringMatching(/repository-local/i),
       ]),
     });
+    const parsers = [
+      { parse: (client: string) => parseSearchArgs(["github", "--client", client]) },
+      { parse: (client: string) => parseAddArgs(["github", "--to", client]) },
+      { parse: (client: string) => parseRemoveArgs(["github", "--to", client]) },
+      { parse: (client: string) => parseUpdateArgs(["github", "--to", client]) },
+    ];
+
+    for (const { id } of CLI_SUPPORTED_CLIENTS) {
+      expect(parsers.map(({ parse }) => parse(id).ok)).toEqual([true, true, true, true]);
+    }
+    expect(parsers.map(({ parse }) => parse("unsupported-client").ok)).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 });

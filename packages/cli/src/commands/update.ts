@@ -278,7 +278,7 @@ async function preflightUpdateListings(
   return { ok: true };
 }
 
-function parseUpdateArgs(
+export function parseUpdateArgs(
   argv: readonly string[],
 ):
   | { readonly ok: true; readonly options: UpdateCommandOptions }

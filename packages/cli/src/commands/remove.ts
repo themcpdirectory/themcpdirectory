@@ -262,7 +262,7 @@ function discoverTargets(
     );
 }
 
-function parseRemoveArgs(argv: readonly string[]):
+export function parseRemoveArgs(argv: readonly string[]):
   | { readonly ok: true; readonly options: RemoveCommandOptions }
   | {
       readonly ok: false;
