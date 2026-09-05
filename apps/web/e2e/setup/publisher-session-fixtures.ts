@@ -8,12 +8,14 @@ import {
   servers,
   createDatabase,
 } from "@themcpdirectory/db";
-import { and, asc, eq, isNotNull, like } from "drizzle-orm";
+import { SEEDED_PUBLISHER_LISTING_DETAIL_ROUTE } from "@themcpdirectory/test-utils";
+import { and, asc, eq, isNotNull, like, ne } from "drizzle-orm";
 import { TEST_BETTER_AUTH_SECRET, TEST_DATABASE_URL } from "./test-database";
 
 /** Better Auth's default cookie prefix + name (see `better-auth/dist/cookies`); not `session_token`. */
 const SESSION_COOKIE_NAME = "better-auth.session_token";
 const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
+const SEEDED_PUBLISHER_LISTING_ID = SEEDED_PUBLISHER_LISTING_DETAIL_ROUTE.split("/").at(-1)!;
 
 export interface PublisherSessionCookie {
   readonly name: string;
@@ -79,27 +81,49 @@ export async function seedPublisherSession(input: {
       expiresAt: new Date(Date.now() + SESSION_LIFETIME_MS),
     });
 
-    const eligibleListings = await db
+    const observedAt = new Date("2026-01-01T00:00:00.000Z");
+    await db
+      .insert(servers)
+      .values({
+        id: SEEDED_PUBLISHER_LISTING_ID,
+        slug: "publisher-fixture-listing",
+        title: "Publisher fixture listing",
+        shortDescription: "Deterministic listing for authenticated release checks.",
+        listingStatus: "active",
+        moderationStatus: "normal",
+        repositoryUrl: "https://github.com/themcpdirectory/publisher-fixture-listing",
+        repositorySource: "github",
+        repositoryExternalId: "1001",
+        firstSeenAt: observedAt,
+        lastSeenAt: observedAt,
+      })
+      .onConflictDoNothing();
+
+    const [claimedListing] = await db
       .select({ id: servers.id })
       .from(servers)
-      .where(and(isNotNull(servers.repositoryExternalId), isNotNull(servers.repositoryUrl)))
+      .where(eq(servers.id, SEEDED_PUBLISHER_LISTING_ID))
+      .limit(1);
+    const [unclaimedListing] = await db
+      .select({ id: servers.id })
+      .from(servers)
+      .where(
+        and(
+          ne(servers.id, SEEDED_PUBLISHER_LISTING_ID),
+          isNotNull(servers.repositoryExternalId),
+          isNotNull(servers.repositoryUrl),
+        ),
+      )
       .orderBy(asc(servers.id))
-      .limit(2);
-    const [claimedListing, unclaimedListing] = eligibleListings;
+      .limit(1);
     if (!claimedListing || !unclaimedListing) {
       throw new Error("Publisher session fixture requires two seeded GitHub listings.");
     }
 
-    await Promise.all([
-      db
-        .update(servers)
-        .set({ repositoryExternalId: "1001" })
-        .where(eq(servers.id, claimedListing.id)),
-      db
-        .update(servers)
-        .set({ repositoryExternalId: "1002" })
-        .where(eq(servers.id, unclaimedListing.id)),
-    ]);
+    await db
+      .update(servers)
+      .set({ repositoryExternalId: "1002" })
+      .where(eq(servers.id, unclaimedListing.id));
 
     await db.insert(publisherClaims).values([
       {

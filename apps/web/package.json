@@ -30,9 +30,11 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.11.0",
     "@playwright/test": "1.62.1",
     "@tailwindcss/postcss": "^4",
     "@themcpdirectory/eslint-config": "workspace:*",
+    "@themcpdirectory/test-utils": "workspace:*",
     "@themcpdirectory/typescript-config": "workspace:*",
     "@types/node": "^20",
     "@types/react": "^19",

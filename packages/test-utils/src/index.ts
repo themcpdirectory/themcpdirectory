@@ -38,3 +38,8 @@ export { createFakeProcessRuntime } from "./fake-process-runtime.js";
 export type { FakeProcessRuntime, FakeProcessRuntimeOptions } from "./fake-process-runtime.js";
 export { createInProcessCliHarness } from "./cli-harness.js";
 export type { CliHarnessDependencies, InProcessCliHarness } from "./cli-harness.js";
+export {
+  AUTHENTICATED_FIXTURE_ROUTE_MATRIX,
+  PUBLIC_RELEASE_ROUTE_MATRIX,
+  SEEDED_PUBLISHER_LISTING_DETAIL_ROUTE,
+} from "./release-route-matrix.js";
