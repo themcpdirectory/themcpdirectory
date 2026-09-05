@@ -80,3 +80,29 @@ None.
 ### Concerns
 
 None.
+
+## Fix Round 3
+
+### Corrections
+
+- Bound the published exact immutable package-version fact to the enforcing npm and PyPI schemas in the existing shared contract test, covering accepted exact versions and rejected ranges, wildcards, tags, and mutable labels.
+- Bound the published secret-redaction/reference fact to the strict install response schema, asserting the environment reference source and rejection of injected secret-bearing fields in environment, header, and remote-variable metadata.
+- Replaced substring checks in the existing API docs browser test with exact rate-limit paragraphs and the complete successful-example paragraph sequence generated from exported contract metadata and examples.
+- Inspected the owning domain projections; secret environment and remote-variable defaults are redacted, secret headers are omitted, and legitimate non-secret header values remain supported, so no production projection change was required.
+
+### TDD Evidence
+
+- The new regression assertions passed against the existing enforcement paths, confirming the remaining findings were missing mechanical test bindings rather than production contradictions.
+- The focused contract test passed 9 tests, and the single API docs Playwright test passed with exact full-envelope rendering assertions.
+
+### Verification
+
+- Node `v24.20.0`.
+- Affected `@themcpdirectory/api-contract` shared-contract test passed.
+- Affected `@themcpdirectory/web` API docs Playwright test passed.
+- Affected package typechecks and lints passed.
+- `git diff --check` passed before commit.
+
+### Concerns
+
+None.

@@ -19,6 +19,10 @@ import {
   slugPathParamsSchema,
   installManifestResponseSchema,
 } from "../index.js";
+import {
+  installManifestNpmPackageVersionSchema,
+  installManifestPypiPackageVersionSchema,
+} from "../public-api/install.js";
 
 describe("shared public-api contracts", () => {
   it("enforces strict server envelopes and bounded request ids", () => {
@@ -178,6 +182,144 @@ describe("shared public-api contracts", () => {
     expect(errorResponseSchema.parse(PUBLIC_API_DOCUMENTATION.example)).toEqual(
       PUBLIC_API_DOCUMENTATION.example,
     );
+  });
+
+  it("binds the published immutable-version fact to exact npm and PyPI schemas", () => {
+    expect(PUBLIC_API_INSTALL_SAFETY.packageVersions).toBe("exact immutable versions only");
+
+    for (const version of ["1.2.3", "1.2.3-beta.1+build.7"]) {
+      expect(installManifestNpmPackageVersionSchema.safeParse(version).success).toBe(true);
+    }
+    for (const version of ["^1.2.3", "~1.2.3", "1.x", "latest", "next"]) {
+      expect(installManifestNpmPackageVersionSchema.safeParse(version).success).toBe(false);
+    }
+
+    for (const version of ["1.2.3", "1!2.3rc1.post2.dev3+linux.x86_64"]) {
+      expect(installManifestPypiPackageVersionSchema.safeParse(version).success).toBe(true);
+    }
+    for (const version of [">=1.2.3", "~=1.2", "1.*", "latest", "stable"]) {
+      expect(installManifestPypiPackageVersionSchema.safeParse(version).success).toBe(false);
+    }
+  });
+
+  it("binds the published redaction fact to strict install metadata schemas", () => {
+    expect(PUBLIC_API_INSTALL_SAFETY.environmentValues).toBe(
+      "references only; secret values are never returned",
+    );
+    expect(PUBLIC_API_INSTALL_SAFETY.environmentValueSource).toBe("environment");
+
+    const packageResponse = {
+      data: {
+        schemaVersion: 1,
+        server: {
+          id: "4d5d0cfe-7c48-4df8-9c18-3f5af777d2bb",
+          slug: "github",
+          title: "GitHub",
+          version: "1.2.3",
+        },
+        provenance: {
+          registry: "official",
+          registryName: "Official MCP Registry",
+          observedAt: "2026-09-01T12:00:00Z",
+        },
+        variants: [
+          {
+            id: "130dbf31-0f47-4cc7-8797-f1bcf47c3b80",
+            kind: "package",
+            registryType: "npm",
+            identifier: "@modelcontextprotocol/server-github",
+            version: "1.2.3",
+            runtimeHint: "npx",
+            transport: "stdio",
+            runtimeArguments: [],
+            packageArguments: [],
+            environmentVariables: [
+              {
+                name: "GITHUB_TOKEN",
+                description: "GitHub access token.",
+                required: true,
+                defaultValue: null,
+                valueSource: "environment",
+              },
+            ],
+            integrity: null,
+          },
+        ],
+        compatibility: {},
+      },
+      meta: { requestId: "req_install_safety" },
+    };
+    const parsedPackageResponse = installManifestResponseSchema.parse(packageResponse);
+    const packageVariant = parsedPackageResponse.data.variants[0];
+
+    expect(packageVariant?.kind).toBe("package");
+    if (packageVariant?.kind !== "package") throw new Error("Expected package variant");
+    expect(packageVariant.environmentVariables[0]?.valueSource).toBe(
+      PUBLIC_API_INSTALL_SAFETY.environmentValueSource,
+    );
+    expect(
+      installManifestResponseSchema.safeParse({
+        ...packageResponse,
+        data: {
+          ...packageResponse.data,
+          variants: [
+            {
+              ...packageResponse.data.variants[0],
+              environmentVariables: [
+                {
+                  ...packageResponse.data.variants[0]?.environmentVariables[0],
+                  value: "secret-token",
+                },
+              ],
+            },
+          ],
+        },
+      }).success,
+    ).toBe(false);
+
+    const remoteResponse = PUBLIC_API_SUCCESS_EXAMPLES.install;
+    expect(
+      installManifestResponseSchema.safeParse({
+        ...remoteResponse,
+        data: {
+          ...remoteResponse.data,
+          variants: [
+            {
+              ...remoteResponse.data.variants[0],
+              headers: [
+                {
+                  name: "Authorization",
+                  value: "Bearer public-configuration",
+                  secretValue: "secret-token",
+                },
+              ],
+            },
+          ],
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      installManifestResponseSchema.safeParse({
+        ...remoteResponse,
+        data: {
+          ...remoteResponse.data,
+          variants: [
+            {
+              ...remoteResponse.data.variants[0],
+              variables: [
+                {
+                  name: "workspace",
+                  description: null,
+                  required: true,
+                  defaultValue: null,
+                  secretValue: "secret-token",
+                },
+              ],
+            },
+          ],
+        },
+      }).success,
+    ).toBe(false);
   });
 
   it("publishes concise successful examples validated by their response schemas", () => {

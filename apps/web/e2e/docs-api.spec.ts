@@ -1,4 +1,9 @@
 import { test, expect } from "@playwright/test";
+import {
+  PUBLIC_API_DOCUMENTATION,
+  PUBLIC_API_ERROR_DEFINITIONS,
+  PUBLIC_API_SUCCESS_EXAMPLES,
+} from "@themcpdirectory/api-contract";
 
 test("API docs project the complete verified public contract", async ({ page }) => {
   await page.goto("/docs/api");
@@ -40,9 +45,10 @@ test("API docs project the complete verified public contract", async ({ page }) 
   await expect(page.getByRole("region", { name: "Pagination" })).toContainText(
     "cursor is opaque, optional, and at most 2048 characters",
   );
-  await expect(page.getByRole("region", { name: "Rate limits" })).toContainText(
-    "Retry-After reports seconds until retry; quota is configuration-dependent",
-  );
+  await expect(page.getByRole("region", { name: "Rate limits" }).locator("p")).toHaveText([
+    `${PUBLIC_API_DOCUMENTATION.rateLimit.status} ${PUBLIC_API_DOCUMENTATION.rateLimit.code}: ${PUBLIC_API_ERROR_DEFINITIONS.RATE_LIMITED.message}.`,
+    `${PUBLIC_API_DOCUMENTATION.rateLimit.header.name} reports seconds until retry; quota is ${PUBLIC_API_DOCUMENTATION.rateLimit.quota}.`,
+  ]);
   await expect(page.getByRole("region", { name: "Example", exact: true })).toContainText(
     '"code": "RATE_LIMITED"',
   );
@@ -186,12 +192,14 @@ test("API docs project the complete verified public contract", async ({ page }) 
   }
 
   const examples = page.getByRole("region", { name: "Successful examples" });
-  await expect(examples).toContainText("Collection - ServerCollectionResponse");
-  await expect(examples).toContainText('"nextCursor": null');
-  await expect(examples).toContainText("Resource - ResolvedServerResponse");
-  await expect(examples).toContainText('"matchedBy": "slug"');
-  await expect(examples).toContainText("Install - InstallManifestResponse");
-  await expect(examples).toContainText('"schemaVersion": 1');
+  await expect(examples.locator("p")).toHaveText([
+    "Collection - ServerCollectionResponse",
+    JSON.stringify(PUBLIC_API_SUCCESS_EXAMPLES.collection, null, 2),
+    "Resource - ResolvedServerResponse",
+    JSON.stringify(PUBLIC_API_SUCCESS_EXAMPLES.resource, null, 2),
+    "Install - InstallManifestResponse",
+    JSON.stringify(PUBLIC_API_SUCCESS_EXAMPLES.install, null, 2),
+  ]);
   await expect(page.getByRole("region", { name: "Listing statuses" }).locator("p")).toHaveText([
     "active",
     "deprecated",
