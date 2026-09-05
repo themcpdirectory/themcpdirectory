@@ -32,6 +32,9 @@ export function parsePublisherRetentionJobData(
 
   const candidate = data as Record<string, unknown>;
   const keys = Object.keys(candidate);
+  if (keys.length === 0) {
+    return { mode: checkedAt.getUTCDate() === 1 ? "monthly_with_dormant" : "daily" };
+  }
   const validKeys = keys.length === 1 && keys[0] === "mode";
   const mode = candidate.mode;
   if (!validKeys || (mode !== "daily" && mode !== "monthly_with_dormant")) {

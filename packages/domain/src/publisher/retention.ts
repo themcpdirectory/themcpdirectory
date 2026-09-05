@@ -157,6 +157,16 @@ async function expireAbandonedClaims(
       from ${publisherClaims} claim
       where claim.status in ('pending', 'verifying')
         and claim.created_at <= ${claimExpiryCutoffIso}::timestamptz
+        and not exists (
+          select 1
+          from ${legalHolds} hold
+          where hold.released_at is null
+            and hold.expires_at > ${nowIso}::timestamptz
+            and (
+              (hold.subject_type = 'user' and hold.subject_id = claim.requester_user_id::text)
+              or (hold.subject_type = 'publisher_claim' and hold.subject_id = claim.id::text)
+            )
+        )
       order by claim.created_at asc, claim.id asc
       limit ${candidateLimit}
     ), update_batch as (

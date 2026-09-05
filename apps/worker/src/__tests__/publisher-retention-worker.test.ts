@@ -1,7 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { asc, eq } from "drizzle-orm";
-import { authSessions, authUsers, legalHolds, type Database } from "@themcpdirectory/db";
-import { processPublisherRetentionJob } from "../publisher-retention-worker.js";
+import {
+  authSessions,
+  authUsers,
+  legalHolds,
+  publisherClaims,
+  publishers,
+  servers,
+  type Database,
+} from "@themcpdirectory/db";
+import {
+  parsePublisherRetentionJobData,
+  processPublisherRetentionJob,
+} from "../publisher-retention-worker.js";
 import { createTempDatabase } from "./postgres-test-db.js";
 
 describe("publisher retention worker", () => {
@@ -44,6 +55,40 @@ describe("publisher retention worker", () => {
       ])
       .returning({ id: authUsers.id });
 
+    const [publisher] = await db
+      .insert(publishers)
+      .values({ slug: "held-claim-publisher", displayName: "Held claim publisher" })
+      .returning({ id: publishers.id });
+    const [server] = await db
+      .insert(servers)
+      .values({
+        slug: "held-claim-server",
+        title: "Held claim server",
+        shortDescription: "Synthetic held claim fixture",
+        listingStatus: "active",
+        moderationStatus: "normal",
+        publisherId: publisher!.id,
+        firstSeenAt: new Date("2026-01-01T00:00:00.000Z"),
+        lastSeenAt: new Date("2026-01-01T00:00:00.000Z"),
+      })
+      .returning({ id: servers.id });
+    const [heldClaim] = await db
+      .insert(publisherClaims)
+      .values({
+        serverId: server!.id,
+        publisherId: publisher!.id,
+        requesterUserId: heldUser!.id,
+        verificationMethod: "github_repository",
+        githubSubjectType: "repository",
+        githubSubjectId: "12345678",
+        status: "pending",
+        evidenceSummary: { installationId: 91 },
+        expiresAt: new Date("2026-02-01T00:00:00.000Z"),
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      })
+      .returning({ id: publisherClaims.id });
+
     await db.insert(legalHolds).values({
       scope: "publisher_dispute",
       subjectType: "user",
@@ -76,11 +121,24 @@ describe("publisher retention worker", () => {
       .from(authUsers)
       .where(eq(authUsers.id, deletableUser!.id));
     expect(deletedUser).toEqual([]);
+
+    const [preservedClaim] = await db
+      .select({ status: publisherClaims.status, evidenceSummary: publisherClaims.evidenceSummary })
+      .from(publisherClaims)
+      .where(eq(publisherClaims.id, heldClaim!.id));
+    expect(preservedClaim).toEqual({
+      status: "pending",
+      evidenceSummary: { installationId: 91 },
+    });
   });
 
   it("runs publisher retention daily but only deletes dormant users in monthly mode", async () => {
     const now = new Date("2027-09-15T00:00:00.000Z");
     const userId = "99999999-9999-4999-8999-999999999999";
+
+    expect(parsePublisherRetentionJobData({}, new Date("2027-09-01T05:19:00.000Z"))).toEqual({
+      mode: "monthly_with_dormant",
+    });
 
     await db.insert(authUsers).values({
       id: userId,
