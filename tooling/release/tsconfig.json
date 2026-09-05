@@ -1,0 +1,7 @@
+{
+  "extends": "@themcpdirectory/typescript-config/node.json",
+  "compilerOptions": {
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"]
+}
