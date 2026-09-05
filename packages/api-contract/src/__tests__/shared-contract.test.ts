@@ -9,8 +9,15 @@ import {
   identifierPathParamsSchema,
   PUBLIC_API_DOCUMENTATION,
   PUBLIC_API_ERROR_DEFINITIONS,
+  PUBLIC_API_HTTP_URL_PROTOCOLS,
+  PUBLIC_API_INSTALL_SAFETY,
+  PUBLIC_API_RATE_LIMIT_RESPONSE,
+  PUBLIC_API_SUCCESS_EXAMPLES,
   requestIdSchema,
+  resolveServerIdentifierResponseSchema,
+  serverCollectionResponseSchema,
   slugPathParamsSchema,
+  installManifestResponseSchema,
 } from "../index.js";
 
 describe("shared public-api contracts", () => {
@@ -144,7 +151,11 @@ describe("shared public-api contracts", () => {
       rateLimit: {
         status: 429,
         code: "RATE_LIMITED",
-        retryAfterHeader: "Retry-After",
+        header: {
+          name: "Retry-After",
+          description: "Seconds until the caller may retry.",
+          minimum: 1,
+        },
         quota: "configuration-dependent",
       },
       upstreamDeletion: {
@@ -161,8 +172,23 @@ describe("shared public-api contracts", () => {
         environmentValues: "references only; secret values are never returned",
       },
     });
+    expect(PUBLIC_API_DOCUMENTATION.rateLimit).toBe(PUBLIC_API_RATE_LIMIT_RESPONSE);
+    expect(PUBLIC_API_DOCUMENTATION.installSafety).toBe(PUBLIC_API_INSTALL_SAFETY);
+    expect(PUBLIC_API_INSTALL_SAFETY.urlProtocols).toBe(PUBLIC_API_HTTP_URL_PROTOCOLS);
     expect(errorResponseSchema.parse(PUBLIC_API_DOCUMENTATION.example)).toEqual(
       PUBLIC_API_DOCUMENTATION.example,
+    );
+  });
+
+  it("publishes concise successful examples validated by their response schemas", () => {
+    expect(serverCollectionResponseSchema.parse(PUBLIC_API_SUCCESS_EXAMPLES.collection)).toEqual(
+      PUBLIC_API_SUCCESS_EXAMPLES.collection,
+    );
+    expect(
+      resolveServerIdentifierResponseSchema.parse(PUBLIC_API_SUCCESS_EXAMPLES.resource),
+    ).toEqual(PUBLIC_API_SUCCESS_EXAMPLES.resource);
+    expect(installManifestResponseSchema.parse(PUBLIC_API_SUCCESS_EXAMPLES.install)).toEqual(
+      PUBLIC_API_SUCCESS_EXAMPLES.install,
     );
   });
 });

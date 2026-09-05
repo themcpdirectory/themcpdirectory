@@ -1,12 +1,11 @@
 import { valid as validPep440 } from "@renovatebot/pep440";
 import { valid as validSemver } from "semver";
 import { z } from "zod";
-import {
-  RemoteHealthObservationV1Schema,
-} from "./health.js";
+import { RemoteHealthObservationV1Schema } from "./health.js";
 import {
   createResourceResponseSchema,
   httpUrlSchema,
+  PUBLIC_API_HTTP_URL_PROTOCOLS,
   rfc3339UtcSchema,
   slugSchema,
   strictObject,
@@ -19,6 +18,13 @@ import {
 } from "./servers.js";
 import { legacyTrustProfileServerSchema } from "./trust.js";
 export { InstallAvailabilitySchema };
+
+export const PUBLIC_API_INSTALL_SAFETY = {
+  urlProtocols: PUBLIC_API_HTTP_URL_PROTOCOLS,
+  packageVersions: "exact immutable versions only",
+  environmentValues: "references only; secret values are never returned",
+  environmentValueSource: "environment",
+} as const;
 
 function isExactNpmPackageVersion(version: string): boolean {
   return validSemver(version) !== null && version.trim() === version && /^\d/.test(version);
@@ -66,11 +72,17 @@ export const installManifestPackageRegistryTypeSchema = z.enum(["npm", "pypi"]);
 export const installManifestNpmPackageVersionSchema = z
   .string()
   .regex(EXACT_NPM_PACKAGE_VERSION_PATTERN)
-  .refine(isExactNpmPackageVersion, "Package version must be an exact immutable npm version");
+  .refine(
+    isExactNpmPackageVersion,
+    `Package version must use ${PUBLIC_API_INSTALL_SAFETY.packageVersions}`,
+  );
 export const installManifestPypiPackageVersionSchema = z
   .string()
   .regex(EXACT_PYPI_PACKAGE_VERSION_PATTERN)
-  .refine(isExactPypiPackageVersion, "Package version must be an exact immutable PyPI version");
+  .refine(
+    isExactPypiPackageVersion,
+    `Package version must use ${PUBLIC_API_INSTALL_SAFETY.packageVersions}`,
+  );
 export const installManifestPackageVersionSchema = z.union([
   installManifestNpmPackageVersionSchema,
   installManifestPypiPackageVersionSchema,
@@ -101,7 +113,7 @@ const environmentVariableSchema = strictObject({
   description: z.string().min(1).nullable(),
   required: z.boolean(),
   defaultValue: z.string().min(1).nullable(),
-  valueSource: z.literal("environment"),
+  valueSource: z.literal(PUBLIC_API_INSTALL_SAFETY.environmentValueSource),
 });
 
 const headerSchema = strictObject({

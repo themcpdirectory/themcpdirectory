@@ -6,6 +6,7 @@ import {
   createPublicApiOpenApiDocument,
   installManifestResponseSchema,
   publisherDetailResponseSchema,
+  PUBLIC_API_RATE_LIMIT_RESPONSE,
   type HealthCheckOutcome,
   type RemoteHealthObservationV1,
   type RemoteHealthObservationV1Client,
@@ -330,26 +331,47 @@ describe("createPublicApiOpenApiDocument", () => {
       getSchemaValueAtPath(errorResponse, ["properties", "error", "properties", "code", "enum"]),
     ).toEqual(apiErrorCodeSchema.options);
 
-    for (const path of Object.keys(document.paths ?? {})) {
+    const expectedResponseStatuses = {
+      "/api/v1/categories": ["200", "429", "500"],
+      "/api/v1/categories/{slug}": ["200", "400", "404", "429", "500"],
+      "/api/v1/clients": ["200", "429", "500"],
+      "/api/v1/clients/{id}": ["200", "400", "404", "429", "500"],
+      "/api/v1/publishers/{slug}": ["200", "400", "404", "429", "500"],
+      "/api/v1/resolve/{identifier}": ["200", "400", "404", "409", "429", "500"],
+      "/api/v1/resolve/{identifier}/install": ["200", "400", "404", "409", "410", "429", "500"],
+      "/api/v1/search": ["200", "400", "429", "500"],
+      "/api/v1/servers": ["200", "400", "429", "500"],
+      "/api/v1/servers/{slug}": ["200", "400", "404", "429", "500"],
+      "/api/v1/servers/{slug}/install": ["200", "400", "404", "410", "429", "500"],
+    } as const;
+
+    expect(
+      Object.fromEntries(
+        Object.entries(document.paths ?? {}).map(([path, pathItem]) => [
+          path,
+          Object.keys(pathItem?.get?.responses ?? {}),
+        ]),
+      ),
+    ).toEqual(expectedResponseStatuses);
+
+    for (const path of Object.keys(expectedResponseStatuses)) {
       const rateLimited = getErrorResponse(document, path, "429");
       expect(rateLimited.content?.["application/json"]?.schema?.$ref).toBe(
         "#/components/schemas/ErrorResponse",
       );
-      expect(rateLimited.headers).toHaveProperty("Retry-After");
+      expect(rateLimited.headers).toEqual({
+        [PUBLIC_API_RATE_LIMIT_RESPONSE.header.name]: {
+          description: PUBLIC_API_RATE_LIMIT_RESPONSE.header.description,
+          schema: {
+            type: "integer",
+            minimum: PUBLIC_API_RATE_LIMIT_RESPONSE.header.minimum,
+          },
+        },
+      });
       expect(
         getErrorResponse(document, path, "500").content?.["application/json"]?.schema?.$ref,
       ).toBe("#/components/schemas/ErrorResponse");
     }
-
-    expect(Object.keys(document.paths?.["/api/v1/servers"]?.get?.responses ?? {})).toEqual([
-      "200",
-      "400",
-      "429",
-      "500",
-    ]);
-    expect(
-      Object.keys(document.paths?.["/api/v1/resolve/{identifier}"]?.get?.responses ?? {}),
-    ).toEqual(["200", "400", "404", "409", "429", "500"]);
 
     for (const path of ["/api/v1/resolve/{identifier}/install", "/api/v1/servers/{slug}/install"]) {
       const gone = getErrorResponse(document, path, "410");

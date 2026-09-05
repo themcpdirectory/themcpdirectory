@@ -7,6 +7,7 @@ import {
   ServerNotFoundError,
   UpstreamDeletedError,
 } from "@themcpdirectory/domain";
+import { PUBLIC_API_RATE_LIMIT_RESPONSE } from "@themcpdirectory/api-contract";
 import { InvalidCursorError } from "@themcpdirectory/search";
 import type { ApiEnv } from "../app.js";
 import { createErrorHandler, HttpApiError } from "../http/errors.js";
@@ -115,5 +116,22 @@ describe("createErrorHandler", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "INTERNAL_ERROR", requestId: "req_response_schema_failure" },
     });
+  });
+
+  it("uses the shared rate-limit response header", async () => {
+    const app = new Hono<ApiEnv>();
+    app.use("*", async (c, next) => {
+      c.set("rateLimitRetryAfter", 12);
+      await next();
+    });
+    app.onError(createErrorHandler({ info() {}, error() {} }));
+    app.get("/", () => {
+      throw new HttpApiError("RATE_LIMITED");
+    });
+
+    const response = await app.request("/");
+
+    expect(response.status).toBe(PUBLIC_API_RATE_LIMIT_RESPONSE.status);
+    expect(response.headers.get(PUBLIC_API_RATE_LIMIT_RESPONSE.header.name)).toBe("12");
   });
 });

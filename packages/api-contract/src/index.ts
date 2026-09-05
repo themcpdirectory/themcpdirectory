@@ -4,6 +4,7 @@ export {
   createResourceResponseSchema,
   httpUrlSchema,
   identifierPathParamsSchema,
+  PUBLIC_API_HTTP_URL_PROTOCOLS,
   PUBLIC_API_PAGINATION,
   publicApiCursorSchema,
   publicApiLimitSchema,
@@ -18,11 +19,13 @@ export {
   apiErrorCodeSchema,
   errorResponseSchema,
   PUBLIC_API_ERROR_DEFINITIONS,
+  PUBLIC_API_RATE_LIMIT_RESPONSE,
   type ApiErrorCode,
   type ApiErrorStatus,
 } from "./public-api/errors.js";
 export {
   PUBLIC_API_DOCUMENTATION,
+  PUBLIC_API_SUCCESS_EXAMPLES,
   type PublicApiDocumentation,
 } from "./public-api/documentation.js";
 export {
@@ -77,6 +80,7 @@ export {
 } from "./public-api/client-parsers.js";
 export {
   InstallAvailabilitySchema,
+  PUBLIC_API_INSTALL_SAFETY,
   isExactPackageVersionForRegistry,
   installManifestQuerySchema,
   installManifestResponseSchema,

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   errorResponseSchema,
   PUBLIC_API_ERROR_DEFINITIONS,
+  PUBLIC_API_RATE_LIMIT_RESPONSE,
   type ApiErrorCode,
   type ApiErrorStatus,
 } from "@themcpdirectory/api-contract";
@@ -72,8 +73,8 @@ export function createErrorHandler(logger: ApiLogger): ErrorHandler<ApiEnv> {
       "x-request-id": requestId,
     });
     const retryAfter = c.get("rateLimitRetryAfter");
-    if (httpError.status === 429 && retryAfter !== undefined) {
-      headers.set("Retry-After", String(retryAfter));
+    if (httpError.status === PUBLIC_API_RATE_LIMIT_RESPONSE.status && retryAfter !== undefined) {
+      headers.set(PUBLIC_API_RATE_LIMIT_RESPONSE.header.name, String(retryAfter));
     }
 
     return new Response(JSON.stringify(body), {

@@ -31,7 +31,12 @@ export function DocumentPage({ document }: { document: ReleaseDocument }) {
               {section.body.map((paragraph) => (
                 <p
                   key={paragraph}
-                  style={{ margin: "0 0 1rem", color: "var(--fg-muted)", overflowWrap: "anywhere" }}
+                  style={{
+                    margin: "0 0 1rem",
+                    color: "var(--fg-muted)",
+                    overflowWrap: "anywhere",
+                    whiteSpace: "pre-wrap",
+                  }}
                 >
                   {paragraph}
                 </p>

@@ -19,10 +19,20 @@ export const identifierPathParamsSchema = z.object({
     .refine((value) => value.trim().length > 0),
 });
 export const rfc3339UtcSchema = z.string().datetime({ offset: true });
-const HTTP_URL_PATTERN = /^[hH][tT][tT][pP][sS]?:\/\//;
+export const PUBLIC_API_HTTP_URL_PROTOCOLS = ["http", "https"] as const;
+const HTTP_URL_PATTERN = new RegExp(
+  `^(?:${PUBLIC_API_HTTP_URL_PROTOCOLS.map((protocol) =>
+    [...protocol]
+      .map((character) => `[${character.toLowerCase()}${character.toUpperCase()}]`)
+      .join(""),
+  ).join("|")}):\\/\\/`,
+);
 export const httpUrlSchema = z
   .string()
-  .regex(HTTP_URL_PATTERN, "URL must use the HTTP or HTTPS protocol")
+  .regex(
+    HTTP_URL_PATTERN,
+    `URL must use the ${PUBLIC_API_HTTP_URL_PROTOCOLS.map((protocol) => protocol.toUpperCase()).join(" or ")} protocol`,
+  )
   .url();
 
 export const PUBLIC_API_PAGINATION = {

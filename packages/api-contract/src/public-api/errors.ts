@@ -25,6 +25,17 @@ export const PUBLIC_API_ERROR_DEFINITIONS = {
   INTERNAL_ERROR: { status: 500, message: "Internal server error" },
 } as const satisfies Record<ApiErrorCode, Readonly<{ status: number; message: string }>>;
 
+export const PUBLIC_API_RATE_LIMIT_RESPONSE = {
+  status: PUBLIC_API_ERROR_DEFINITIONS.RATE_LIMITED.status,
+  code: "RATE_LIMITED",
+  header: {
+    name: "Retry-After",
+    description: "Seconds until the caller may retry.",
+    minimum: 1,
+  },
+  quota: "configuration-dependent",
+} as const;
+
 export type ApiErrorStatus = (typeof PUBLIC_API_ERROR_DEFINITIONS)[ApiErrorCode]["status"];
 
 export const errorResponseSchema = strictObject({

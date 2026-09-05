@@ -14,7 +14,12 @@ import {
   discoveryPageQuerySchema,
   publisherDetailResponseSchema,
 } from "./discovery.js";
-import { errorResponseSchema, PUBLIC_API_ERROR_DEFINITIONS, type ApiErrorCode } from "./errors.js";
+import {
+  errorResponseSchema,
+  PUBLIC_API_ERROR_DEFINITIONS,
+  PUBLIC_API_RATE_LIMIT_RESPONSE,
+  type ApiErrorCode,
+} from "./errors.js";
 import {
   InstallAvailabilitySchema,
   installManifestQuerySchema,
@@ -54,9 +59,12 @@ function createErrorResponse(
     ...(includeRetryAfter
       ? {
           headers: {
-            "Retry-After": {
-              description: "Seconds until the caller may retry.",
-              schema: { type: "integer" as const, minimum: 1 },
+            [PUBLIC_API_RATE_LIMIT_RESPONSE.header.name]: {
+              description: PUBLIC_API_RATE_LIMIT_RESPONSE.header.description,
+              schema: {
+                type: "integer" as const,
+                minimum: PUBLIC_API_RATE_LIMIT_RESPONSE.header.minimum,
+              },
             },
           },
         }
