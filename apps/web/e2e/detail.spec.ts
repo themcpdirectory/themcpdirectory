@@ -76,10 +76,11 @@ test.describe("Server detail page", () => {
           Boolean((window as Window & { __jsonLdXss?: boolean }).__jsonLdXss),
         ),
       ).toBe(false);
-      const jsonLd = await page
+      const jsonLdBlocks = await page
         .locator('script[type="application/ld+json"]')
-        .evaluate((script) => JSON.parse(script.textContent ?? "{}"));
-      expect(jsonLd.description).toBe(payload);
+        .evaluateAll((scripts) => scripts.map((script) => JSON.parse(script.textContent ?? "{}")));
+      const softwareJsonLd = jsonLdBlocks.find((entry) => entry["@type"] === "SoftwareApplication");
+      expect(softwareJsonLd?.description).toBe(payload);
     } finally {
       await client`
         update servers

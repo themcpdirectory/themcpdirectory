@@ -1,7 +1,4 @@
-import {
-  PhasePrerequisiteFailure,
-  verifyPhasePrerequisites,
-} from "./phase-prerequisites.js";
+import { PhasePrerequisiteFailure, verifyPhasePrerequisites } from "./phase-prerequisites.js";
 
 try {
   const result = await verifyPhasePrerequisites();

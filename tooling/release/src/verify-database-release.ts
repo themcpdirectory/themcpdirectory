@@ -22,6 +22,7 @@ const PREVIOUS_RELEASE_FIXTURE = fileURLToPath(
   new URL("../fixtures/previous-release.sql", import.meta.url),
 );
 const PREVIOUS_RELEASE_MIGRATION = "0004_trust_signal_legacy_retention";
+const DEFAULT_REGISTRY_BASE_URL = "https://registry.modelcontextprotocol.io";
 
 interface MigrationJournalEntry {
   readonly tag: string;
@@ -114,11 +115,22 @@ async function createTemporaryDatabase(label: string): Promise<TemporaryDatabase
   };
 }
 
+export function workspaceCommandEnv(
+  environment: NodeJS.ProcessEnv,
+  databaseUrl: string,
+): NodeJS.ProcessEnv {
+  return {
+    ...environment,
+    DATABASE_URL: databaseUrl,
+    MCP_REGISTRY_BASE_URL: environment.MCP_REGISTRY_BASE_URL ?? DEFAULT_REGISTRY_BASE_URL,
+  };
+}
+
 function runWorkspaceCommand(command: string, databaseUrl: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn("pnpm", [command], {
       cwd: REPOSITORY_ROOT,
-      env: { ...process.env, DATABASE_URL: databaseUrl },
+      env: workspaceCommandEnv(process.env, databaseUrl),
       stdio: "inherit",
     });
     child.once("error", reject);

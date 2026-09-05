@@ -3,10 +3,7 @@ import { and, eq, ne } from "drizzle-orm";
 import type { Database } from "@themcpdirectory/db";
 import { publisherClaims } from "@themcpdirectory/db";
 import type { WebEnv } from "@themcpdirectory/config";
-import {
-  resumeRetryableAccountErasure,
-  type AccountErasureDeps,
-} from "@themcpdirectory/domain";
+import { resumeRetryableAccountErasure, type AccountErasureDeps } from "@themcpdirectory/domain";
 
 export const PUBLISHER_ERASURE_QUEUE = "publisher.erasure";
 
@@ -82,10 +79,7 @@ function isOwnedUserInstallationEvidence(evidenceSummary: unknown): {
   return null;
 }
 
-async function loadOwnedInstallationIds(
-  db: Database,
-  userId: string,
-): Promise<readonly number[]> {
+async function loadOwnedInstallationIds(db: Database, userId: string): Promise<readonly number[]> {
   const userClaims = await db
     .select({ evidenceSummary: publisherClaims.evidenceSummary })
     .from(publisherClaims)
@@ -116,12 +110,17 @@ async function loadOwnedInstallationIds(
     }
   }
 
-  return [...candidateIds].filter((installationId) => !sharedIds.has(installationId)).sort((a, b) => a - b);
+  return [...candidateIds]
+    .filter((installationId) => !sharedIds.has(installationId))
+    .sort((a, b) => a - b);
 }
 
-async function disconnectInstallation(
-  input: { env: GitHubErasureEnv; installationId: number; operationId: string; fetchImpl: typeof fetch },
-): Promise<void> {
+async function disconnectInstallation(input: {
+  env: GitHubErasureEnv;
+  installationId: number;
+  operationId: string;
+  fetchImpl: typeof fetch;
+}): Promise<void> {
   const { env, installationId, operationId, fetchImpl } = input;
   if (!Number.isSafeInteger(installationId) || installationId <= 0) {
     throw new Error("GITHUB_APP_INSTALLATION_ID_INVALID");
@@ -152,13 +151,11 @@ async function disconnectInstallation(
   throw new Error(`GITHUB_APP_DISCONNECT_FAILED_${response.status}`);
 }
 
-export function createAccountErasureDeps(
-  input: {
-    db: Database;
-    env: GitHubErasureEnv;
-    fetchImpl?: typeof fetch;
-  },
-): AccountErasureDeps {
+export function createAccountErasureDeps(input: {
+  db: Database;
+  env: GitHubErasureEnv;
+  fetchImpl?: typeof fetch;
+}): AccountErasureDeps {
   const fetchImpl = input.fetchImpl ?? fetch;
 
   return {

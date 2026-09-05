@@ -65,10 +65,7 @@ export interface PublisherDashboard {
     readonly claimableListings: readonly {
       readonly serverId: string;
       readonly serverTitle: string;
-      readonly verificationMethods: readonly (
-        | "github_repository"
-        | "github_organization"
-      )[];
+      readonly verificationMethods: readonly ("github_repository" | "github_organization")[];
     }[];
     readonly claims: readonly {
       readonly claimId: string;
@@ -224,11 +221,18 @@ async function loadClaimableListings(db: Database, publisherId: string) {
     const methods: ("github_repository" | "github_organization")[] = ["github_repository"];
     if (
       canUseOrganisation &&
-      repositoryOwner(listing.repositoryUrl)?.toLowerCase() === organisation?.githubOrg?.toLowerCase()
+      repositoryOwner(listing.repositoryUrl)?.toLowerCase() ===
+        organisation?.githubOrg?.toLowerCase()
     ) {
       methods.push("github_organization");
     }
-    return [{ serverId: listing.serverId, serverTitle: listing.serverTitle, verificationMethods: methods }];
+    return [
+      {
+        serverId: listing.serverId,
+        serverTitle: listing.serverTitle,
+        verificationMethods: methods,
+      },
+    ];
   });
 }
 

@@ -40,8 +40,6 @@ test("dashboard explains claim permissions, works at 320px, and focuses the erro
   await page.goto(`/dashboard/listings/${session.claimedListingId}`);
   await expect(page.getByText("Claim status:")).toContainText("pending");
 
-  const unauthorizedResponse = await page.goto(
-    `/dashboard/listings/${session.unclaimedListingId}`,
-  );
+  const unauthorizedResponse = await page.goto(`/dashboard/listings/${session.unclaimedListingId}`);
   expect(unauthorizedResponse?.status()).toBe(404);
 });

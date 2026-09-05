@@ -1,8 +1,5 @@
 import type { Database } from "@themcpdirectory/db";
-import {
-  runPublisherRetentionSweep,
-  type PublisherRetentionPolicy,
-} from "@themcpdirectory/domain";
+import { runPublisherRetentionSweep, type PublisherRetentionPolicy } from "@themcpdirectory/domain";
 
 export const PUBLISHER_RETENTION_QUEUE = "publisher.retention";
 

@@ -15,7 +15,12 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { startFakeDirectoryApi } from "./fake-directory-api.js";
 
-export const CLI_TARBALL_ALLOWLIST = ["README.md", "dist/index.js", "package.json"] as const;
+export const CLI_TARBALL_ALLOWLIST = [
+  "README.md",
+  "dist/index.d.ts",
+  "dist/index.js",
+  "package.json",
+] as const;
 
 export const CLI_TARBALL_SMOKE_STEPS = [
   "npm-pack-dry-run",
@@ -23,6 +28,7 @@ export const CLI_TARBALL_SMOKE_STEPS = [
   "inspect-tarball-allowlist",
   "hash-tarball-sha256",
   "install-into-temporary-prefix",
+  "typescript-consumer",
   "start-fake-directory-api",
   "published-bin-help",
   "published-bin-version",
@@ -67,6 +73,7 @@ interface NpmPackDryRun {
 const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const CLI_PACKAGE_DIRECTORY = path.join(REPOSITORY_ROOT, "packages", "cli");
 const REPORT_PATH = path.join(REPOSITORY_ROOT, "test-results", "release", "cli-tarball.json");
+const TYPESCRIPT_CLI_PATH = fileURLToPath(import.meta.resolve("typescript/bin/tsc"));
 const LEGACY_RECEIPT_FIXTURE = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../fixtures/legacy-receipt-v1.json",
@@ -322,6 +329,42 @@ export async function verifyCliTarball(rootDirectory = REPOSITORY_ROOT): Promise
       ],
       { cwd: installPrefix },
     );
+
+    const consumerConfigPath = path.join(installPrefix, "tsconfig.json");
+    await writeFile(
+      path.join(installPrefix, "consumer.ts"),
+      [
+        'import { parseCliJsonEnvelope, runCli } from "@themcpdirectory/cli";',
+        'import { CLI_COMMANDS, type CliCommandMetadata } from "@themcpdirectory/cli/command-metadata";',
+        "const firstCommand: CliCommandMetadata | undefined = CLI_COMMANDS[0];",
+        "void firstCommand;",
+        "void parseCliJsonEnvelope;",
+        "void runCli;",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await writeFile(
+      consumerConfigPath,
+      `${JSON.stringify(
+        {
+          compilerOptions: {
+            module: "NodeNext",
+            moduleResolution: "NodeNext",
+            noEmit: true,
+            skipLibCheck: false,
+            strict: true,
+          },
+          files: ["consumer.ts"],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    await runCommand(process.execPath, [TYPESCRIPT_CLI_PATH, "--project", consumerConfigPath], {
+      cwd: installPrefix,
+    });
 
     const binaryPath = path.join(
       installPrefix,

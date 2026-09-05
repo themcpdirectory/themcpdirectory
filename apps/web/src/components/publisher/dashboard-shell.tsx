@@ -142,39 +142,41 @@ export function DashboardShell({ dashboard }: DashboardShellProps) {
               <>
                 <ErrorSummary id="claim-list-error-summary" errors={claimErrors} />
                 <ul className="publisher-claim-list">
-                {activePublisher.claims.map((claim) => (
-                  <li key={claim.claimId}>
-                    <div className="publisher-claim-heading">
-                      <Link href={`/dashboard/listings/${claim.serverId}`}>
-                        {claim.serverTitle}
-                      </Link>
-                      <span className="trust-signal-state">{claim.status}</span>
-                    </div>
-                    <p>{claimGuidance(claim)}</p>
-                    {activePublisher.capabilities.includes("claims.manage") &&
-                      !claim.requiresManualReview &&
-                      (claim.status === "pending" || claim.status === "verifying") && (
-                        <div className="publisher-claim-actions">
-                          <button
-                            type="button"
-                            className="publisher-action publisher-secondary-action"
-                            disabled={pendingClaimId === claim.claimId}
-                            onClick={() => void verifyClaim(claim.claimId)}
-                          >
-                            {claim.status === "verifying" ? "Retry verification" : "Verify with GitHub"}
-                          </button>
-                          <button
-                            type="button"
-                            className="publisher-action publisher-secondary-action"
-                            disabled={pendingClaimId === claim.claimId}
-                            onClick={() => void withdrawClaim(claim.claimId)}
-                          >
-                            Withdraw claim
-                          </button>
-                        </div>
-                      )}
-                  </li>
-                ))}
+                  {activePublisher.claims.map((claim) => (
+                    <li key={claim.claimId}>
+                      <div className="publisher-claim-heading">
+                        <Link href={`/dashboard/listings/${claim.serverId}`}>
+                          {claim.serverTitle}
+                        </Link>
+                        <span className="trust-signal-state">{claim.status}</span>
+                      </div>
+                      <p>{claimGuidance(claim)}</p>
+                      {activePublisher.capabilities.includes("claims.manage") &&
+                        !claim.requiresManualReview &&
+                        (claim.status === "pending" || claim.status === "verifying") && (
+                          <div className="publisher-claim-actions">
+                            <button
+                              type="button"
+                              className="publisher-action publisher-secondary-action"
+                              disabled={pendingClaimId === claim.claimId}
+                              onClick={() => void verifyClaim(claim.claimId)}
+                            >
+                              {claim.status === "verifying"
+                                ? "Retry verification"
+                                : "Verify with GitHub"}
+                            </button>
+                            <button
+                              type="button"
+                              className="publisher-action publisher-secondary-action"
+                              disabled={pendingClaimId === claim.claimId}
+                              onClick={() => void withdrawClaim(claim.claimId)}
+                            >
+                              Withdraw claim
+                            </button>
+                          </div>
+                        )}
+                    </li>
+                  ))}
                 </ul>
               </>
             )}

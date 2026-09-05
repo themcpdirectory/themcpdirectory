@@ -18,7 +18,9 @@ test("legal and governance routes preserve repository truth", async ({ page }) =
 
   await page.goto("/security");
   await expect(page.getByText(/GitHub's private vulnerability reporting form/i)).toBeVisible();
-  await expect(page.getByText(/does not currently promise a response or resolution/i)).toBeVisible();
+  await expect(
+    page.getByText(/does not currently promise a response or resolution/i),
+  ).toBeVisible();
 
   for (const path of ["/privacy", "/terms"]) {
     await page.goto(path);

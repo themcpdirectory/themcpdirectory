@@ -18,7 +18,10 @@ function normalizeUrl(url: string): string {
     parsed.host !== "anysphere.cursor-deeplink" ||
     parsed.pathname !== "/mcp/install"
   ) {
-    throw new CursorJsonError("CURSOR_INVALID_DOCUMENT", "Cursor deeplink operation URL is invalid");
+    throw new CursorJsonError(
+      "CURSOR_INVALID_DOCUMENT",
+      "Cursor deeplink operation URL is invalid",
+    );
   }
 
   const entries = Array.from(parsed.searchParams.entries());

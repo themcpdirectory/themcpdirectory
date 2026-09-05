@@ -87,9 +87,7 @@ describe("auth configuration", () => {
         });
       }
 
-      return Response.json([
-        { email: "public@example.com", primary: true, verified: false },
-      ]);
+      return Response.json([{ email: "public@example.com", primary: true, verified: false }]);
     };
     const auth = createAuth({
       db: createDatabase(TEST_ENV.DATABASE_URL),

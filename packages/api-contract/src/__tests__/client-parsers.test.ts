@@ -76,14 +76,16 @@ describe("UnsupportedManifestVersionError", () => {
     expect(parsed.data.installAvailability).toBe("available");
     expect(parsed.data.latestHealth?.outcome).toBe("healthy");
     expect(
-      ((parsed.data.latestHealth as Record<string, unknown> | undefined)?.futureHealthField as
-        | Record<string, unknown>
-        | undefined)?.safe,
+      (
+        (parsed.data.latestHealth as Record<string, unknown> | undefined)?.futureHealthField as
+          Record<string, unknown> | undefined
+      )?.safe,
     ).toBe(true);
     expect(
-      (((parsed.data.trustProfile as Record<string, unknown>).futureTrustField as
-        | Record<string, unknown>
-        | undefined)?.safe),
+      (
+        (parsed.data.trustProfile as Record<string, unknown>).futureTrustField as
+          Record<string, unknown> | undefined
+      )?.safe,
     ).toBe(true);
     expect((parsed.data as Record<string, unknown>).futureDetailField).toBe("preserved");
   });

@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  PHASE_PREREQUISITE_MATRIX,
-  verifyPhasePrerequisites,
-} from "../phase-prerequisites.js";
+import { PHASE_PREREQUISITE_MATRIX, verifyPhasePrerequisites } from "../phase-prerequisites.js";
 import type { PhasePrerequisiteFailure } from "../phase-prerequisites.js";
 
 describe("phase H prerequisite gate", () => {

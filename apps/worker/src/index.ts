@@ -53,10 +53,7 @@ import {
   nextRemoteHealthRetryDelayMs,
 } from "./trust-health-config.js";
 import { cleanupHealthHistory, cleanupTrustHistory } from "./retention.js";
-import {
-  PUBLISHER_OUTBOX_QUEUE,
-  processPublisherOutboxJob,
-} from "./publisher-outbox-worker.js";
+import { PUBLISHER_OUTBOX_QUEUE, processPublisherOutboxJob } from "./publisher-outbox-worker.js";
 import {
   PUBLISHER_ERASURE_QUEUE,
   createAccountErasureDeps,

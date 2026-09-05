@@ -11,19 +11,21 @@ const remoteHealthObservationExample = {
   redirectCount: 0,
 } as const;
 
-export const HealthCheckOutcomeSchema = z.enum([
-  "healthy",
-  "degraded",
-  "unreachable",
-  "timed_out",
-  "unsafe_destination",
-  "response_too_large",
-  "unsupported",
-  "unknown",
-]).meta({
-  id: "HealthCheckOutcome",
-  example: remoteHealthObservationExample.outcome,
-});
+export const HealthCheckOutcomeSchema = z
+  .enum([
+    "healthy",
+    "degraded",
+    "unreachable",
+    "timed_out",
+    "unsafe_destination",
+    "response_too_large",
+    "unsupported",
+    "unknown",
+  ])
+  .meta({
+    id: "HealthCheckOutcome",
+    example: remoteHealthObservationExample.outcome,
+  });
 export type HealthCheckOutcome = z.infer<typeof HealthCheckOutcomeSchema>;
 
 const RemoteHealthObservationShape = {
@@ -36,14 +38,10 @@ const RemoteHealthObservationShape = {
   redirectCount: z.number().int().nonnegative(),
 };
 
-export const RemoteHealthObservationV1Schema = strictObject(
-  RemoteHealthObservationShape,
-).meta({
+export const RemoteHealthObservationV1Schema = strictObject(RemoteHealthObservationShape).meta({
   id: "RemoteHealthObservationV1",
   example: remoteHealthObservationExample,
 });
 export type RemoteHealthObservationV1 = z.infer<typeof RemoteHealthObservationV1Schema>;
 export const RemoteHealthObservationV1ClientSchema = clientObject(RemoteHealthObservationShape);
-export type RemoteHealthObservationV1Client = z.infer<
-  typeof RemoteHealthObservationV1ClientSchema
->;
+export type RemoteHealthObservationV1Client = z.infer<typeof RemoteHealthObservationV1ClientSchema>;

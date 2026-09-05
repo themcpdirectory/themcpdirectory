@@ -20,9 +20,11 @@ export const metadata: Metadata = buildDocumentMetadata({
 
 export default function HomePage() {
   return (
-    <Suspense fallback={<LoadingState />}>
-      <HomeDirectory />
-    </Suspense>
+    <main id="main-content" tabIndex={-1} style={{ minHeight: "100vh" }}>
+      <Suspense fallback={<LoadingState withinMain />}>
+        <HomeDirectory />
+      </Suspense>
+    </main>
   );
 }
 
@@ -36,7 +38,7 @@ async function HomeDirectory() {
   const featuredCategories = allCategories.filter((c) => c.serverCount > 0).slice(0, 6);
 
   return (
-    <main id="main-content" tabIndex={-1} style={{ minHeight: "100vh" }}>
+    <>
       {/* Hero search */}
       <section
         aria-label="Search MCP servers"
@@ -177,6 +179,6 @@ async function HomeDirectory() {
           </p>
         )}
       </div>
-    </main>
+    </>
   );
 }

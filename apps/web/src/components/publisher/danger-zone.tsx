@@ -78,7 +78,10 @@ export function DangerZone() {
   }
 
   return (
-    <section aria-labelledby="danger-zone-heading" className="publisher-panel publisher-danger-zone">
+    <section
+      aria-labelledby="danger-zone-heading"
+      className="publisher-panel publisher-danger-zone"
+    >
       <h2 id="danger-zone-heading" style={{ margin: "0 0 0.75rem", fontSize: "1.0625rem" }}>
         Export and erasure
       </h2>

@@ -63,13 +63,13 @@ export async function getPublicClientById(
   input: { id: SupportedClientId; cursor?: string; limit?: number },
   options: SearchServersPageOptions,
 ): Promise<PublicClientDetail | null> {
-  const client = getSupportedClientById(input.id);
-  if (!client) return null;
+  const descriptor = getSupportedClientById(input.id);
+  if (!descriptor) return null;
 
   const page = await searchServersPage(
     db,
     {
-      client: client.id,
+      client: descriptor.id,
       sort: "recent",
       limit: input.limit ?? 30,
       cursor: input.cursor,
@@ -77,5 +77,10 @@ export async function getPublicClientById(
     options,
   );
 
+  const client = {
+    id: descriptor.id,
+    name: descriptor.name,
+    capabilities: descriptor.capabilities,
+  };
   return { client, servers: [...page.items], nextCursor: page.nextCursor };
 }

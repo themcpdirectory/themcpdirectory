@@ -18,8 +18,8 @@
 | 5    | ready after 4  | Runtime includes stdin, bounds, mode, fsync/backup primitives and structured rollback.       |
 | 6    | ready after 5  | Expose or remove probe result; prove all bounded process options and safe discovery.         |
 | 7    | ready after 5  | Same capability/runtime requirements as Task 6.                                              |
-| 8    | complete       | Cursor covers mode, backup, fsync, concurrency, symlinks, rollback, and fixed scopes.       |
-| 8A   | complete       | VS Code uses documented JSON shapes and portable workspace/user paths; no guessed CLI use.  |
+| 8    | complete       | Cursor covers mode, backup, fsync, concurrency, symlinks, rollback, and fixed scopes.        |
+| 8A   | complete       | VS Code uses documented JSON shapes and portable workspace/user paths; no guessed CLI use.   |
 | 9    | ready after 8  | Choose one shebang bin entry; build before smoke and invoke built output directly.           |
 | 10   | ready after 9  | `CommandResult` carries data/human lines/category; only `runCli` writes; compose adapters.   |
 | 11   | ready after 10 | Reusable planner separate from command wrapper; dry-run permits read-only probes only.       |

@@ -48,7 +48,11 @@ export function medianScore(scores: readonly number[]): number {
   return (ordered[midpoint - 1]! + ordered[midpoint]!) / 2;
 }
 
-function runCommand(command: string, args: readonly string[], env: NodeJS.ProcessEnv): Promise<void> {
+function runCommand(
+  command: string,
+  args: readonly string[],
+  env: NodeJS.ProcessEnv,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: REPOSITORY_ROOT,
@@ -58,7 +62,8 @@ function runCommand(command: string, args: readonly string[], env: NodeJS.Proces
     child.once("error", reject);
     child.once("exit", (code, signal) => {
       if (code === 0) resolve();
-      else reject(new Error(`${command} failed with ${signal ?? `exit code ${code ?? "unknown"}`}.`));
+      else
+        reject(new Error(`${command} failed with ${signal ?? `exit code ${code ?? "unknown"}`}.`));
     });
   });
 }
@@ -138,9 +143,7 @@ async function loadWebFixtures(): Promise<{
   readonly database: TestDatabaseModule;
   readonly session: SessionFixtureModule;
 }> {
-  const databaseUrl = pathToFileURL(
-    path.join(WEB_DIRECTORY, "e2e/setup/test-database.ts"),
-  ).href;
+  const databaseUrl = pathToFileURL(path.join(WEB_DIRECTORY, "e2e/setup/test-database.ts")).href;
   const sessionUrl = pathToFileURL(
     path.join(WEB_DIRECTORY, "e2e/setup/publisher-session-fixtures.ts"),
   ).href;
@@ -253,7 +256,9 @@ export async function runLighthouseReleaseGate(): Promise<void> {
     }
 
     if (results.length !== expectedResults) {
-      throw new Error(`Lighthouse produced ${results.length} of ${expectedResults} expected results.`);
+      throw new Error(
+        `Lighthouse produced ${results.length} of ${expectedResults} expected results.`,
+      );
     }
     const failures = results.flatMap((result) =>
       Object.entries(result.median)

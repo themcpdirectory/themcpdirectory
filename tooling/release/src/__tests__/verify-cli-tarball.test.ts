@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { CLI_TARBALL_SMOKE_STEPS } from "../verify-cli-tarball.js";
+import { CLI_TARBALL_ALLOWLIST, CLI_TARBALL_SMOKE_STEPS } from "../verify-cli-tarball.js";
 import { RELEASE_CHECKS } from "../verify-release.js";
 
 describe("cli tarball smoke", () => {
+  it("allows the public JavaScript entry point and generated TypeScript declarations", () => {
+    expect(CLI_TARBALL_ALLOWLIST).toContain("dist/index.js");
+    expect(CLI_TARBALL_ALLOWLIST).toContain("dist/index.d.ts");
+    expect(CLI_TARBALL_ALLOWLIST).not.toContain("dist/commands/add.d.ts");
+  });
+
   it("covers deterministic pack, published bin, JSON, adapters, and receipt migration", () => {
     expect(CLI_TARBALL_SMOKE_STEPS).toEqual([
       "npm-pack-dry-run",
@@ -10,6 +16,7 @@ describe("cli tarball smoke", () => {
       "inspect-tarball-allowlist",
       "hash-tarball-sha256",
       "install-into-temporary-prefix",
+      "typescript-consumer",
       "start-fake-directory-api",
       "published-bin-help",
       "published-bin-version",

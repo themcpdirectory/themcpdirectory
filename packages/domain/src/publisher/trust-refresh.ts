@@ -1,5 +1,11 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { publishers, servers, transactionalOutbox, trustSignals, type Database } from "@themcpdirectory/db";
+import {
+  publishers,
+  servers,
+  transactionalOutbox,
+  trustSignals,
+  type Database,
+} from "@themcpdirectory/db";
 
 const TRUST_REFRESH_EVENT_TYPE = "trust.refresh";
 const TRUST_SIGNAL_KEY = "publisher_verified";

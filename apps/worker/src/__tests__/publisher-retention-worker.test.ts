@@ -98,12 +98,9 @@ describe("publisher retention worker", () => {
       createdBy: "worker-test",
     });
 
-    const summary = await processPublisherRetentionJob(
-      db,
-      now,
-      undefined,
-      { mode: "monthly_with_dormant" },
-    );
+    const summary = await processPublisherRetentionJob(db, now, undefined, {
+      mode: "monthly_with_dormant",
+    });
 
     expect(summary.deletedDormantUsers).toBe(1);
     expect(summary.done).toBe(true);

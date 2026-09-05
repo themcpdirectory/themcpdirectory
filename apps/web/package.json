@@ -8,7 +8,7 @@
     "start": "next start --port ${WEB_PORT:-3000}",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
-    "test:e2e": "playwright test",
+    "test:e2e": "WEB_E2E_MODE=production playwright test",
     "test:integration": "vitest run --passWithNoTests",
     "typecheck": "next typegen && tsc --noEmit"
   },

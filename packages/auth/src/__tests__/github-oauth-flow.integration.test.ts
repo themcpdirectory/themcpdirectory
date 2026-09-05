@@ -50,9 +50,7 @@ describe("GitHub OAuth flow", () => {
         });
       }
       if (url === "https://api.github.com/user/emails") {
-        return Response.json([
-          { email: "octocat@example.com", primary: true, verified: true },
-        ]);
+        return Response.json([{ email: "octocat@example.com", primary: true, verified: true }]);
       }
 
       return Response.json({ message: `Unexpected URL: ${url}` }, { status: 500 });

@@ -141,12 +141,8 @@
           "name": "account_erasure_requests_user_id_user_id_fk",
           "tableFrom": "account_erasure_requests",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -276,12 +272,8 @@
           "name": "audit_events_actor_user_id_user_id_fk",
           "tableFrom": "audit_events",
           "tableTo": "user",
-          "columnsFrom": [
-            "actor_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["actor_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -427,12 +419,8 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -536,12 +524,8 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -753,9 +737,7 @@
         "categories_slug_unique": {
           "name": "categories_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -896,12 +878,8 @@
           "name": "claim_verification_nonces_claim_id_publisher_claims_id_fk",
           "tableFrom": "claim_verification_nonces",
           "tableTo": "publisher_claims",
-          "columnsFrom": [
-            "claim_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["claim_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -909,12 +887,8 @@
           "name": "claim_verification_nonces_requester_user_id_user_id_fk",
           "tableFrom": "claim_verification_nonces",
           "tableTo": "user",
-          "columnsFrom": [
-            "requester_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["requester_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1003,12 +977,8 @@
           "name": "client_compatibility_server_id_servers_id_fk",
           "tableFrom": "client_compatibility",
           "tableTo": "servers",
-          "columnsFrom": [
-            "server_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1114,12 +1084,8 @@
           "name": "install_overrides_server_id_servers_id_fk",
           "tableFrom": "install_overrides",
           "tableTo": "servers",
-          "columnsFrom": [
-            "server_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1304,12 +1270,8 @@
           "name": "moderation_events_server_id_servers_id_fk",
           "tableFrom": "moderation_events",
           "tableTo": "servers",
-          "columnsFrom": [
-            "server_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1426,12 +1388,8 @@
           "name": "publisher_claim_events_claim_id_publisher_claims_id_fk",
           "tableFrom": "publisher_claim_events",
           "tableTo": "publisher_claims",
-          "columnsFrom": [
-            "claim_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["claim_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1439,12 +1397,8 @@
           "name": "publisher_claim_events_actor_user_id_user_id_fk",
           "tableFrom": "publisher_claim_events",
           "tableTo": "user",
-          "columnsFrom": [
-            "actor_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["actor_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1655,12 +1609,8 @@
           "name": "publisher_claims_server_id_servers_id_fk",
           "tableFrom": "publisher_claims",
           "tableTo": "servers",
-          "columnsFrom": [
-            "server_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1668,12 +1618,8 @@
           "name": "publisher_claims_publisher_id_publishers_id_fk",
           "tableFrom": "publisher_claims",
           "tableTo": "publishers",
-          "columnsFrom": [
-            "publisher_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["publisher_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1681,12 +1627,8 @@
           "name": "publisher_claims_requester_user_id_user_id_fk",
           "tableFrom": "publisher_claims",
           "tableTo": "user",
-          "columnsFrom": [
-            "requester_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["requester_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1694,12 +1636,8 @@
           "name": "publisher_claims_reviewed_by_user_id_user_id_fk",
           "tableFrom": "publisher_claims",
           "tableTo": "user",
-          "columnsFrom": [
-            "reviewed_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reviewed_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1707,12 +1645,8 @@
           "name": "publisher_claims_conflict_claim_id_fk",
           "tableFrom": "publisher_claims",
           "tableTo": "publisher_claims",
-          "columnsFrom": [
-            "conflict_claim_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["conflict_claim_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1838,12 +1772,8 @@
           "name": "publisher_memberships_publisher_id_publishers_id_fk",
           "tableFrom": "publisher_memberships",
           "tableTo": "publishers",
-          "columnsFrom": [
-            "publisher_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["publisher_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1851,12 +1781,8 @@
           "name": "publisher_memberships_user_id_user_id_fk",
           "tableFrom": "publisher_memberships",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1973,9 +1899,7 @@
         "publishers_slug_unique": {
           "name": "publishers_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -2084,12 +2008,8 @@
           "name": "registry_snapshots_registry_source_id_registry_sources_id_fk",
           "tableFrom": "registry_snapshots",
           "tableTo": "registry_sources",
-          "columnsFrom": [
-            "registry_source_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["registry_source_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2099,12 +2019,7 @@
         "registry_snapshots_identity": {
           "name": "registry_snapshots_identity",
           "nullsNotDistinct": false,
-          "columns": [
-            "registry_source_id",
-            "external_name",
-            "external_version",
-            "payload_hash"
-          ]
+          "columns": ["registry_source_id", "external_name", "external_version", "payload_hash"]
         }
       },
       "policies": {},
@@ -2175,9 +2090,7 @@
         "registry_sources_key_unique": {
           "name": "registry_sources_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "key"
-          ]
+          "columns": ["key"]
         }
       },
       "policies": {},
@@ -2295,12 +2208,8 @@
           "name": "registry_sync_runs_registry_source_id_registry_sources_id_fk",
           "tableFrom": "registry_sync_runs",
           "tableTo": "registry_sources",
-          "columnsFrom": [
-            "registry_source_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["registry_source_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2401,12 +2310,8 @@
           "name": "reports_server_id_servers_id_fk",
           "tableFrom": "reports",
           "tableTo": "servers",
-          "columnsFrom": [
-            "server_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2607,12 +2512,8 @@
           "name": "repository_snapshots_server_id_servers_id_fk",
           "tableFrom": "repository_snapshots",
           "tableTo": "servers",
-          "columnsFrom": [
-            "server_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2697,12 +2598,8 @@
           "name": "server_aliases_server_id_servers_id_fk",
           "tableFrom": "server_aliases",
           "tableTo": "servers",
-          "columnsFrom": [
-            "server_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2776,12 +2673,8 @@
           "name": "server_categories_server_id_servers_id_fk",
           "tableFrom": "server_categories",
           "tableTo": "servers",
-          "columnsFrom": [
-            "server_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2789,12 +2682,8 @@
           "name": "server_categories_category_id_categories_id_fk",
           "tableFrom": "server_categories",
           "tableTo": "categories",
-          "columnsFrom": [
-            "category_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["category_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2802,10 +2691,7 @@
       "compositePrimaryKeys": {
         "server_categories_server_id_category_id_pk": {
           "name": "server_categories_server_id_category_id_pk",
-          "columns": [
-            "server_id",
-            "category_id"
-          ]
+          "columns": ["server_id", "category_id"]
         }
       },
       "uniqueConstraints": {},
@@ -2990,12 +2876,8 @@
           "name": "server_health_checks_server_id_servers_id_fk",
           "tableFrom": "server_health_checks",
           "tableTo": "servers",
-          "columnsFrom": [
-            "server_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3003,12 +2885,8 @@
           "name": "server_health_checks_server_version_id_server_versions_id_fk",
           "tableFrom": "server_health_checks",
           "tableTo": "server_versions",
-          "columnsFrom": [
-            "server_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3016,12 +2894,8 @@
           "name": "server_health_checks_remote_id_server_remotes_id_fk",
           "tableFrom": "server_health_checks",
           "tableTo": "server_remotes",
-          "columnsFrom": [
-            "remote_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["remote_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3103,12 +2977,8 @@
           "name": "server_icons_server_version_id_server_versions_id_fk",
           "tableFrom": "server_icons",
           "tableTo": "server_versions",
-          "columnsFrom": [
-            "server_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3229,12 +3099,8 @@
           "name": "server_packages_server_version_id_server_versions_id_fk",
           "tableFrom": "server_packages",
           "tableTo": "server_versions",
-          "columnsFrom": [
-            "server_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3318,12 +3184,8 @@
           "name": "server_remotes_server_version_id_server_versions_id_fk",
           "tableFrom": "server_remotes",
           "tableTo": "server_versions",
-          "columnsFrom": [
-            "server_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3484,12 +3346,8 @@
           "name": "server_versions_server_id_servers_id_fk",
           "tableFrom": "server_versions",
           "tableTo": "servers",
-          "columnsFrom": [
-            "server_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3497,12 +3355,8 @@
           "name": "server_versions_registry_source_id_registry_sources_id_fk",
           "tableFrom": "server_versions",
           "tableTo": "registry_sources",
-          "columnsFrom": [
-            "registry_source_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["registry_source_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3510,12 +3364,8 @@
           "name": "server_versions_registry_snapshot_id_registry_snapshots_id_fk",
           "tableFrom": "server_versions",
           "tableTo": "registry_snapshots",
-          "columnsFrom": [
-            "registry_snapshot_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["registry_snapshot_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3525,11 +3375,7 @@
         "server_versions_identity": {
           "name": "server_versions_identity",
           "nullsNotDistinct": false,
-          "columns": [
-            "server_id",
-            "version",
-            "registry_source_id"
-          ]
+          "columns": ["server_id", "version", "registry_source_id"]
         }
       },
       "policies": {},
@@ -3813,12 +3659,8 @@
           "name": "servers_publisher_id_publishers_id_fk",
           "tableFrom": "servers",
           "tableTo": "publishers",
-          "columnsFrom": [
-            "publisher_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["publisher_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3826,12 +3668,8 @@
           "name": "servers_current_version_id_server_versions_id_fk",
           "tableFrom": "servers",
           "tableTo": "server_versions",
-          "columnsFrom": [
-            "current_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["current_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3841,9 +3679,7 @@
         "servers_slug_unique": {
           "name": "servers_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -4180,12 +4016,8 @@
           "name": "trust_signals_server_id_servers_id_fk",
           "tableFrom": "trust_signals",
           "tableTo": "servers",
-          "columnsFrom": [
-            "server_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4193,12 +4025,8 @@
           "name": "trust_signals_server_version_id_server_versions_id_fk",
           "tableFrom": "trust_signals",
           "tableTo": "server_versions",
-          "columnsFrom": [
-            "server_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["server_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }

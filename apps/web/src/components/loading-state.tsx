@@ -1,23 +1,24 @@
-export function LoadingState() {
+export function LoadingState({ withinMain = false }: { withinMain?: boolean }) {
+  const Container = withinMain ? "div" : "main";
+
   return (
-    <main
-      id="main-content"
-      tabIndex={-1}
+    <Container
+      {...(!withinMain && { id: "main-content", tabIndex: -1, "aria-label": "Loading" })}
       style={{
         minHeight: "100vh",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
       }}
-      aria-label="Loading"
     >
       <p
         style={{ color: "var(--fg-muted)", fontSize: "0.875rem" }}
+        role="status"
         aria-busy="true"
         aria-live="polite"
       >
         Loading…
       </p>
-    </main>
+    </Container>
   );
 }

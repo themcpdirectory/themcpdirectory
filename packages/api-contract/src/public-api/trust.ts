@@ -1,28 +1,26 @@
 import { z } from "zod";
 import { clientObject, rfc3339UtcSchema, strictObject } from "./shared.js";
 
-export const TrustSignalStateSchema = z.enum([
-  "positive",
-  "neutral",
-  "warning",
-  "negative",
-  "unknown",
-]).meta({ id: "TrustSignalState", example: "positive" });
+export const TrustSignalStateSchema = z
+  .enum(["positive", "neutral", "warning", "negative", "unknown"])
+  .meta({ id: "TrustSignalState", example: "positive" });
 export type TrustSignalState = z.infer<typeof TrustSignalStateSchema>;
 
-export const TrustSignalKeySchema = z.enum([
-  "official_registry",
-  "publisher_verified",
-  "repository_available",
-  "repository_archived",
-  "open_source_license",
-  "recent_repository_activity",
-  "recent_release",
-  "remote_reachable",
-  "current_version_present",
-  "package_present",
-  "upstream_deleted",
-]).meta({ id: "TrustSignalKey", example: "official_registry" });
+export const TrustSignalKeySchema = z
+  .enum([
+    "official_registry",
+    "publisher_verified",
+    "repository_available",
+    "repository_archived",
+    "open_source_license",
+    "recent_repository_activity",
+    "recent_release",
+    "remote_reachable",
+    "current_version_present",
+    "package_present",
+    "upstream_deleted",
+  ])
+  .meta({ id: "TrustSignalKey", example: "official_registry" });
 export type TrustSignalKey = z.infer<typeof TrustSignalKeySchema>;
 
 const trustSignalExample = {

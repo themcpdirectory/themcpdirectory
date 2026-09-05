@@ -20,9 +20,9 @@ describe("supportedClientIdSchema", () => {
 
 describe("serverCollectionQuerySchema", () => {
   it("rejects relevance without q and clamps limit semantics to the contract", () => {
-    expect(() =>
-      serverCollectionQuerySchema.parse({ sort: "relevance", limit: "30" }),
-    ).toThrow(/q is required when sort is relevance/i);
+    expect(() => serverCollectionQuerySchema.parse({ sort: "relevance", limit: "30" })).toThrow(
+      /q is required when sort is relevance/i,
+    );
     expect(() => serverCollectionQuerySchema.parse({ limit: "101" })).toThrow(/100/);
   });
 

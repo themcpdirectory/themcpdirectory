@@ -43,7 +43,12 @@ export async function buildAccountExport(
 ): Promise<AccountExportV1> {
   const [[user], memberships, claims, accountAudits] = await Promise.all([
     db
-      .select({ id: authUsers.id, email: authUsers.email, name: authUsers.name, image: authUsers.image })
+      .select({
+        id: authUsers.id,
+        email: authUsers.email,
+        name: authUsers.name,
+        image: authUsers.image,
+      })
       .from(authUsers)
       .where(eq(authUsers.id, userId))
       .limit(1),

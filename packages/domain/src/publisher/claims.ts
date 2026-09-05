@@ -192,10 +192,7 @@ function isOpenClaimUniqueViolation(error: unknown): boolean {
       constraint_name?: unknown;
       cause?: unknown;
     };
-    if (
-      candidate.code === "23505" &&
-      candidate.constraint_name === OPEN_SERVER_CLAIM_CONSTRAINT
-    ) {
+    if (candidate.code === "23505" && candidate.constraint_name === OPEN_SERVER_CLAIM_CONSTRAINT) {
       return true;
     }
     current = candidate.cause;

@@ -34,9 +34,9 @@ test.describe("Homepage", () => {
 
   test("publishes the compact brand icon", async ({ page }) => {
     await page.goto("/");
-    const iconHrefs = await page.locator('link[rel="icon"]').evaluateAll((icons) =>
-      icons.map((icon) => icon.getAttribute("href")),
-    );
+    const iconHrefs = await page
+      .locator('link[rel="icon"]')
+      .evaluateAll((icons) => icons.map((icon) => icon.getAttribute("href")));
 
     expect(iconHrefs).toContainEqual(expect.stringMatching(/^\/icon\.svg\?/));
   });

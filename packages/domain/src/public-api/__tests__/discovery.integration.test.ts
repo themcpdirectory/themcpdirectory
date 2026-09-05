@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   categoryDetailResponseSchema,
+  clientDetailResponseSchema,
   clientsCollectionResponseSchema,
   publisherDetailResponseSchema,
 } from "@themcpdirectory/api-contract";
@@ -110,6 +111,12 @@ describe("public discovery queries", () => {
       "category-second",
       "github",
     ]);
+    expect(
+      clientDetailResponseSchema.safeParse({
+        data: cursor,
+        meta: { requestId: crypto.randomUUID() },
+      }).success,
+    ).toBe(true);
 
     const codex = await getPublicClientById(context.db, { id: "codex", limit: 10 }, options);
     expect(codex?.servers).toEqual([]);

@@ -114,9 +114,9 @@ function erasureMetadata(value: unknown): ErasureMetadata {
       (assignment): assignment is SuccessorAssignment =>
         Boolean(
           assignment &&
-            typeof assignment === "object" &&
-            typeof (assignment as SuccessorAssignment).publisherId === "string" &&
-            typeof (assignment as SuccessorAssignment).successorUserId === "string",
+          typeof assignment === "object" &&
+          typeof (assignment as SuccessorAssignment).publisherId === "string" &&
+          typeof (assignment as SuccessorAssignment).successorUserId === "string",
         ),
     ),
     auditTombstone: metadata.auditTombstone,
@@ -311,7 +311,13 @@ async function moveToStep(
 ): Promise<void> {
   await db
     .update(accountErasureRequests)
-    .set({ status: "in_progress", currentStep, nextAttemptAt: null, lastError: null, updatedAt: now })
+    .set({
+      status: "in_progress",
+      currentStep,
+      nextAttemptAt: null,
+      lastError: null,
+      updatedAt: now,
+    })
     .where(eq(accountErasureRequests.id, requestId));
 }
 
@@ -585,7 +591,10 @@ async function pseudonymiseAudits(
   ).map(({ id }) => id);
   const claimAuditPredicate =
     claimIds.length > 0
-      ? and(eq(auditEvents.resourceType, "publisher_claim"), inArray(auditEvents.resourceId, claimIds))
+      ? and(
+          eq(auditEvents.resourceType, "publisher_claim"),
+          inArray(auditEvents.resourceId, claimIds),
+        )
       : sql`false`;
 
   await db
@@ -690,10 +699,17 @@ export async function advanceAccountErasure(
       if (!request) throw new Error("ACCOUNT_ERASURE_REQUEST_NOT_FOUND");
       const status = toStatus(request.status);
       const currentStep = toStep(request.currentStep);
-      if (status === "completed" || status === "failed" || currentStep !== "disconnect_github_app_installations") {
+      if (
+        status === "completed" ||
+        status === "failed" ||
+        currentStep !== "disconnect_github_app_installations"
+      ) {
         return { kind: "return" as const, result: { requestId: request.id, status, currentStep } };
       }
-      if (request.nextAttemptAt && request.nextAttemptAt > new Date(input.now.getTime() + EXTERNAL_OPERATION_LEASE_MS)) {
+      if (
+        request.nextAttemptAt &&
+        request.nextAttemptAt > new Date(input.now.getTime() + EXTERNAL_OPERATION_LEASE_MS)
+      ) {
         return { kind: "return" as const, result: { requestId: request.id, status, currentStep } };
       }
       if (await hasActiveLegalHold(tx, request.userId, input.now)) {
@@ -845,7 +861,12 @@ export async function resumeRetryableAccountErasure(
     .from(accountErasureRequests)
     .where(
       and(
-        inArray(accountErasureRequests.status, ["pending", "in_progress", "retry_scheduled", "blocked"]),
+        inArray(accountErasureRequests.status, [
+          "pending",
+          "in_progress",
+          "retry_scheduled",
+          "blocked",
+        ]),
         lte(accountErasureRequests.nextAttemptAt, input.now),
       ),
     )
