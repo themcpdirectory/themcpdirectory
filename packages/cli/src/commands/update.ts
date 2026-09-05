@@ -1,6 +1,7 @@
 import { parseSemVer, type ClientId } from "@themcpdirectory/install-engine";
 import { DirectoryClientError } from "@themcpdirectory/directory-client";
 import type { InstallationReceipt } from "../config/receipt-store.js";
+import { getCliCommandMetadata } from "../command-metadata.js";
 import type { CliDependencies } from "../dependencies.js";
 import { sanitizeTerminalText } from "../output/render.js";
 import { executeAddCommand, type TargetInstallResultV1 } from "./add-execute.js";
@@ -31,8 +32,7 @@ export interface UpdateResult {
   readonly skipped: readonly string[];
 }
 
-export const UPDATE_USAGE =
-  "Usage: mcpdir update [server] [--to <client>] [--yes] [--dry-run] [--json]";
+export const UPDATE_USAGE = getCliCommandMetadata("update")!.usage;
 
 export async function runUpdateCliCommand(
   argv: readonly string[],

@@ -12,6 +12,7 @@ import {
   type ParsedSemVer,
 } from "@themcpdirectory/install-engine";
 import type { InstallationReceipt } from "../config/receipt-store.js";
+import { getCliCommandMetadata } from "../command-metadata.js";
 import type { CliDependencies } from "../dependencies.js";
 import { createSuccessResult, type CommandResult } from "./result.js";
 
@@ -29,7 +30,7 @@ export interface DoctorReport {
   readonly checks: readonly DoctorCheckResult[];
 }
 
-export const DOCTOR_USAGE = "Usage: mcpdir doctor [--json]";
+export const DOCTOR_USAGE = getCliCommandMetadata("doctor")!.usage;
 
 export async function runDoctorCommand(
   argv: readonly string[],

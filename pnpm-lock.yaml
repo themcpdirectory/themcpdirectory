@@ -90,6 +90,9 @@ importers:
       '@themcpdirectory/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@themcpdirectory/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@themcpdirectory/config':
         specifier: workspace:*
         version: link:../../packages/config

@@ -1,10 +1,10 @@
 import { DirectoryClientError } from "@themcpdirectory/directory-client";
 import type { SearchServersParams } from "@themcpdirectory/directory-client";
+import { getCliCommandMetadata } from "../command-metadata.js";
 import { createFailureResult, createSuccessResult, type CommandResult } from "./result.js";
 import type { CliDependencies } from "../dependencies.js";
 
-const SEARCH_USAGE =
-  "Usage: mcpdir search <query> [--client <id>] [--category <slug>] [--cursor <value>] [--limit <n>] [--sort <recent|name|relevance>]";
+const SEARCH_USAGE = getCliCommandMetadata("search")!.usage;
 
 type MutableSearchServersParams = {
   -readonly [Key in keyof SearchServersParams]: SearchServersParams[Key];
@@ -52,7 +52,12 @@ function parseSearchArgs(
 
     if (token === "--client") {
       const value = argv[index + 1];
-      if (value !== "claude-code" && value !== "codex" && value !== "cursor" && value !== "vscode") {
+      if (
+        value !== "claude-code" &&
+        value !== "codex" &&
+        value !== "cursor" &&
+        value !== "vscode"
+      ) {
         return { ok: false, message: "search requires a supported --client value" };
       }
 

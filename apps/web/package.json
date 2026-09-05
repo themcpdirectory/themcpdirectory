@@ -15,6 +15,7 @@
   "dependencies": {
     "@themcpdirectory/api-contract": "workspace:*",
     "@themcpdirectory/auth": "workspace:*",
+    "@themcpdirectory/cli": "workspace:*",
     "@themcpdirectory/config": "workspace:*",
     "@themcpdirectory/db": "workspace:*",
     "@themcpdirectory/domain": "workspace:*",

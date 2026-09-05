@@ -367,7 +367,7 @@ describe("Task 10 search and info command runner", () => {
     const exitCode = await runCli(["info", "--json"], context.deps);
 
     expect(exitCode).toBe(2);
-    expect(context.stderr).toEqual(["Usage: mcpdir info <slug>\n"]);
+    expect(context.stderr).toEqual(["Usage: mcpdir info <slug> [--json]\n"]);
     expect(context.stdout).toEqual([
       `${JSON.stringify({
         schemaVersion: 1,

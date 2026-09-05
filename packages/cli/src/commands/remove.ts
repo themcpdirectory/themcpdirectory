@@ -7,6 +7,7 @@ import {
   type RemovalPlan,
 } from "@themcpdirectory/install-engine";
 import type { InstallationReceipt } from "../config/receipt-store.js";
+import { getCliCommandMetadata } from "../command-metadata.js";
 import type { CliDependencies } from "../dependencies.js";
 import { inspectAdapters } from "./list.js";
 import { createFailureResult, createSuccessResult, type CommandResult } from "./result.js";
@@ -64,8 +65,7 @@ type RemoveCommandData = RemovalResult | RemovalAmbiguityResult | RemovalNotInst
 type RemovalPhase =
   "discovery" | "planning" | "confirmation" | "execution" | "verification" | "receipt";
 
-export const REMOVE_USAGE =
-  "Usage: mcpdir remove <slug> [--to <client>] [--scope <user|project|global>] [--yes] [--dry-run] [--json]";
+export const REMOVE_USAGE = getCliCommandMetadata("remove")!.usage;
 
 export async function runRemoveCliCommand(
   argv: readonly string[],

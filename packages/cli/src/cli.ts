@@ -1,30 +1,19 @@
 #!/usr/bin/env node
 
-import { ADD_USAGE, runAddCliCommand } from "./commands/add.js";
+import { runAddCliCommand } from "./commands/add.js";
 import { runInfoCommand } from "./commands/info.js";
 import { runListCommand } from "./commands/list.js";
-import { DOCTOR_USAGE, runDoctorCommand } from "./commands/doctor.js";
-import { REMOVE_USAGE, runRemoveCliCommand } from "./commands/remove.js";
+import { runDoctorCommand } from "./commands/doctor.js";
+import { runRemoveCliCommand } from "./commands/remove.js";
 import type { CommandResult } from "./commands/result.js";
 import { runSearchCommand } from "./commands/search.js";
-import { runUpdateCliCommand, UPDATE_USAGE } from "./commands/update.js";
+import { runUpdateCliCommand } from "./commands/update.js";
+import { getCliCommandMetadata, renderCliHelp } from "./command-metadata.js";
 import { createDefaultCliDependencies, type CliDependencies } from "./dependencies.js";
 import { serializeJsonEnvelope } from "./output/json.js";
 import { renderHumanEnvelope, sanitizeTerminalText } from "./output/render.js";
 
-export const CLI_HELP_TEXT = [
-  "Usage: mcpdir <command> [options]",
-  "",
-  "Commands:",
-  "  help     Show this help",
-  "  doctor                                Diagnose Directory and client health",
-  "  search   Search directory listings",
-  "  info     Show directory details for one server",
-  "  add <slug-or-alias> [options]          Install an MCP server",
-  "  list                                  List installed MCP servers",
-  "  remove <slug> [--to <client>]         Remove an installed MCP server",
-  "  update [server] [--to <client>]       Update Directory-managed installations",
-].join("\n");
+export const CLI_HELP_TEXT = renderCliHelp();
 
 type CliCommandHandler = (argv: readonly string[], deps: CliDependencies) => Promise<CommandResult>;
 
@@ -50,23 +39,9 @@ export async function runCli(argv: readonly string[], deps?: CliDependencies): P
     return finalizeExitCode(0, ownsProcessExit);
   }
 
-  if (command === "add" && (commandArgs.includes("--help") || commandArgs.includes("-h"))) {
-    resolvedDeps.output.writeStdout(`${ADD_USAGE}\n`);
-    return finalizeExitCode(0, ownsProcessExit);
-  }
-
-  if (command === "remove" && (commandArgs.includes("--help") || commandArgs.includes("-h"))) {
-    resolvedDeps.output.writeStdout(`${REMOVE_USAGE}\n`);
-    return finalizeExitCode(0, ownsProcessExit);
-  }
-
-  if (command === "update" && (commandArgs.includes("--help") || commandArgs.includes("-h"))) {
-    resolvedDeps.output.writeStdout(`${UPDATE_USAGE}\n`);
-    return finalizeExitCode(0, ownsProcessExit);
-  }
-
-  if (command === "doctor" && (commandArgs.includes("--help") || commandArgs.includes("-h"))) {
-    resolvedDeps.output.writeStdout(`${DOCTOR_USAGE}\n`);
+  const commandMetadata = getCliCommandMetadata(command);
+  if (commandMetadata && (commandArgs.includes("--help") || commandArgs.includes("-h"))) {
+    resolvedDeps.output.writeStdout(`${commandMetadata.usage}\n`);
     return finalizeExitCode(0, ownsProcessExit);
   }
 

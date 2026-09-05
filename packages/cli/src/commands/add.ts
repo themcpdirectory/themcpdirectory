@@ -1,12 +1,12 @@
 import type { ClientId, ClientScope } from "@themcpdirectory/install-engine";
 import type { CliDependencies } from "../dependencies.js";
+import { getCliCommandMetadata } from "../command-metadata.js";
 import { sanitizeTerminalText } from "../output/render.js";
 import { executeAddCommand, type AddExecutionResult } from "./add-execute.js";
 import { planAddCommand, type AddCommandOptions, type TargetInstallPreview } from "./add-plan.js";
 import type { CommandResult } from "./result.js";
 
-export const ADD_USAGE =
-  "Usage: mcpdir add <slug-or-alias> [--to <client[,client]|all>] [--scope <user|project|global>] [--variant <id>] [--yes] [--dry-run] [--json]";
+export const ADD_USAGE = getCliCommandMetadata("add")!.usage;
 
 export async function runAddCliCommand(
   argv: readonly string[],

@@ -1,8 +1,9 @@
 import { DirectoryClientError } from "@themcpdirectory/directory-client";
+import { getCliCommandMetadata } from "../command-metadata.js";
 import { createFailureResult, createSuccessResult, type CommandResult } from "./result.js";
 import type { CliDependencies } from "../dependencies.js";
 
-const INFO_USAGE = "Usage: mcpdir info <slug>";
+const INFO_USAGE = getCliCommandMetadata("info")!.usage;
 
 export async function runInfoCommand(
   argv: readonly string[],
@@ -28,9 +29,7 @@ export async function runInfoCommand(
 
 function parseInfoArgs(
   argv: readonly string[],
-):
-  | { readonly ok: true; readonly slug: string }
-  | { readonly ok: false; readonly message: string } {
+): { readonly ok: true; readonly slug: string } | { readonly ok: false; readonly message: string } {
   const positional: string[] = [];
 
   for (const token of argv) {

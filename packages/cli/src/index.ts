@@ -39,6 +39,14 @@ export {
   type UpdateResult,
 } from "./commands/update.js";
 export { CLI_HELP_TEXT, runCli, runCliMain } from "./cli.js";
+export {
+  CLI_COMMANDS,
+  CLI_SUPPORTED_CLIENTS,
+  getCliCommandMetadata,
+  renderCliHelp,
+  type CliCommandMetadata,
+  type CliOptionMetadata,
+} from "./command-metadata.js";
 export { resolveCliRuntimeConfig, type CliRuntimeConfig } from "./config/runtime.js";
 export { resolveCliStatePaths, type CliStatePaths } from "./config/state-paths.js";
 export {

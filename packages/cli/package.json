@@ -7,7 +7,8 @@
     "mcpdir": "./dist/index.js"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./command-metadata": "./src/command-metadata.ts"
   },
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/index.js",

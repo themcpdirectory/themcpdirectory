@@ -28,9 +28,9 @@ export function DocumentPage({ document }: { document: ReleaseDocument }) {
               <h2 id={section.id} style={{ margin: "0 0 0.75rem", fontSize: "1.125rem" }}>
                 {section.heading}
               </h2>
-              {section.body.map((paragraph) => (
+              {section.body.map((paragraph, paragraphIndex) => (
                 <p
-                  key={paragraph}
+                  key={`${section.id}-${paragraphIndex}`}
                   style={{
                     margin: "0 0 1rem",
                     color: "var(--fg-muted)",

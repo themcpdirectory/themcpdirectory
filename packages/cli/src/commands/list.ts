@@ -1,6 +1,7 @@
 import type { InstalledMcpServer, McpClientAdapter } from "@themcpdirectory/client-adapters";
 import type { ClientId, ClientScope } from "@themcpdirectory/install-engine";
 import type { InstallationReceipt } from "../config/receipt-store.js";
+import { getCliCommandMetadata } from "../command-metadata.js";
 import type { CliDependencies } from "../dependencies.js";
 import { createFailureResult, createSuccessResult, type CommandResult } from "./result.js";
 
@@ -25,7 +26,7 @@ export async function runListCommand(
       exitCode: 2,
       code: "USAGE_ERROR",
       message: `list does not support argument ${unsupported}`,
-      stderrLines: ["Usage: mcpdir list [--json]"],
+      stderrLines: [getCliCommandMetadata("list")!.usage],
     }) as CommandResult<readonly ListCommandEntry[]>;
   }
 
