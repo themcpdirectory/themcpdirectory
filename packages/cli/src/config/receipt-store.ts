@@ -1,5 +1,6 @@
 import { mkdir, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import { isSupportedClientId } from "@themcpdirectory/client-adapters";
 import type { ClientId, ClientScope } from "@themcpdirectory/install-engine";
 import type { CliStatePaths } from "./state-paths.js";
 import { FileLockError, type FileLockOptions, withFileLock } from "./file-lock.js";
@@ -434,7 +435,7 @@ function readNumberField(record: Record<string, unknown>, key: string): number {
 
 function readClientId(record: Record<string, unknown>, source: string): ClientId {
   const value = readStringField(record, "client", source);
-  if (value !== "claude-code" && value !== "codex" && value !== "cursor" && value !== "vscode") {
+  if (!isSupportedClientId(value)) {
     throw new ReceiptStoreError("RECEIPT_STATE_INVALID", `${source} client is unsupported`);
   }
 

@@ -1,3 +1,4 @@
+import { isSupportedClientId } from "@themcpdirectory/client-adapters";
 import type { ClientId, ClientScope } from "@themcpdirectory/install-engine";
 import type { CliDependencies } from "../dependencies.js";
 import { getCliCommandMetadata } from "../command-metadata.js";
@@ -140,7 +141,7 @@ function parseTargets(value: string | undefined): readonly ClientId[] | "all" | 
 }
 
 function isClientId(value: string): value is ClientId {
-  return value === "claude-code" || value === "codex" || value === "cursor" || value === "vscode";
+  return isSupportedClientId(value);
 }
 
 function isClientScope(value: string | undefined): value is ClientScope {

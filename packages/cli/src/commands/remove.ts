@@ -1,4 +1,4 @@
-import type { InstalledMcpServer } from "@themcpdirectory/client-adapters";
+import { isSupportedClientId, type InstalledMcpServer } from "@themcpdirectory/client-adapters";
 import {
   PlanValidationError,
   validateRemovalPlan,
@@ -322,7 +322,7 @@ function parseRemoveArgs(argv: readonly string[]):
 }
 
 function isClientId(value: string | undefined): value is ClientId {
-  return value === "claude-code" || value === "codex" || value === "cursor" || value === "vscode";
+  return isSupportedClientId(value);
 }
 
 function isClientScope(value: string | undefined): value is ClientScope {

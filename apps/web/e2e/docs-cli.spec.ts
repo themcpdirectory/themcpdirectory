@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+const cli = "node packages/cli/dist/index.js";
+
 test("CLI docs project commands, clients, safety, and current distribution state", async ({
   page,
 }) => {
@@ -7,23 +9,27 @@ test("CLI docs project commands, clients, safety, and current distribution state
   expect(response?.status()).toBe(200);
 
   await expect(page.getByRole("heading", { level: 1, name: "CLI Reference" })).toBeVisible();
-  await expect(page.getByText("mcpdir add github-server", { exact: true })).toBeVisible();
+  await expect(page.getByText(`${cli} add github-server`, { exact: true })).toBeVisible();
   await expect(
-    page.getByText("mcpdir add github-server --to codex", { exact: true }),
+    page.getByText(`${cli} add github-server --to codex`, { exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("region", { name: "Supported clients" }).locator("p")).toHaveText([
-    "Claude Code (claude-code)",
-    "Codex (codex)",
-    "Cursor (cursor)",
-    "VS Code (vscode)",
+    "Claude Code (claude-code): supported scopes are capability-probed from the installed CLI at runtime.",
+    "Codex (codex): user.",
+    "Cursor (cursor): user, project.",
+    "VS Code (vscode): user, project.",
   ]);
-  await expect(page.getByRole("region", { name: "Commands and options" })).toContainText(
-    "Usage: mcpdir doctor [--json]",
+  const commandReference = page.getByRole("region", { name: "Commands and options" });
+  await expect(commandReference).toContainText(`Usage: ${cli} help`);
+  await expect(commandReference).toContainText("Aliases: --help, -h.");
+  await expect(commandReference).toContainText(`Usage: ${cli} doctor [--json]`);
+  await expect(commandReference).toContainText(
+    `Usage: ${cli} update [server] [--to <client>] [--yes] [--dry-run] [--json]`,
   );
-  await expect(page.getByRole("region", { name: "Commands and options" })).toContainText(
-    "Usage: mcpdir update [server] [--to <client>] [--yes] [--dry-run] [--json]",
-  );
+  await expect(commandReference).toContainText("--yes, -y");
   await expect(page.getByText(/secrets are never written to receipts/i)).toBeVisible();
+  await expect(page.getByText(/receipt writes are locked and atomic/i)).toBeVisible();
+  await expect(page.getByText(/backups preserve corrupt receipt state/i)).toBeVisible();
   await expect(
     page.getByText(/unsupported clients and ambiguous servers fail clearly/i),
   ).toBeVisible();
@@ -32,6 +38,7 @@ test("CLI docs project commands, clients, safety, and current distribution state
     "2 means invalid command usage",
   );
   await expect(page.getByRole("region", { name: "Removal and uninstall" })).toContainText(
-    "mcpdir remove github-server --to codex --scope user --dry-run",
+    `${cli} remove github-server --to codex --scope user --dry-run`,
   );
+  await expect(page.getByRole("region", { name: "Quick start" })).not.toContainText("mcpdir ");
 });

@@ -1,5 +1,6 @@
 import { DirectoryClientError } from "@themcpdirectory/directory-client";
 import type { SearchServersParams } from "@themcpdirectory/directory-client";
+import { isSupportedClientId } from "@themcpdirectory/client-adapters";
 import { getCliCommandMetadata } from "../command-metadata.js";
 import { createFailureResult, createSuccessResult, type CommandResult } from "./result.js";
 import type { CliDependencies } from "../dependencies.js";
@@ -52,12 +53,7 @@ function parseSearchArgs(
 
     if (token === "--client") {
       const value = argv[index + 1];
-      if (
-        value !== "claude-code" &&
-        value !== "codex" &&
-        value !== "cursor" &&
-        value !== "vscode"
-      ) {
+      if (!isSupportedClientId(value)) {
         return { ok: false, message: "search requires a supported --client value" };
       }
 

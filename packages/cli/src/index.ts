@@ -41,6 +41,9 @@ export {
 export { CLI_HELP_TEXT, runCli, runCliMain } from "./cli.js";
 export {
   CLI_COMMANDS,
+  CLI_DOCUMENTATION,
+  CLI_EXECUTABLE_NAME,
+  CLI_REPOSITORY_INVOCATION,
   CLI_SUPPORTED_CLIENTS,
   getCliCommandMetadata,
   renderCliHelp,

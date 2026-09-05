@@ -1,5 +1,8 @@
 import { SUPPORTED_CLIENTS } from "@themcpdirectory/client-adapters";
 
+export const CLI_EXECUTABLE_NAME = "mcpdir";
+export const CLI_REPOSITORY_INVOCATION = "node packages/cli/dist/index.js";
+
 export interface CliOptionMetadata {
   readonly syntax: string;
   readonly description: string;
@@ -7,6 +10,7 @@ export interface CliOptionMetadata {
 
 export interface CliCommandMetadata {
   readonly name: string;
+  readonly aliases: readonly string[];
   readonly synopsis: string;
   readonly summary: string;
   readonly usage: string;
@@ -19,12 +23,14 @@ function command(
   summary: string,
   options: readonly CliOptionMetadata[],
   usageSynopsis = synopsis,
+  aliases: readonly string[] = [],
 ): CliCommandMetadata {
   return Object.freeze({
     name,
+    aliases: Object.freeze(aliases),
     synopsis,
     summary,
-    usage: `Usage: mcpdir ${usageSynopsis}`,
+    usage: `Usage: ${CLI_EXECUTABLE_NAME} ${usageSynopsis}`,
     options: Object.freeze(options),
   });
 }
@@ -35,6 +41,7 @@ const JSON_OPTION = {
 } as const;
 
 export const CLI_COMMANDS = Object.freeze([
+  command("help", "help", "Show this help", [], "help", ["--help", "-h"]),
   command("doctor", "doctor [--json]", "Diagnose Directory and client health", [JSON_OPTION]),
   command(
     "search",
@@ -111,11 +118,80 @@ export const CLI_COMMANDS = Object.freeze([
 ] as const);
 
 export const CLI_SUPPORTED_CLIENTS = Object.freeze(
-  SUPPORTED_CLIENTS.map(({ id, name }) => Object.freeze({ id, name })),
+  SUPPORTED_CLIENTS.map(({ id, name, scopeSupport }) =>
+    Object.freeze({
+      id,
+      name,
+      scopeSupport:
+        scopeSupport.mode === "runtime-probed"
+          ? Object.freeze({ mode: "runtime-probed" as const })
+          : Object.freeze({
+              mode: "static" as const,
+              scopes: Object.freeze([...scopeSupport.scopes]),
+            }),
+    }),
+  ),
 );
 
+export const CLI_DOCUMENTATION = Object.freeze({
+  invocation: CLI_REPOSITORY_INVOCATION,
+  commands: CLI_COMMANDS,
+  clients: CLI_SUPPORTED_CLIENTS,
+  install: Object.freeze([
+    "Run from the repository root with Node.js 24 and pnpm 11.",
+    "Install workspace dependencies: pnpm install",
+    "Build the repository-local executable: pnpm --filter @themcpdirectory/cli build",
+  ] as const),
+  distribution: Object.freeze([
+    "The @themcpdirectory/cli package is private and is not published to a package registry.",
+    `Invoke the repository-local executable with: ${CLI_REPOSITORY_INVOCATION}`,
+  ] as const),
+  receipts: Object.freeze({
+    fields:
+      "Receipts store non-secret install state: server slug, client, scope, exact server version, variant, manifest hash, install time, and adapter fingerprint.",
+    guarantees: Object.freeze([
+      "Receipt writes are locked and atomic; receipt reads are also locked.",
+      "Backups preserve corrupt receipt state before it is reset; ordinary receipt replacements do not create backups.",
+      "Set MCPDIR_STATE_DIR to override the platform-specific state directory.",
+    ] as const),
+  }),
+  secrets: Object.freeze([
+    "Secrets are never written to receipts.",
+    "When a client supports environment references, the CLI records the environment variable name rather than its value.",
+    "A sensitive value is persisted only when the client advertises persisted-secret support and the user explicitly approves it interactively.",
+    "Non-interactive installation fails when required secure input is unavailable.",
+  ] as const),
+  safety: Object.freeze([
+    "Install plans are validated and reviewed before mutation.",
+    "Unsupported clients and ambiguous servers fail clearly.",
+    "Dry runs validate and preview plans without mutating client configuration or receipts.",
+  ] as const),
+  exitCodes: Object.freeze([
+    Object.freeze({
+      code: 0,
+      meaning:
+        "The command completed successfully, including a valid dry run or an update with nothing to change.",
+    }),
+    Object.freeze({
+      code: 1,
+      meaning: "Operational failure, failed doctor check, cancellation, or unknown command.",
+    }),
+    Object.freeze({
+      code: 2,
+      meaning: "Invalid command usage, including unsupported options or missing arguments.",
+    }),
+  ]),
+  uninstall: Object.freeze([
+    "Remove managed servers with the repository-local remove command before deleting the checkout if they should no longer remain configured.",
+    "Delete packages/cli/dist to remove the built repository-local executable, or delete the repository checkout after removing any managed servers you no longer want configured.",
+    "Deleting the executable does not remove client configuration or receipt state.",
+  ] as const),
+});
+
 export function getCliCommandMetadata(name: string): CliCommandMetadata | undefined {
-  return CLI_COMMANDS.find((candidate) => candidate.name === name);
+  return CLI_COMMANDS.find(
+    (candidate) => candidate.name === name || candidate.aliases.includes(name),
+  );
 }
 
 export function renderCliHelp(): string {
@@ -123,10 +199,9 @@ export function renderCliHelp(): string {
     ({ synopsis, summary }) => `  ${synopsis.padEnd(36)} ${summary}`,
   );
   return [
-    "Usage: mcpdir <command> [options]",
+    `Usage: ${CLI_EXECUTABLE_NAME} <command> [options]`,
     "",
     "Commands:",
-    "  help".padEnd(38) + " Show this help",
     ...commandLines,
   ].join("\n");
 }

@@ -1,5 +1,6 @@
 import { parseSemVer, type ClientId } from "@themcpdirectory/install-engine";
 import { DirectoryClientError } from "@themcpdirectory/directory-client";
+import { isSupportedClientId } from "@themcpdirectory/client-adapters";
 import type { InstallationReceipt } from "../config/receipt-store.js";
 import { getCliCommandMetadata } from "../command-metadata.js";
 import type { CliDependencies } from "../dependencies.js";
@@ -419,7 +420,7 @@ function compareReceiptKey(left: InstallationReceipt, right: InstallationReceipt
 }
 
 function isClientId(value: string | undefined): value is ClientId {
-  return value === "claude-code" || value === "codex" || value === "cursor" || value === "vscode";
+  return isSupportedClientId(value);
 }
 
 function failure(

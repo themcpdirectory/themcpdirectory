@@ -1,8 +1,10 @@
 export {
   SUPPORTED_CLIENTS,
   getSupportedClientById,
+  isSupportedClientId,
   type ClientDescriptor,
   type ClientCapabilities,
+  type ClientScopeSupport,
 } from "./catalog.js";
 export {
   createNodeAdapterRuntime,
@@ -32,11 +34,7 @@ export {
   type ClaudeCapabilityProbeResult,
   type ClaudeCodeAdapterErrorCode,
 } from "./claude-code.js";
-export {
-  CursorAdapterError,
-  createCursorAdapter,
-  type CursorAdapterErrorCode,
-} from "./cursor.js";
+export { CursorAdapterError, createCursorAdapter, type CursorAdapterErrorCode } from "./cursor.js";
 export {
   CursorJsonError,
   applyCursorConfigMutation,
@@ -67,11 +65,7 @@ export {
   type VsCodeScopePaths,
 } from "./vscode-json.js";
 export { createCursorDeeplink } from "./cursor-deeplink.js";
-export {
-  VsCodeAdapterError,
-  createVsCodeAdapter,
-  type VsCodeAdapterErrorCode,
-} from "./vscode.js";
+export { VsCodeAdapterError, createVsCodeAdapter, type VsCodeAdapterErrorCode } from "./vscode.js";
 export type {
   AdapterRegistry,
   AdapterRollbackResult,
