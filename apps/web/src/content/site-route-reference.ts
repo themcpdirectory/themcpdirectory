@@ -114,6 +114,20 @@ export const PUBLIC_SITE_ROUTE_REFERENCE: readonly PublicSiteRouteReference[] = 
     availability: "available",
   },
   {
+    path: "/publish",
+    title: "Publish a server",
+    auth: "anonymous",
+    index: true,
+    availability: "available",
+  },
+  {
+    path: "/advertise",
+    title: "Advertising status",
+    auth: "anonymous",
+    index: false,
+    availability: "available",
+  },
+  {
     path: "/dashboard",
     title: "Publisher dashboard",
     auth: "authenticated",

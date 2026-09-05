@@ -117,6 +117,20 @@ test("docs landing lists the exact current and planned route facts", async ({ pa
       availability: "Availability: available now.",
     },
     {
+      path: "/publish",
+      title: "Publish a server",
+      access: "Access: available without signing in.",
+      index: "Search indexing: included in the public index.",
+      availability: "Availability: available now.",
+    },
+    {
+      path: "/advertise",
+      title: "Advertising status",
+      access: "Access: available without signing in.",
+      index: "Search indexing: excluded from the public index.",
+      availability: "Availability: available now.",
+    },
+    {
       path: "/dashboard",
       title: "Publisher dashboard",
       access: "Access: requires publisher authentication.",
