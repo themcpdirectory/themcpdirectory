@@ -136,6 +136,18 @@ export {
 
 export { appendAuditEvent, type AuditEventInput } from "./publisher/audit.js";
 
+export { buildAccountExport, type AccountExportV1 } from "./publisher/account-export.js";
+
+export {
+  advanceAccountErasure,
+  requestAccountErasure,
+  resumeRetryableAccountErasure,
+  type AccountErasureDeps,
+  type AccountErasureStatus,
+  type AccountErasureStep,
+  type SuccessorAssignment,
+} from "./publisher/account-erasure.js";
+
 export {
   PublisherClaimAuthorityError,
   PublisherClaimConflictError,

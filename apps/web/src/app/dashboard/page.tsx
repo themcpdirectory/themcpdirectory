@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { getSessionOrNull } from "@themcpdirectory/auth";
 import { getPublisherDashboard } from "@themcpdirectory/domain";
 import { DashboardShell } from "@/components/publisher/dashboard-shell";
+import { DangerZone } from "@/components/publisher/danger-zone";
 import { getDb } from "@/lib/db";
 
 export const metadata: Metadata = {
@@ -27,6 +28,9 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   return (
     <main id="main-content" tabIndex={-1} style={{ minHeight: "100vh" }}>
       <DashboardShell dashboard={dashboard} />
+      <div style={{ maxWidth: "60rem", margin: "0 auto", padding: "0 1rem 2rem" }}>
+        <DangerZone />
+      </div>
     </main>
   );
 }

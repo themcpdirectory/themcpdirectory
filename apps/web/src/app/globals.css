@@ -316,6 +316,38 @@ object {
   cursor: pointer;
 }
 
+.publisher-danger-zone {
+  border-color: var(--error-fg);
+}
+
+.publisher-danger-action {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--error-fg);
+  border-radius: var(--radius-sm);
+  background: var(--error-fg);
+  color: var(--surface);
+  font: inherit;
+  cursor: pointer;
+}
+
+.publisher-action:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.publisher-help-text,
+.publisher-action-status {
+  margin: 0 0 1rem;
+  color: var(--fg-muted);
+  font-size: 0.875rem;
+}
+
+.publisher-action-status {
+  margin: 1rem 0 0;
+  color: var(--fg);
+}
+
 .publisher-claim-list {
   display: grid;
   gap: 1rem;

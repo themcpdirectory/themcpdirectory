@@ -1,7 +1,9 @@
 import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { roleHasCapability, type PublisherRole } from "@themcpdirectory/auth";
 import {
+  accountErasureRequests,
   authAccounts,
+  authUsers,
   claimVerificationNonces,
   publisherClaimEvents,
   publisherClaims,
@@ -911,6 +913,35 @@ async function confirmRequesterMembership(
     });
 }
 
+async function assertRequesterCanCompleteClaim(
+  tx: ClaimStore,
+  input: { claimId: string; requesterUserId: string },
+): Promise<void> {
+  const [user] = await tx
+    .select({ id: authUsers.id })
+    .from(authUsers)
+    .where(eq(authUsers.id, input.requesterUserId))
+    .limit(1)
+    .for("update");
+  if (!user) {
+    throw new PublisherClaimTransitionError(input.claimId, "verifying", "FORBIDDEN");
+  }
+
+  const [erasure] = await tx
+    .select({ id: accountErasureRequests.id })
+    .from(accountErasureRequests)
+    .where(
+      and(
+        eq(accountErasureRequests.userId, input.requesterUserId),
+        ne(accountErasureRequests.status, "failed"),
+      ),
+    )
+    .limit(1);
+  if (erasure) {
+    throw new PublisherClaimTransitionError(input.claimId, "verifying", "FORBIDDEN");
+  }
+}
+
 function describeCleanupError(error: unknown): string {
   // Error messages in this path are internal codes; tokens are never interpolated into them.
   return error instanceof Error ? error.message : "unknown_error";
@@ -1068,6 +1099,10 @@ export async function completePublisherClaimVerification(
     );
 
     const outcome = await db.transaction(async (tx) => {
+      await assertRequesterCanCompleteClaim(tx, {
+        claimId: claim.id,
+        requesterUserId: claim.requesterUserId,
+      });
       const current = await lockClaimForTransition(tx, {
         claimId: claim.id,
         allowed: ["verifying"],
