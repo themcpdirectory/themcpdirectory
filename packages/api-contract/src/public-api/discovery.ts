@@ -3,6 +3,8 @@ import {
   createCollectionResponseSchema,
   createResourceResponseSchema,
   httpUrlSchema,
+  publicApiCursorSchema,
+  publicApiLimitSchema,
   slugSchema,
   strictObject,
 } from "./shared.js";
@@ -10,8 +12,8 @@ import { serverSummaryServerSchema, supportedClientIdSchema } from "./servers.js
 
 export const discoveryPageQuerySchema = z
   .object({
-    cursor: z.string().min(1).max(2048).optional(),
-    limit: z.coerce.number().int().min(1).max(100).default(30),
+    cursor: publicApiCursorSchema.optional(),
+    limit: publicApiLimitSchema,
   })
   .strict();
 

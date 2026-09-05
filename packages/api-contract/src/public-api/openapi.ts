@@ -14,6 +14,7 @@ import {
   discoveryPageQuerySchema,
   publisherDetailResponseSchema,
 } from "./discovery.js";
+import { errorResponseSchema, PUBLIC_API_ERROR_DEFINITIONS, type ApiErrorCode } from "./errors.js";
 import {
   InstallAvailabilitySchema,
   installManifestQuerySchema,
@@ -32,6 +33,37 @@ import { TrustProfileV1Schema, TrustSignalKeySchema, TrustSignalStateSchema } fr
 extendZodWithOpenApi(z);
 
 type OpenAPIObject = ReturnType<OpenApiGeneratorV31["generateDocument"]>;
+
+function createErrorResponse(
+  errorResponse: typeof errorResponseSchema,
+  codes: readonly ApiErrorCode[],
+  includeRetryAfter = false,
+) {
+  const statuses = new Set(codes.map((code) => PUBLIC_API_ERROR_DEFINITIONS[code].status));
+  if (statuses.size !== 1) {
+    throw new Error("OpenAPI error responses must group codes with the same HTTP status");
+  }
+
+  return {
+    description: codes
+      .map((code) => {
+        const definition = PUBLIC_API_ERROR_DEFINITIONS[code];
+        return `${definition.status} ${code}: ${definition.message}`;
+      })
+      .join("; "),
+    ...(includeRetryAfter
+      ? {
+          headers: {
+            "Retry-After": {
+              description: "Seconds until the caller may retry.",
+              schema: { type: "integer" as const, minimum: 1 },
+            },
+          },
+        }
+      : {}),
+    content: { "application/json": { schema: errorResponse } },
+  };
+}
 
 export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   const validatedBaseUrl = httpUrlSchema.parse(baseUrl);
@@ -78,6 +110,24 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
   const clientDetailResponse = clientDetailResponseSchema.meta({
     id: "ClientDetailResponse",
   });
+  const errorResponse = errorResponseSchema.meta({
+    id: "ErrorResponse",
+    description: "Fail-closed public error envelope.",
+  });
+  const validationError = createErrorResponse(errorResponse, ["VALIDATION_ERROR"]);
+  const invalidCollectionRequest = createErrorResponse(errorResponse, [
+    "VALIDATION_ERROR",
+    "CURSOR_INVALID",
+  ]);
+  const notFoundError = createErrorResponse(errorResponse, ["SERVER_NOT_FOUND"]);
+  const ambiguousServerError = createErrorResponse(errorResponse, ["AMBIGUOUS_SERVER"]);
+  const installGoneError = createErrorResponse(errorResponse, [
+    "INSTALL_UNAVAILABLE",
+    "UPSTREAM_DELETED",
+  ]);
+  const rateLimitedError = createErrorResponse(errorResponse, ["RATE_LIMITED"], true);
+  const internalError = createErrorResponse(errorResponse, ["INTERNAL_ERROR"]);
+  const commonErrors = { 429: rateLimitedError, 500: internalError };
 
   registry.registerPath({
     method: "get",
@@ -87,6 +137,7 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
         description: "Category collection",
         content: { "application/json": { schema: categoriesCollectionResponse } },
       },
+      ...commonErrors,
     },
   });
 
@@ -99,6 +150,9 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
         description: "Category detail",
         content: { "application/json": { schema: categoryDetailResponse } },
       },
+      400: invalidCollectionRequest,
+      404: notFoundError,
+      ...commonErrors,
     },
   });
 
@@ -110,6 +164,7 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
         description: "Client collection",
         content: { "application/json": { schema: clientsCollectionResponse } },
       },
+      ...commonErrors,
     },
   });
 
@@ -122,6 +177,9 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
         description: "Client detail",
         content: { "application/json": { schema: clientDetailResponse } },
       },
+      400: invalidCollectionRequest,
+      404: notFoundError,
+      ...commonErrors,
     },
   });
 
@@ -134,6 +192,9 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
         description: "Publisher detail",
         content: { "application/json": { schema: publisherDetailResponse } },
       },
+      400: invalidCollectionRequest,
+      404: notFoundError,
+      ...commonErrors,
     },
   });
 
@@ -146,6 +207,10 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
         description: "Resolved server",
         content: { "application/json": { schema: resolvedServerResponse } },
       },
+      400: validationError,
+      404: notFoundError,
+      409: ambiguousServerError,
+      ...commonErrors,
     },
   });
 
@@ -158,6 +223,11 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
         description: "Install manifest via resolution",
         content: { "application/json": { schema: installManifestResponse } },
       },
+      400: validationError,
+      404: notFoundError,
+      409: ambiguousServerError,
+      410: installGoneError,
+      ...commonErrors,
     },
   });
 
@@ -170,6 +240,8 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
         description: "Search projection",
         content: { "application/json": { schema: serverCollectionResponse } },
       },
+      400: invalidCollectionRequest,
+      ...commonErrors,
     },
   });
 
@@ -182,6 +254,8 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
         description: "Server collection",
         content: { "application/json": { schema: serverCollectionResponse } },
       },
+      400: invalidCollectionRequest,
+      ...commonErrors,
     },
   });
 
@@ -194,6 +268,9 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
         description: "Server detail",
         content: { "application/json": { schema: serverDetailResponse } },
       },
+      400: validationError,
+      404: notFoundError,
+      ...commonErrors,
     },
   });
 
@@ -206,6 +283,10 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
         description: "Install manifest",
         content: { "application/json": { schema: installManifestResponse } },
       },
+      400: validationError,
+      404: notFoundError,
+      410: installGoneError,
+      ...commonErrors,
     },
   });
 

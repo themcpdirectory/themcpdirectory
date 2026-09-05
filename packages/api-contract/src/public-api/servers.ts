@@ -4,6 +4,8 @@ import {
   createCollectionResponseSchema,
   createResourceResponseSchema,
   httpUrlSchema,
+  publicApiCursorSchema,
+  publicApiLimitSchema,
   rfc3339UtcSchema,
   slugSchema,
   strictObject,
@@ -60,8 +62,8 @@ const baseServerCollectionQuerySchema = z
     openSource: queryBooleanSchema.optional(),
     status: listingStatusSchema.optional(),
     sort: serverSortSchema.default("recent"),
-    cursor: z.string().min(1).max(2048).optional(),
-    limit: z.coerce.number().int().min(1).max(100).default(30),
+    cursor: publicApiCursorSchema.optional(),
+    limit: publicApiLimitSchema,
   })
   .strict()
   .superRefine((value, ctx) => {

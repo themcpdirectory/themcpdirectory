@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  apiErrorCodeSchema,
   categoryDetailResponseSchema,
   clientDetailResponseSchema,
   createPublicApiOpenApiDocument,
@@ -23,6 +24,8 @@ type OpenApiParameter = {
 };
 type OpenApiResponse = {
   readonly $ref?: string;
+  readonly description?: string;
+  readonly headers?: Record<string, unknown>;
   readonly content?: Record<string, { readonly schema?: { readonly $ref?: string } }>;
 };
 
@@ -127,6 +130,15 @@ function getResponseSchemaRef(document: OpenAPIObject, path: string): string | n
   return schema.$ref;
 }
 
+function getErrorResponse(document: OpenAPIObject, path: string, status: string): OpenApiResponse {
+  const response = document.paths?.[path]?.get?.responses?.[status];
+  if (!response || isReferenceObject(response)) {
+    throw new Error(`Missing inline ${status} response for ${path}`);
+  }
+
+  return response;
+}
+
 function getParameterNames(document: OpenAPIObject, path: string): string[] {
   const paths = document.paths ?? {};
 
@@ -149,7 +161,10 @@ function getPathParameters(document: OpenAPIObject, path: string): OpenApiParame
   );
 }
 
-function getComponentSchema(document: OpenAPIObject, componentKey: string): Record<string, unknown> {
+function getComponentSchema(
+  document: OpenAPIObject,
+  componentKey: string,
+): Record<string, unknown> {
   const schema = document.components?.schemas?.[componentKey];
   if (!schema || isReferenceObject(schema)) {
     throw new Error(`Missing object schema component: ${componentKey}`);
@@ -286,6 +301,64 @@ describe("createPublicApiOpenApiDocument", () => {
       "/api/v1/servers/{slug}",
       "/api/v1/servers/{slug}/install",
     ]);
+    expect(
+      Object.entries(paths).flatMap(([path, pathItem]) =>
+        Object.keys(pathItem ?? {})
+          .filter((key) => ["get", "post", "put", "patch", "delete"].includes(key))
+          .map((method) => `${method.toUpperCase()} ${path}`),
+      ),
+    ).toEqual([
+      "GET /api/v1/categories",
+      "GET /api/v1/categories/{slug}",
+      "GET /api/v1/clients",
+      "GET /api/v1/clients/{id}",
+      "GET /api/v1/publishers/{slug}",
+      "GET /api/v1/resolve/{identifier}",
+      "GET /api/v1/resolve/{identifier}/install",
+      "GET /api/v1/search",
+      "GET /api/v1/servers",
+      "GET /api/v1/servers/{slug}",
+      "GET /api/v1/servers/{slug}/install",
+    ]);
+  });
+
+  it("documents the verified error envelope and route error responses", () => {
+    const document = createPublicApiOpenApiDocument("https://api.themcpdirectory.test");
+    const errorResponse = getComponentSchema(document, "ErrorResponse");
+
+    expect(
+      getSchemaValueAtPath(errorResponse, ["properties", "error", "properties", "code", "enum"]),
+    ).toEqual(apiErrorCodeSchema.options);
+
+    for (const path of Object.keys(document.paths ?? {})) {
+      const rateLimited = getErrorResponse(document, path, "429");
+      expect(rateLimited.content?.["application/json"]?.schema?.$ref).toBe(
+        "#/components/schemas/ErrorResponse",
+      );
+      expect(rateLimited.headers).toHaveProperty("Retry-After");
+      expect(
+        getErrorResponse(document, path, "500").content?.["application/json"]?.schema?.$ref,
+      ).toBe("#/components/schemas/ErrorResponse");
+    }
+
+    expect(Object.keys(document.paths?.["/api/v1/servers"]?.get?.responses ?? {})).toEqual([
+      "200",
+      "400",
+      "429",
+      "500",
+    ]);
+    expect(
+      Object.keys(document.paths?.["/api/v1/resolve/{identifier}"]?.get?.responses ?? {}),
+    ).toEqual(["200", "400", "404", "409", "429", "500"]);
+
+    for (const path of ["/api/v1/resolve/{identifier}/install", "/api/v1/servers/{slug}/install"]) {
+      const gone = getErrorResponse(document, path, "410");
+      expect(gone.description).toContain("410 INSTALL_UNAVAILABLE");
+      expect(gone.description).toContain("410 UPSTREAM_DELETED");
+      expect(gone.content?.["application/json"]?.schema?.$ref).toBe(
+        "#/components/schemas/ErrorResponse",
+      );
+    }
   });
 
   it.each([
@@ -503,7 +576,7 @@ describe("createPublicApiOpenApiDocument", () => {
         example: "available",
       }),
     );
-    expect(getSchemaValueAtPath(trustProfileComponent, ["example"])) .toEqual({
+    expect(getSchemaValueAtPath(trustProfileComponent, ["example"])).toEqual({
       schemaVersion: 1,
       signals: [
         {
@@ -735,6 +808,7 @@ describe("createPublicApiOpenApiDocument", () => {
           "CategoryDetailResponse",
           "ClientDetailResponse",
           "ClientsCollectionResponse",
+          "ErrorResponse",
           "HealthCheckOutcome",
           "InstallAvailability",
           "InstallManifestResponse",

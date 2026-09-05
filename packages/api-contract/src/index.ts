@@ -4,6 +4,9 @@ export {
   createResourceResponseSchema,
   httpUrlSchema,
   identifierPathParamsSchema,
+  PUBLIC_API_PAGINATION,
+  publicApiCursorSchema,
+  publicApiLimitSchema,
   requestIdSchema,
   rfc3339UtcSchema,
   slugSchema,
@@ -11,7 +14,17 @@ export {
   strictObject,
   uuidSchema,
 } from "./public-api/shared.js";
-export { apiErrorCodeSchema, errorResponseSchema, type ApiErrorCode } from "./public-api/errors.js";
+export {
+  apiErrorCodeSchema,
+  errorResponseSchema,
+  PUBLIC_API_ERROR_DEFINITIONS,
+  type ApiErrorCode,
+  type ApiErrorStatus,
+} from "./public-api/errors.js";
+export {
+  PUBLIC_API_DOCUMENTATION,
+  type PublicApiDocumentation,
+} from "./public-api/documentation.js";
 export {
   HealthCheckOutcomeSchema,
   RemoteHealthObservationV1ClientSchema,

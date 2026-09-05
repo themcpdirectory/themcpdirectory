@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { errorResponseSchema, type ApiErrorCode } from "@themcpdirectory/api-contract";
+import {
+  errorResponseSchema,
+  PUBLIC_API_ERROR_DEFINITIONS,
+  type ApiErrorCode,
+  type ApiErrorStatus,
+} from "@themcpdirectory/api-contract";
 import {
   AmbiguousServerIdentifierError,
   InstallManifestUnavailableError,
@@ -10,24 +15,11 @@ import { InvalidCursorError } from "@themcpdirectory/search";
 import type { ErrorHandler } from "hono";
 import type { ApiEnv, ApiLogger } from "../app.js";
 
-type HttpApiStatus = 400 | 404 | 409 | 410 | 429 | 500;
-
-const PUBLIC_ERRORS = {
-  VALIDATION_ERROR: { status: 400, message: "Validation failed" },
-  SERVER_NOT_FOUND: { status: 404, message: "Server not found" },
-  AMBIGUOUS_SERVER: { status: 409, message: "Identifier matches multiple servers" },
-  INSTALL_UNAVAILABLE: { status: 410, message: "Install manifest is unavailable" },
-  UPSTREAM_DELETED: { status: 410, message: "Listing was deleted upstream" },
-  CURSOR_INVALID: { status: 400, message: "Cursor is invalid" },
-  RATE_LIMITED: { status: 429, message: "Too many requests" },
-  INTERNAL_ERROR: { status: 500, message: "Internal server error" },
-} as const satisfies Record<ApiErrorCode, { status: HttpApiStatus; message: string }>;
-
 export class HttpApiError extends Error {
-  readonly status: HttpApiStatus;
+  readonly status: ApiErrorStatus;
 
   constructor(readonly code: ApiErrorCode) {
-    const definition = PUBLIC_ERRORS[code];
+    const definition = PUBLIC_API_ERROR_DEFINITIONS[code];
     super(definition.message);
     this.status = definition.status;
     this.name = "HttpApiError";

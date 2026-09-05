@@ -7,6 +7,8 @@ import {
   createResourceResponseSchema,
   errorResponseSchema,
   identifierPathParamsSchema,
+  PUBLIC_API_DOCUMENTATION,
+  PUBLIC_API_ERROR_DEFINITIONS,
   requestIdSchema,
   slugPathParamsSchema,
 } from "../index.js";
@@ -113,6 +115,55 @@ describe("shared public-api contracts", () => {
     }
 
     expect(() => apiErrorCodeSchema.parse("NOT_AN_APPROVED_CODE")).toThrow();
+  });
+
+  it("publishes complete error definitions and schema-derived documentation facts", () => {
+    expect(PUBLIC_API_ERROR_DEFINITIONS).toEqual({
+      VALIDATION_ERROR: { status: 400, message: "Validation failed" },
+      SERVER_NOT_FOUND: { status: 404, message: "Server not found" },
+      AMBIGUOUS_SERVER: { status: 409, message: "Identifier matches multiple servers" },
+      INSTALL_UNAVAILABLE: { status: 410, message: "Install manifest is unavailable" },
+      UPSTREAM_DELETED: { status: 410, message: "Listing was deleted upstream" },
+      CURSOR_INVALID: { status: 400, message: "Cursor is invalid" },
+      RATE_LIMITED: { status: 429, message: "Too many requests" },
+      INTERNAL_ERROR: { status: 500, message: "Internal server error" },
+    });
+    expect(Object.keys(PUBLIC_API_ERROR_DEFINITIONS)).toEqual(apiErrorCodeSchema.options);
+    expect(PUBLIC_API_DOCUMENTATION).toMatchObject({
+      envelopes: {
+        resource: ["data", "meta.requestId"],
+        collection: ["data[]", "meta.requestId", "meta.nextCursor"],
+        error: ["error.code", "error.message", "error.requestId", "error.details[]?"],
+      },
+      pagination: {
+        defaultLimit: 30,
+        minimumLimit: 1,
+        maximumLimit: 100,
+        maximumCursorLength: 2048,
+      },
+      rateLimit: {
+        status: 429,
+        code: "RATE_LIMITED",
+        retryAfterHeader: "Retry-After",
+        quota: "configuration-dependent",
+      },
+      upstreamDeletion: {
+        listingStatus: "deleted_upstream",
+        installError: {
+          code: "UPSTREAM_DELETED",
+          status: 410,
+          message: "Listing was deleted upstream",
+        },
+      },
+      installSafety: {
+        urlProtocols: ["http", "https"],
+        packageVersions: "exact immutable versions only",
+        environmentValues: "references only; secret values are never returned",
+      },
+    });
+    expect(errorResponseSchema.parse(PUBLIC_API_DOCUMENTATION.example)).toEqual(
+      PUBLIC_API_DOCUMENTATION.example,
+    );
   });
 });
 

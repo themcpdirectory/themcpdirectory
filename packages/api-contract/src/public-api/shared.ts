@@ -25,6 +25,24 @@ export const httpUrlSchema = z
   .regex(HTTP_URL_PATTERN, "URL must use the HTTP or HTTPS protocol")
   .url();
 
+export const PUBLIC_API_PAGINATION = {
+  defaultLimit: 30,
+  minimumLimit: 1,
+  maximumLimit: 100,
+  maximumCursorLength: 2048,
+} as const;
+
+export const publicApiCursorSchema = z
+  .string()
+  .min(1)
+  .max(PUBLIC_API_PAGINATION.maximumCursorLength);
+export const publicApiLimitSchema = z.coerce
+  .number()
+  .int()
+  .min(PUBLIC_API_PAGINATION.minimumLimit)
+  .max(PUBLIC_API_PAGINATION.maximumLimit)
+  .default(PUBLIC_API_PAGINATION.defaultLimit);
+
 export function strictObject<TShape extends z.ZodRawShape>(shape: TShape) {
   return z.object(shape).strict();
 }

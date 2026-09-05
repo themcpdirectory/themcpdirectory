@@ -14,6 +14,19 @@ export const apiErrorCodeSchema = z.enum([
 
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;
 
+export const PUBLIC_API_ERROR_DEFINITIONS = {
+  VALIDATION_ERROR: { status: 400, message: "Validation failed" },
+  SERVER_NOT_FOUND: { status: 404, message: "Server not found" },
+  AMBIGUOUS_SERVER: { status: 409, message: "Identifier matches multiple servers" },
+  INSTALL_UNAVAILABLE: { status: 410, message: "Install manifest is unavailable" },
+  UPSTREAM_DELETED: { status: 410, message: "Listing was deleted upstream" },
+  CURSOR_INVALID: { status: 400, message: "Cursor is invalid" },
+  RATE_LIMITED: { status: 429, message: "Too many requests" },
+  INTERNAL_ERROR: { status: 500, message: "Internal server error" },
+} as const satisfies Record<ApiErrorCode, Readonly<{ status: number; message: string }>>;
+
+export type ApiErrorStatus = (typeof PUBLIC_API_ERROR_DEFINITIONS)[ApiErrorCode]["status"];
+
 export const errorResponseSchema = strictObject({
   error: strictObject({
     code: apiErrorCodeSchema,
