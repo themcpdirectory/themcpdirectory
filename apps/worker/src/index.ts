@@ -53,6 +53,19 @@ import {
   nextRemoteHealthRetryDelayMs,
 } from "./trust-health-config.js";
 import { cleanupHealthHistory, cleanupTrustHistory } from "./retention.js";
+import {
+  PUBLISHER_OUTBOX_QUEUE,
+  processPublisherOutboxJob,
+} from "./publisher-outbox-worker.js";
+import {
+  PUBLISHER_ERASURE_QUEUE,
+  createAccountErasureDeps,
+  processPublisherErasureJob,
+} from "./publisher-erasure-worker.js";
+import {
+  PUBLISHER_RETENTION_QUEUE,
+  processPublisherRetentionJob,
+} from "./publisher-retention-worker.js";
 
 export const REGISTRY_SYNC_QUEUE = "registry.sync";
 export const GITHUB_ENRICH_QUEUE = "github.enrich";
@@ -84,6 +97,24 @@ export const TRUST_REFRESH_QUEUE_OPTIONS = {
   retryBackoff: true,
 } as const;
 export const RETENTION_QUEUE_OPTIONS = {
+  policy: "short",
+  retryLimit: 5,
+  retryDelay: 30,
+  retryBackoff: true,
+} as const;
+export const PUBLISHER_OUTBOX_QUEUE_OPTIONS = {
+  policy: "short",
+  retryLimit: 5,
+  retryDelay: 30,
+  retryBackoff: true,
+} as const;
+export const PUBLISHER_ERASURE_QUEUE_OPTIONS = {
+  policy: "short",
+  retryLimit: 5,
+  retryDelay: 30,
+  retryBackoff: true,
+} as const;
+export const PUBLISHER_RETENTION_QUEUE_OPTIONS = {
   policy: "short",
   retryLimit: 5,
   retryDelay: 30,
@@ -254,6 +285,17 @@ export function parseGitHubEnrichJobData(data: unknown): GitHubEnrichJobData {
     ...(typeof candidate.retriesConsumed === "number"
       ? { retriesConsumed: candidate.retriesConsumed }
       : {}),
+  };
+}
+
+function publisherRetentionPolicyFromEnv(env: ReturnType<typeof loadEnv>) {
+  return {
+    expiredSessionGraceDays: env.PUBLISHER_EXPIRED_SESSION_GRACE_DAYS,
+    claimExpiryDays: env.PUBLISHER_CLAIM_EXPIRY_DAYS,
+    claimEvidenceRetentionDays: env.PUBLISHER_CLAIM_EVIDENCE_RETENTION_DAYS,
+    outboxRetentionDays: env.PUBLISHER_OUTBOX_RETENTION_DAYS,
+    dormantAccountRetentionDays: env.PUBLISHER_DORMANT_ACCOUNT_RETENTION_DAYS,
+    auditRetentionDays: env.PUBLISHER_AUDIT_RETENTION_DAYS,
   };
 }
 
@@ -634,6 +676,18 @@ export async function initializeWorkerQueues(
     name: TRUST_RETENTION_QUEUE,
     ...RETENTION_QUEUE_OPTIONS,
   });
+  await boss.createQueue(PUBLISHER_OUTBOX_QUEUE, {
+    name: PUBLISHER_OUTBOX_QUEUE,
+    ...PUBLISHER_OUTBOX_QUEUE_OPTIONS,
+  });
+  await boss.createQueue(PUBLISHER_ERASURE_QUEUE, {
+    name: PUBLISHER_ERASURE_QUEUE,
+    ...PUBLISHER_ERASURE_QUEUE_OPTIONS,
+  });
+  await boss.createQueue(PUBLISHER_RETENTION_QUEUE, {
+    name: PUBLISHER_RETENTION_QUEUE,
+    ...PUBLISHER_RETENTION_QUEUE_OPTIONS,
+  });
 
   await boss.schedule(REMOTE_HEALTH_QUEUE, "7 * * * *", TRUST_HEALTH_SWEEP_JOB, {
     tz: "UTC",
@@ -643,6 +697,9 @@ export async function initializeWorkerQueues(
   });
   await boss.schedule(HEALTH_RETENTION_QUEUE, "37 3 * * *", {}, { tz: "UTC" });
   await boss.schedule(TRUST_RETENTION_QUEUE, "47 4 1 * *", {}, { tz: "UTC" });
+  await boss.schedule(PUBLISHER_OUTBOX_QUEUE, "*/10 * * * *", {}, { tz: "UTC" });
+  await boss.schedule(PUBLISHER_ERASURE_QUEUE, "*/15 * * * *", {}, { tz: "UTC" });
+  await boss.schedule(PUBLISHER_RETENTION_QUEUE, "19 5 1 * *", {}, { tz: "UTC" });
 
   const initialRegistrySyncJobId = await boss.send(
     REGISTRY_SYNC_QUEUE,
@@ -917,6 +974,42 @@ export async function startWorker(): Promise<void> {
     console.info({ event: "trust_retention", queue: TRUST_RETENTION_QUEUE, ...result });
   });
 
+  await boss.work(PUBLISHER_OUTBOX_QUEUE, async ([job]) => {
+    const result = await processPublisherOutboxJob(db, new Date());
+    if (result.retried > 0) await boss.send(PUBLISHER_OUTBOX_QUEUE, {});
+    console.info({
+      event: "publisher_outbox",
+      queue: PUBLISHER_OUTBOX_QUEUE,
+      jobId: job?.id ?? null,
+      ...result,
+    });
+  });
+
+  await boss.work(PUBLISHER_ERASURE_QUEUE, async ([job]) => {
+    const result = await processPublisherErasureJob(db, new Date(), createAccountErasureDeps());
+    if (result.retryScheduled > 0) await boss.send(PUBLISHER_ERASURE_QUEUE, {});
+    console.info({
+      event: "publisher_erasure",
+      queue: PUBLISHER_ERASURE_QUEUE,
+      jobId: job?.id ?? null,
+      ...result,
+    });
+  });
+
+  await boss.work(PUBLISHER_RETENTION_QUEUE, async ([job]) => {
+    const result = await processPublisherRetentionJob(
+      db,
+      new Date(),
+      publisherRetentionPolicyFromEnv(env),
+    );
+    console.info({
+      event: "publisher_retention",
+      queue: PUBLISHER_RETENTION_QUEUE,
+      jobId: job?.id ?? null,
+      ...result,
+    });
+  });
+
   const shutdown = async () => {
     await boss.stop({ graceful: true });
     process.exit(0);
@@ -934,6 +1027,9 @@ export async function startWorker(): Promise<void> {
       TRUST_REFRESH_QUEUE,
       HEALTH_RETENTION_QUEUE,
       TRUST_RETENTION_QUEUE,
+      PUBLISHER_OUTBOX_QUEUE,
+      PUBLISHER_ERASURE_QUEUE,
+      PUBLISHER_RETENTION_QUEUE,
     ],
   });
 }

@@ -149,6 +149,16 @@ export {
 } from "./publisher/account-erasure.js";
 
 export {
+  deliverTrustRefreshOutbox,
+  refreshPublisherVerificationTrustSignal,
+} from "./publisher/trust-refresh.js";
+
+export {
+  runPublisherRetentionSweep,
+  type PublisherRetentionPolicy,
+} from "./publisher/retention.js";
+
+export {
   PublisherClaimAuthorityError,
   PublisherClaimConflictError,
   PublisherClaimTransitionError,
