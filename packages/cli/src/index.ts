@@ -38,7 +38,7 @@ export {
   type UpdateCommandOptions,
   type UpdateResult,
 } from "./commands/update.js";
-export { CLI_HELP_TEXT, runCli, runCliMain } from "./cli.js";
+export { CLI_HELP_TEXT, CLI_VERSION, runCli, runCliMain } from "./cli.js";
 export {
   CLI_COMMANDS,
   CLI_DOCUMENTATION,
@@ -68,6 +68,7 @@ export {
   type PromptIO,
 } from "./dependencies.js";
 export { serializeJsonEnvelope } from "./output/json.js";
+export { CLI_JSON_SCHEMAS, parseCliJsonEnvelope, type CliJsonSchemaName } from "./output/schema.js";
 export { renderHumanEnvelope } from "./output/render.js";
 
 if (isDirectExecution(process.argv[1])) {

@@ -17,9 +17,11 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "turbo lint",
+    "release:cli-tarball": "pnpm --filter @themcpdirectory/release-tools verify:cli-tarball",
     "release:dependency-audit": "pnpm --filter @themcpdirectory/release-tools exec tsx src/verify-dependency-audit.ts",
     "release:database": "pnpm --filter @themcpdirectory/release-tools exec tsx src/verify-database-release.ts",
     "release:lockfile-integrity": "pnpm --filter @themcpdirectory/release-tools exec tsx src/verify-lockfile-integrity.ts",
+    "release:prerequisites": "pnpm --filter @themcpdirectory/release-tools verify:prerequisites",
     "release:secret-scan": "pnpm --filter @themcpdirectory/release-tools exec tsx src/verify-secret-scanning.ts",
     "test": "turbo test",
     "test:cli": "pnpm --filter @themcpdirectory/cli test",
@@ -27,6 +29,8 @@
     "test:integration": "turbo test:integration",
     "test:lighthouse": "pnpm --filter @themcpdirectory/release-tools exec tsx src/run-lighthouse.ts",
     "typecheck": "turbo typecheck",
+    "verify:release": "pnpm --filter @themcpdirectory/release-tools exec tsx src/verify-release.ts",
+    "web:accessibility-release": "pnpm --filter @themcpdirectory/web exec playwright test e2e/accessibility.release.spec.ts",
     "web:security-release": "WEB_E2E_MODE=production pnpm --filter @themcpdirectory/web exec playwright test e2e/security.release.spec.ts"
   },
   "devDependencies": {

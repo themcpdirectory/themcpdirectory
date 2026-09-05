@@ -2,27 +2,41 @@
   "name": "@themcpdirectory/cli",
   "version": "0.1.0",
   "private": true,
+  "description": "Command-line client for The MCP Directory.",
   "type": "module",
   "bin": {
-    "mcpdir": "./dist/index.js"
+    "mcpdir": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "license": "UNLICENSED",
+  "homepage": "https://github.com/themcpdirectory/themcpdirectory#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/themcpdirectory/themcpdirectory.git",
+    "directory": "packages/cli"
+  },
+  "engines": {
+    "node": ">=24.10 <25"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./command-metadata": "./src/command-metadata.ts"
+    ".": "./dist/index.js",
+    "./command-metadata": "./dist/index.js"
   },
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/index.js",
+    "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && esbuild src/index.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/index.js",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
     "@themcpdirectory/api-contract": "workspace:*",
     "@themcpdirectory/client-adapters": "workspace:*",
     "@themcpdirectory/directory-client": "workspace:*",
-    "@themcpdirectory/install-engine": "workspace:*"
-  },
-  "devDependencies": {
+    "@themcpdirectory/install-engine": "workspace:*",
     "@themcpdirectory/eslint-config": "workspace:*",
     "@themcpdirectory/test-utils": "workspace:*",
     "@themcpdirectory/typescript-config": "workspace:*",
@@ -30,6 +44,7 @@
     "esbuild": "0.28.2",
     "eslint": "9.39.5",
     "typescript": "5.9.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.11",
+    "zod": "4.5.4"
   }
 }

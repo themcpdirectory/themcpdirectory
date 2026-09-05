@@ -51,6 +51,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function getFileSystemErrorCode(error: unknown): string | undefined {
+  if (!isRecord(error)) {
+    return undefined;
+  }
+  return typeof error.causeCode === "string"
+    ? error.causeCode
+    : typeof error.code === "string"
+      ? error.code
+      : undefined;
+}
+
 function parseCursorConfigDocument(raw: string): CursorConfigDocument {
   let parsed: unknown;
   try {
@@ -126,7 +137,7 @@ async function ensureDirectoryNotSymlink(runtime: AdapterRuntime, path: string):
       );
     }
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
+    const code = getFileSystemErrorCode(error);
     if (code !== "ENOENT") {
       throw error;
     }
@@ -151,7 +162,7 @@ async function assertFileNotSymlink(runtime: AdapterRuntime, path: string): Prom
     }
     return true;
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
+    const code = getFileSystemErrorCode(error);
     if (code === "ENOENT") {
       return false;
     }
@@ -163,7 +174,7 @@ async function safeFsyncDirectory(runtime: AdapterRuntime, path: string): Promis
   try {
     await runtime.fsyncDirectory(path);
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
+    const code = getFileSystemErrorCode(error);
     if (code !== "ENOTSUP" && code !== "EINVAL" && code !== "ENOSYS") {
       throw error;
     }
@@ -174,7 +185,7 @@ async function safeUnlink(runtime: AdapterRuntime, path: string): Promise<void> 
   try {
     await runtime.unlink(path);
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
+    const code = getFileSystemErrorCode(error);
     if (code !== "ENOENT") {
       throw error;
     }
@@ -193,7 +204,7 @@ async function copyFileToAvailableBackupPath(
       await runtime.copyFile(fromPath, candidatePath, { exclusive: true });
       return candidatePath;
     } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
+      const code = getFileSystemErrorCode(error);
       if (code !== "EEXIST") {
         throw error;
       }
@@ -202,7 +213,10 @@ async function copyFileToAvailableBackupPath(
   }
 }
 
-export function resolveCursorScopePaths(runtime: AdapterRuntime, scope: ClientScope): CursorScopePaths {
+export function resolveCursorScopePaths(
+  runtime: AdapterRuntime,
+  scope: ClientScope,
+): CursorScopePaths {
   const pathModule = getPathModule(runtime.platform);
   if (scope === "global") {
     throw new CursorJsonError(
@@ -222,7 +236,11 @@ export function resolveCursorScopePaths(runtime: AdapterRuntime, scope: ClientSc
               "Cursor",
               "User",
             )
-          : pathModule.join(runtime.env.XDG_CONFIG_HOME ?? pathModule.join(runtime.homeDirectory, ".config"), "Cursor", "User");
+          : pathModule.join(
+              runtime.env.XDG_CONFIG_HOME ?? pathModule.join(runtime.homeDirectory, ".config"),
+              "Cursor",
+              "User",
+            );
 
   return Object.freeze({
     rootPath,
@@ -390,10 +408,7 @@ export function removeCursorServerEntry(
   return writable as CursorConfigDocument;
 }
 
-export function getCursorServerEntry(
-  document: CursorConfigDocument,
-  serverKey: string,
-): unknown {
+export function getCursorServerEntry(document: CursorConfigDocument, serverKey: string): unknown {
   if (!document.mcpServers || !isRecord(document.mcpServers)) {
     return undefined;
   }

@@ -12,8 +12,10 @@ import { getCliCommandMetadata, renderCliHelp } from "./command-metadata.js";
 import { createDefaultCliDependencies, type CliDependencies } from "./dependencies.js";
 import { serializeJsonEnvelope } from "./output/json.js";
 import { renderHumanEnvelope, sanitizeTerminalText } from "./output/render.js";
+import packageMetadata from "../package.json" with { type: "json" };
 
 export const CLI_HELP_TEXT = renderCliHelp();
+export const CLI_VERSION = packageMetadata.version;
 
 type CliCommandHandler = (argv: readonly string[], deps: CliDependencies) => Promise<CommandResult>;
 
@@ -36,6 +38,11 @@ export async function runCli(argv: readonly string[], deps?: CliDependencies): P
 
   if (!command || command === "help" || command === "--help" || command === "-h") {
     resolvedDeps.output.writeStdout(`${CLI_HELP_TEXT}\n`);
+    return finalizeExitCode(0, ownsProcessExit);
+  }
+
+  if (command === "--version" || command === "-v") {
+    resolvedDeps.output.writeStdout(`${CLI_VERSION}\n`);
     return finalizeExitCode(0, ownsProcessExit);
   }
 

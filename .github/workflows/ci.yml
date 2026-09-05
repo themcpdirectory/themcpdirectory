@@ -56,55 +56,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify lockfile integrity
-        run: pnpm release:lockfile-integrity
-
-      - name: Format check
-        run: pnpm format:check
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Database release gate
-        run: pnpm release:database
-
-      - name: Test
-        run: pnpm test
-
-      - name: Integration tests
-        run: pnpm test:integration
-
-      - name: CLI tests
-        run: pnpm test:cli
-
-      - name: Build
-        run: pnpm build
-
       - name: Install Chromium
         run: pnpm --filter @themcpdirectory/web exec playwright install --with-deps chromium
 
-      - name: Browser tests
-        run: pnpm test:e2e
+      - name: Verify release
+        run: pnpm verify:release
 
-      - name: Browser security release gate
-        run: pnpm web:security-release
-
-      - name: Lighthouse release gate
-        run: pnpm test:lighthouse
-
-      - name: Upload Lighthouse report
+      - name: Upload release reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lighthouse-release-report
-          path: test-results/release/lighthouse.json
+          name: release-reports
+          path: test-results/release/
           if-no-files-found: error
-
-      - name: Dependency audit
-        run: pnpm release:dependency-audit
-
-      - name: Secret scan
-        run: pnpm release:secret-scan

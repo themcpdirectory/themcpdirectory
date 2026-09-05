@@ -7,6 +7,7 @@
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
+    "verify:cli-tarball": "tsx src/verify-cli-tarball.ts",
     "verify:prerequisites": "tsx src/verify-phase-prerequisites.ts"
   },
   "dependencies": {

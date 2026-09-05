@@ -52,6 +52,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function getFileSystemErrorCode(error: unknown): string | undefined {
+  if (!isRecord(error)) {
+    return undefined;
+  }
+  return typeof error.causeCode === "string"
+    ? error.causeCode
+    : typeof error.code === "string"
+      ? error.code
+      : undefined;
+}
+
 function parseVsCodeConfigDocument(raw: string): VsCodeConfigDocument {
   let parsed: unknown;
   try {
@@ -137,7 +148,7 @@ async function ensureDirectoryNotSymlink(runtime: AdapterRuntime, path: string):
       );
     }
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
+    const code = getFileSystemErrorCode(error);
     if (code !== "ENOENT") {
       throw error;
     }
@@ -162,7 +173,7 @@ async function assertFileNotSymlink(runtime: AdapterRuntime, path: string): Prom
     }
     return true;
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
+    const code = getFileSystemErrorCode(error);
     if (code === "ENOENT") {
       return false;
     }
@@ -174,7 +185,7 @@ async function safeFsyncDirectory(runtime: AdapterRuntime, path: string): Promis
   try {
     await runtime.fsyncDirectory(path);
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
+    const code = getFileSystemErrorCode(error);
     if (code !== "ENOTSUP" && code !== "EINVAL" && code !== "ENOSYS") {
       throw error;
     }
@@ -185,7 +196,7 @@ async function safeUnlink(runtime: AdapterRuntime, path: string): Promise<void> 
   try {
     await runtime.unlink(path);
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
+    const code = getFileSystemErrorCode(error);
     if (code !== "ENOENT") {
       throw error;
     }
@@ -204,7 +215,7 @@ async function copyFileToAvailableBackupPath(
       await runtime.copyFile(fromPath, candidatePath, { exclusive: true });
       return candidatePath;
     } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
+      const code = getFileSystemErrorCode(error);
       if (code !== "EEXIST") {
         throw error;
       }
@@ -213,7 +224,10 @@ async function copyFileToAvailableBackupPath(
   }
 }
 
-export function resolveVsCodeScopePaths(runtime: AdapterRuntime, scope: ClientScope): VsCodeScopePaths {
+export function resolveVsCodeScopePaths(
+  runtime: AdapterRuntime,
+  scope: ClientScope,
+): VsCodeScopePaths {
   const pathModule = getPathModule(runtime.platform);
   if (scope === "global") {
     throw new VsCodeJsonError(
@@ -223,11 +237,16 @@ export function resolveVsCodeScopePaths(runtime: AdapterRuntime, scope: ClientSc
   }
 
   const rootPath =
-    scope === "project" ? pathModule.join(runtime.cwd, ".vscode") : pathModule.join(runtime.homeDirectory, ".copilot");
+    scope === "project"
+      ? pathModule.join(runtime.cwd, ".vscode")
+      : pathModule.join(runtime.homeDirectory, ".copilot");
 
   return Object.freeze({
     rootPath,
-    configPath: scope === "project" ? pathModule.join(rootPath, "mcp.json") : pathModule.join(rootPath, "mcp-config.json"),
+    configPath:
+      scope === "project"
+        ? pathModule.join(rootPath, "mcp.json")
+        : pathModule.join(rootPath, "mcp-config.json"),
   });
 }
 
@@ -314,7 +333,11 @@ export async function applyVsCodeConfigMutation(
   let backupPathUsed: string | null = null;
   await safeUnlink(runtime, mutation.tempPath);
   if (fileExists) {
-    backupPathUsed = await copyFileToAvailableBackupPath(runtime, mutation.path, mutation.backupPath);
+    backupPathUsed = await copyFileToAvailableBackupPath(
+      runtime,
+      mutation.path,
+      mutation.backupPath,
+    );
   }
 
   await runtime.writeFile(mutation.tempPath, toCanonicalJson(nextDocument), {
