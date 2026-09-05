@@ -31,7 +31,7 @@ describe("publisher routes", () => {
       }),
     });
 
-    const response = await createClaim(request as never, { params: Promise.resolve({}) } as never);
+    const response = await createClaim(request as never);
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({ error: { code: "ORIGIN_FORBIDDEN" } });

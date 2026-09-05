@@ -20,6 +20,11 @@ test("dashboard explains claim permissions, works at 320px, and focuses the erro
   await expect(
     page.getByLabel("Verification method").locator('option[value="github_organization"]'),
   ).toHaveCount(0);
+  expect(
+    (await context.cookies()).some((cookie) =>
+      cookie.name.startsWith("publisher_claim_verification_"),
+    ),
+  ).toBe(false);
   await listingSelect.selectOption("");
   await page.getByRole("button", { name: "Submit claim" }).click();
 

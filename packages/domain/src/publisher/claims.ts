@@ -173,9 +173,26 @@ function parseStableGitHubId(value: string, errorCode: string): number {
 }
 
 function isOpenClaimUniqueViolation(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const candidate = error as { code?: unknown; constraint_name?: unknown };
-  return candidate.code === "23505" && candidate.constraint_name === OPEN_SERVER_CLAIM_CONSTRAINT;
+  const seen = new Set<unknown>();
+  let current = error;
+
+  while (typeof current === "object" && current !== null && !seen.has(current)) {
+    seen.add(current);
+    const candidate = current as {
+      code?: unknown;
+      constraint_name?: unknown;
+      cause?: unknown;
+    };
+    if (
+      candidate.code === "23505" &&
+      candidate.constraint_name === OPEN_SERVER_CLAIM_CONSTRAINT
+    ) {
+      return true;
+    }
+    current = candidate.cause;
+  }
+
+  return false;
 }
 
 function parseGitHubRepositorySlug(url: string | null): { owner: string; name: string } | null {

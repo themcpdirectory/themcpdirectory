@@ -12,16 +12,19 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "1.7.2",
     "@themcpdirectory/config": "workspace:*",
     "@themcpdirectory/db": "workspace:*",
-    "better-auth": "1.7.2",
-    "@better-auth/drizzle-adapter": "1.7.2"
+    "better-auth": "1.7.2"
   },
   "devDependencies": {
-    "eslint": "9.39.5",
     "@themcpdirectory/eslint-config": "workspace:*",
+    "@themcpdirectory/test-utils": "workspace:*",
     "@themcpdirectory/typescript-config": "workspace:*",
     "@types/node": "^20",
+    "drizzle-orm": "0.45.2",
+    "eslint": "9.39.5",
+    "postgres": "3.4.7",
     "typescript": "5.9.3",
     "vitest": "4.1.11"
   }

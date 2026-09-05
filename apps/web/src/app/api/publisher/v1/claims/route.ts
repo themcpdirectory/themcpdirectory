@@ -22,10 +22,7 @@ function parseCreateClaimBody(value: unknown): CreateClaimBody {
   return parseWithSchema(createClaimBodySchema, value);
 }
 
-export async function POST(
-  request: Request,
-  _context?: { params: Promise<Record<string, never>> },
-): Promise<Response> {
+export async function POST(request: Request): Promise<Response> {
   try {
     const session = await requirePublisherRouteSession(request);
     const payload = parseCreateClaimBody(await request.json());

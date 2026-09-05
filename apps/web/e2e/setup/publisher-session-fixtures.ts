@@ -8,7 +8,7 @@ import {
   servers,
   createDatabase,
 } from "@themcpdirectory/db";
-import { and, isNotNull } from "drizzle-orm";
+import { and, asc, eq, isNotNull, like } from "drizzle-orm";
 import { TEST_BETTER_AUTH_SECRET, TEST_DATABASE_URL } from "./test-database";
 
 /** Better Auth's default cookie prefix + name (see `better-auth/dist/cookies`); not `session_token`. */
@@ -48,6 +48,8 @@ export async function seedPublisherSession(input: {
 }): Promise<SeededPublisherSession> {
   const db = createDatabase(TEST_DATABASE_URL);
   try {
+    await db.delete(publishers).where(like(publishers.slug, "fixture-publisher-%"));
+
     const userId = randomUUID();
     const publisherId = randomUUID();
     const sessionToken = randomUUID();
@@ -81,11 +83,23 @@ export async function seedPublisherSession(input: {
       .select({ id: servers.id })
       .from(servers)
       .where(and(isNotNull(servers.repositoryExternalId), isNotNull(servers.repositoryUrl)))
+      .orderBy(asc(servers.id))
       .limit(2);
     const [claimedListing, unclaimedListing] = eligibleListings;
     if (!claimedListing || !unclaimedListing) {
       throw new Error("Publisher session fixture requires two seeded GitHub listings.");
     }
+
+    await Promise.all([
+      db
+        .update(servers)
+        .set({ repositoryExternalId: "1001" })
+        .where(eq(servers.id, claimedListing.id)),
+      db
+        .update(servers)
+        .set({ repositoryExternalId: "1002" })
+        .where(eq(servers.id, unclaimedListing.id)),
+    ]);
 
     await db.insert(publisherClaims).values([
       {
