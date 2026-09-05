@@ -21,8 +21,25 @@ export interface ProbeRequestInit {
 export interface ProbeResponse {
   readonly status: number;
   readonly ok: boolean;
-  readonly headers: Headers;
-  readonly body: ReadableStream<Uint8Array> | null;
+  readonly headers: {
+    get(name: string): string | null;
+    forEach(callback: (value: string, key: string) => void): void;
+  };
+  readonly body: ProbeBody | null;
+}
+
+interface ProbeBody {
+  getReader(): ProbeBodyReader;
+  cancel(): Promise<void>;
+}
+
+interface ProbeBodyReader {
+  read(): Promise<
+    | { readonly done: true; readonly value?: undefined }
+    | { readonly done: false; readonly value: { readonly byteLength: number } }
+  >;
+  cancel(): Promise<void>;
+  releaseLock(): void;
 }
 
 export type ProbeFetch = (input: string, init?: ProbeRequestInit) => Promise<ProbeResponse>;
@@ -223,9 +240,9 @@ function pickDeterministicAddress(addresses: readonly string[]): string {
 
 function countHeaderBytes(headers: ProbeResponse["headers"]): number {
   let total = 0;
-  for (const [name, value] of headers) {
+  headers.forEach((value, name) => {
     total += Buffer.byteLength(name) + Buffer.byteLength(value) + 4;
-  }
+  });
   return total;
 }
 
@@ -256,7 +273,7 @@ async function exceedsStreamLimit(response: ProbeResponse, limit: number): Promi
   }
 }
 
-function cancelReader(reader: ReadableStreamDefaultReader<Uint8Array>): void {
+function cancelReader(reader: ProbeBodyReader): void {
   try {
     void reader.cancel().catch(() => {
       // Stream cancellation must not replace or delay the probe outcome.
