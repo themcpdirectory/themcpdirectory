@@ -27,7 +27,7 @@ The CLI provides `search`, `info`, `add`, `list`, `remove`, `update`, and `docto
 
 Install and removal plans are restricted to adapter-owned executables, configuration roots, capabilities, and deeplinks. Mutating commands show or require confirmation unless `--yes` is supplied, receipts are written only after successful verification, and `doctor` performs read-only configuration inspection without starting installed MCP servers. Output and receipts never contain environment values or persisted secrets.
 
-The workspace build is intended for local development. Packed-tarball verification and publishing remain Phase H work.
+The workspace build is intended for local development. `pnpm release:cli-tarball` builds, inspects, hashes, installs, and smoke-tests the packed CLI in an isolated temporary environment. The package remains private and unpublished; do not present it as a public npm installation until licensing and publication are explicitly approved.
 
 ## Quick Start
 
@@ -47,28 +47,22 @@ set +a
 docker compose up -d --wait postgres
 pnpm db:migrate
 pnpm db:seed
-pnpm dev
-```
-
-Open:
-
-- Web directory: <http://localhost:3000>
-- API health: <http://localhost:3001>
-
-`pnpm dev` starts the web app, API, and worker. Starting the worker creates an initial live Registry synchronization job against `MCP_REGISTRY_BASE_URL`; omit the worker when you only want to browse deterministic seed data.
-
-```sh
 pnpm --filter @themcpdirectory/web dev
-pnpm --filter @themcpdirectory/api dev
 ```
+
+Open the web directory at <http://localhost:3000>.
+
+The copied `.env.example` is sufficient for the anonymous web app and shared database commands, but not for `pnpm dev`. The all-process command also starts the API and worker: the API requires `API_CURSOR_SIGNING_SECRET`, while the worker and publisher surfaces require dedicated development GitHub OAuth and GitHub App credentials. Starting the worker creates an initial live Registry synchronization job against `MCP_REGISTRY_BASE_URL`. Configure those process-specific values as described in [Local development](docs/development.md) before starting the affected processes.
 
 See [Local development](docs/development.md) for database reset, migrations, fixture and live ingestion, process commands, tests, and production builds.
 
 ## Deployment
 
-The MVP can be deployed from Git to Portainer Business Edition on Docker Standalone. GitHub Actions publishes the workspace image to GHCR, and the production stack pulls it, runs migrations, starts the public web directory and Registry worker, keeps PostgreSQL private, and connects the web service to an existing Nginx Proxy Manager network.
+A reference deployment topology targets Portainer Business Edition on Docker Standalone. GitHub Actions can publish the workspace image to GHCR, and the stack can pull it, run migrations, start the public web directory and Registry worker, keep PostgreSQL private, and connect the web service to an existing Nginx Proxy Manager network.
 
 See [Portainer deployment](docs/deployment.md) for required environment variables, stack settings, proxy configuration, updates, backups, and rollback constraints.
+
+**Production deployment is blocked.** The current Portainer stack defines PostgreSQL, migrations, the web application, and the worker, but it does not deploy or proxy the standalone public API and does not pass the required publisher-authentication configuration to the web and worker services. Do not execute the deployment procedure until every applicable item in [Production authorisation blockers](docs/production-authorisation-blockers.md) is resolved and each external action is explicitly approved.
 
 ## Architecture
 
@@ -106,6 +100,18 @@ GitHub API --------------------> domain <------------+
 Authoritative product and engineering specifications live in [`docs/ai-docs`](docs/ai-docs). They include later-phase designs; this README describes only implemented behavior.
 
 ## Verification
+
+Run the complete release-candidate gate from the repository root on supported Node.js 24:
+
+```sh
+pnpm verify:release
+```
+
+pnpm verify:release does not publish to npm or deploy the stack.
+
+See [`docs/release-runbook.md`](docs/release-runbook.md) for versioning, release evidence, migration and deployment order, health and smoke checks, and recovery decisions. See [`docs/production-authorisation-blockers.md`](docs/production-authorisation-blockers.md) for the external approvals and production configuration that remain outstanding.
+
+Individual development checks remain available:
 
 ```sh
 pnpm format:check
