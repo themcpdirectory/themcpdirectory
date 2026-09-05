@@ -84,6 +84,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@themcpdirectory/api-contract':
+        specifier: workspace:*
+        version: link:../../packages/api-contract
       '@themcpdirectory/auth':
         specifier: workspace:*
         version: link:../../packages/auth

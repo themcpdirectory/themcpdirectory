@@ -49,9 +49,9 @@ test("docs landing lists the exact current and planned route facts", async ({ pa
     {
       path: "/docs/api",
       title: "API docs",
-      access: "Access: anonymous access planned.",
-      index: "Search indexing: planned for inclusion in the public index.",
-      availability: "Availability: planned; not yet available.",
+      access: "Access: available without signing in.",
+      index: "Search indexing: included in the public index.",
+      availability: "Availability: available now.",
     },
     {
       path: "/sign-in",

@@ -13,6 +13,7 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@themcpdirectory/api-contract": "workspace:*",
     "@themcpdirectory/auth": "workspace:*",
     "@themcpdirectory/config": "workspace:*",
     "@themcpdirectory/db": "workspace:*",

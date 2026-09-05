@@ -1,4 +1,12 @@
-export const PUBLIC_SITE_ROUTE_REFERENCE = [
+interface PublicSiteRouteReference {
+  readonly path: string;
+  readonly title: string;
+  readonly auth: "anonymous" | "authenticated";
+  readonly index: boolean;
+  readonly availability: "available" | "planned";
+}
+
+export const PUBLIC_SITE_ROUTE_REFERENCE: readonly PublicSiteRouteReference[] = [
   { path: "/", title: "Home", auth: "anonymous", index: true, availability: "available" },
   {
     path: "/search",
@@ -40,7 +48,7 @@ export const PUBLIC_SITE_ROUTE_REFERENCE = [
     title: "API docs",
     auth: "anonymous",
     index: true,
-    availability: "planned",
+    availability: "available",
   },
   {
     path: "/sign-in",
@@ -63,4 +71,4 @@ export const PUBLIC_SITE_ROUTE_REFERENCE = [
     index: false,
     availability: "available",
   },
-] as const;
+];
