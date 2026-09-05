@@ -17,7 +17,7 @@ import {
   trustSignals,
   type Database,
 } from "@themcpdirectory/db";
-import { loadEnv } from "@themcpdirectory/config";
+import { loadEnv, loadWebEnv } from "@themcpdirectory/config";
 import {
   OfficialRegistryClient,
   RegistryPageSchema,
@@ -64,6 +64,7 @@ import {
 } from "./publisher-erasure-worker.js";
 import {
   PUBLISHER_RETENTION_QUEUE,
+  parsePublisherRetentionJobData,
   processPublisherRetentionJob,
 } from "./publisher-retention-worker.js";
 
@@ -699,7 +700,7 @@ export async function initializeWorkerQueues(
   await boss.schedule(TRUST_RETENTION_QUEUE, "47 4 1 * *", {}, { tz: "UTC" });
   await boss.schedule(PUBLISHER_OUTBOX_QUEUE, "*/10 * * * *", {}, { tz: "UTC" });
   await boss.schedule(PUBLISHER_ERASURE_QUEUE, "*/15 * * * *", {}, { tz: "UTC" });
-  await boss.schedule(PUBLISHER_RETENTION_QUEUE, "19 5 1 * *", {}, { tz: "UTC" });
+  await boss.schedule(PUBLISHER_RETENTION_QUEUE, "19 5 * * *", {}, { tz: "UTC" });
 
   const initialRegistrySyncJobId = await boss.send(
     REGISTRY_SYNC_QUEUE,
@@ -775,6 +776,16 @@ export async function startWorker(): Promise<void> {
     await runFixtureSyncCommand(db, env.MCP_REGISTRY_BASE_URL);
     return;
   }
+
+  const webEnv = loadWebEnv();
+  const accountErasureDeps = createAccountErasureDeps({
+    db,
+    env: {
+      GITHUB_APP_ID: webEnv.GITHUB_APP_ID,
+      GITHUB_APP_PRIVATE_KEY: webEnv.GITHUB_APP_PRIVATE_KEY,
+    },
+    fetchImpl: fetch,
+  });
 
   const boss = new PgBoss({ connectionString: env.DATABASE_URL });
   await boss.start();
@@ -986,7 +997,7 @@ export async function startWorker(): Promise<void> {
   });
 
   await boss.work(PUBLISHER_ERASURE_QUEUE, async ([job]) => {
-    const result = await processPublisherErasureJob(db, new Date(), createAccountErasureDeps());
+    const result = await processPublisherErasureJob(db, new Date(), accountErasureDeps);
     if (result.retryScheduled > 0) await boss.send(PUBLISHER_ERASURE_QUEUE, {});
     console.info({
       event: "publisher_erasure",
@@ -997,11 +1008,15 @@ export async function startWorker(): Promise<void> {
   });
 
   await boss.work(PUBLISHER_RETENTION_QUEUE, async ([job]) => {
+    const checkedAt = new Date();
+    const jobData = parsePublisherRetentionJobData(job?.data, checkedAt);
     const result = await processPublisherRetentionJob(
       db,
-      new Date(),
+      checkedAt,
       publisherRetentionPolicyFromEnv(env),
+      jobData,
     );
+    if (!result.done) await boss.send(PUBLISHER_RETENTION_QUEUE, jobData);
     console.info({
       event: "publisher_retention",
       queue: PUBLISHER_RETENTION_QUEUE,

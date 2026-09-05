@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { asc, eq } from "drizzle-orm";
-import { authUsers, legalHolds, type Database } from "@themcpdirectory/db";
+import { authSessions, authUsers, legalHolds, type Database } from "@themcpdirectory/db";
 import { processPublisherRetentionJob } from "../publisher-retention-worker.js";
 import { createTempDatabase } from "./postgres-test-db.js";
 
@@ -53,9 +53,15 @@ describe("publisher retention worker", () => {
       createdBy: "worker-test",
     });
 
-    const summary = await processPublisherRetentionJob(db, now);
+    const summary = await processPublisherRetentionJob(
+      db,
+      now,
+      undefined,
+      { mode: "monthly_with_dormant" },
+    );
 
     expect(summary.deletedDormantUsers).toBe(1);
+    expect(summary.done).toBe(true);
 
     const remainingUsers = await db
       .select({ id: authUsers.id })
@@ -70,5 +76,67 @@ describe("publisher retention worker", () => {
       .from(authUsers)
       .where(eq(authUsers.id, deletableUser!.id));
     expect(deletedUser).toEqual([]);
+  });
+
+  it("runs publisher retention daily but only deletes dormant users in monthly mode", async () => {
+    const now = new Date("2027-09-15T00:00:00.000Z");
+    const userId = "99999999-9999-4999-8999-999999999999";
+
+    await db.insert(authUsers).values({
+      id: userId,
+      name: "Dormant User",
+      email: "daily-retention-user@example.com",
+      emailVerified: true,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+
+    const daily = await processPublisherRetentionJob(db, now, undefined, { mode: "daily" });
+    expect(daily.deletedDormantUsers).toBe(0);
+    expect(daily.done).toBe(true);
+
+    const stillPresent = await db
+      .select({ id: authUsers.id })
+      .from(authUsers)
+      .where(eq(authUsers.id, userId));
+    expect(stillPresent).toEqual([{ id: userId }]);
+
+    const monthly = await processPublisherRetentionJob(db, now, undefined, {
+      mode: "monthly_with_dormant",
+    });
+    expect(monthly.deletedDormantUsers).toBe(1);
+    expect(monthly.done).toBe(true);
+  });
+
+  it("returns done=false when more than one retention batch remains and then completes", async () => {
+    const now = new Date("2027-09-15T00:00:00.000Z");
+
+    const users = Array.from({ length: 501 }, (_, index) => ({
+      id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      name: `Retention User ${index + 1}`,
+      email: `retention-user-${index + 1}@example.com`,
+      emailVerified: true,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    }));
+    await db.insert(authUsers).values(users);
+
+    const sessions = users.map((user, index) => ({
+      id: `10000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      token: `expired-session-${index + 1}`,
+      userId: user.id,
+      expiresAt: new Date("2026-01-02T00:00:00.000Z"),
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    }));
+    await db.insert(authSessions).values(sessions);
+
+    const first = await processPublisherRetentionJob(db, now, undefined, { mode: "daily" });
+    expect(first.expiredSessions).toBe(500);
+    expect(first.done).toBe(false);
+
+    const second = await processPublisherRetentionJob(db, now, undefined, { mode: "daily" });
+    expect(second.expiredSessions).toBe(1);
+    expect(second.done).toBe(true);
   });
 });
