@@ -139,6 +139,7 @@ export { appendAuditEvent, type AuditEventInput } from "./publisher/audit.js";
 export { buildAccountExport, type AccountExportV1 } from "./publisher/account-export.js";
 
 export {
+  ACCOUNT_ERASURE_STATUSES,
   advanceAccountErasure,
   requestAccountErasure,
   resumeRetryableAccountErasure,
@@ -159,6 +160,7 @@ export {
 } from "./publisher/retention.js";
 
 export {
+  PUBLISHER_CLAIM_STATUSES,
   PublisherClaimAuthorityError,
   PublisherClaimConflictError,
   PublisherClaimTransitionError,
@@ -172,6 +174,7 @@ export {
   type CompleteClaimVerificationDeps,
   type CreatePublisherClaimInput,
   type CreatePublisherClaimResult,
+  type PublisherClaimStatus,
 } from "./publisher/claims.js";
 
 export {

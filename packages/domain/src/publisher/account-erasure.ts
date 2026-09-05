@@ -21,13 +21,15 @@ const MAX_RESUMED_REQUESTS = 25;
 const EXTERNAL_OPERATION_LEASE_MS = 5 * 60_000;
 const BLOCKED_RECHECK_MS = 24 * 60 * 60_000;
 
-export type AccountErasureStatus =
-  | "pending"
-  | "in_progress"
-  | "retry_scheduled"
-  | "blocked"
-  | "completed"
-  | "failed";
+export const ACCOUNT_ERASURE_STATUSES = Object.freeze([
+  "pending",
+  "in_progress",
+  "retry_scheduled",
+  "blocked",
+  "completed",
+  "failed",
+] as const);
+export type AccountErasureStatus = (typeof ACCOUNT_ERASURE_STATUSES)[number];
 
 export type AccountErasureStep =
   | "revoke_sessions"

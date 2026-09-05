@@ -1,4 +1,6 @@
 import {
+  PUBLISHER_CAPABILITIES,
+  PUBLISHER_ROLES,
   roleHasCapability,
   type PublisherCapability,
   type PublisherRole,
@@ -12,17 +14,6 @@ import {
   type Database,
 } from "@themcpdirectory/db";
 import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
-
-const PUBLISHER_CAPABILITIES: readonly PublisherCapability[] = [
-  "publisher.read",
-  "publisher.edit",
-  "claims.manage",
-  "members.manage",
-  "ownership.transfer",
-  "publisher.destroy",
-];
-
-const PUBLISHER_ROLES: readonly PublisherRole[] = ["owner", "admin", "editor", "viewer"];
 
 interface MembershipRow {
   readonly membershipId: string;

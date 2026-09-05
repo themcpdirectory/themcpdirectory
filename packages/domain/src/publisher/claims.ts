@@ -1,5 +1,5 @@
 import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
-import { roleHasCapability, type PublisherRole } from "@themcpdirectory/auth";
+import { PUBLISHER_ROLES, roleHasCapability, type PublisherRole } from "@themcpdirectory/auth";
 import {
   accountErasureRequests,
   authAccounts,
@@ -26,7 +26,16 @@ const MAX_INSTALLATION_TOKEN_LIFETIME_MS = 60 * 60 * 1000;
 const TOKEN_CLEANUP_TIMEOUT_MS = 10_000;
 const OPEN_CLAIM_STATUSES = ["pending", "verifying"] as const;
 const OPEN_SERVER_CLAIM_CONSTRAINT = "publisher_claims_open_server_uidx";
-const PUBLISHER_ROLES: readonly PublisherRole[] = ["owner", "admin", "editor", "viewer"];
+export const PUBLISHER_CLAIM_STATUSES = Object.freeze([
+  "pending",
+  "verifying",
+  "verified",
+  "rejected",
+  "withdrawn",
+  "superseded",
+  "revoked",
+] as const);
+export type PublisherClaimStatus = (typeof PUBLISHER_CLAIM_STATUSES)[number];
 
 type ClaimStore = Pick<Database, "select" | "insert" | "update">;
 

@@ -51,6 +51,27 @@ export const PUBLIC_SITE_ROUTE_REFERENCE: readonly PublicSiteRouteReference[] = 
     availability: "available",
   },
   {
+    path: "/docs/cli",
+    title: "CLI docs",
+    auth: "anonymous",
+    index: true,
+    availability: "available",
+  },
+  {
+    path: "/docs/trust",
+    title: "Trust and health docs",
+    auth: "anonymous",
+    index: true,
+    availability: "available",
+  },
+  {
+    path: "/docs/publishers",
+    title: "Publisher docs",
+    auth: "anonymous",
+    index: true,
+    availability: "available",
+  },
+  {
     path: "/sign-in",
     title: "Publisher sign-in",
     auth: "anonymous",

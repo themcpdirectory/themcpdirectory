@@ -54,6 +54,27 @@ test("docs landing lists the exact current and planned route facts", async ({ pa
       availability: "Availability: available now.",
     },
     {
+      path: "/docs/cli",
+      title: "CLI docs",
+      access: "Access: available without signing in.",
+      index: "Search indexing: included in the public index.",
+      availability: "Availability: available now.",
+    },
+    {
+      path: "/docs/trust",
+      title: "Trust and health docs",
+      access: "Access: available without signing in.",
+      index: "Search indexing: included in the public index.",
+      availability: "Availability: available now.",
+    },
+    {
+      path: "/docs/publishers",
+      title: "Publisher docs",
+      access: "Access: available without signing in.",
+      index: "Search indexing: included in the public index.",
+      availability: "Availability: available now.",
+    },
+    {
       path: "/sign-in",
       title: "Publisher sign-in",
       access: "Access: available without signing in.",

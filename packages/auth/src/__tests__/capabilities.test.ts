@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { roleHasCapability } from "../capabilities.js";
+import {
+  PUBLISHER_CAPABILITIES,
+  PUBLISHER_CAPABILITY_MATRIX,
+  PUBLISHER_ROLES,
+  roleHasCapability,
+} from "../capabilities.js";
 
 describe("roleHasCapability", () => {
   it("grants owner every capability, including ownership transfer and destroy", () => {
+    expect(Object.isFrozen(PUBLISHER_ROLES)).toBe(true);
+    expect(Object.isFrozen(PUBLISHER_CAPABILITIES)).toBe(true);
+    expect(Object.isFrozen(PUBLISHER_CAPABILITY_MATRIX)).toBe(true);
+    expect(Object.values(PUBLISHER_CAPABILITY_MATRIX).every(Object.isFrozen)).toBe(true);
     expect(roleHasCapability("owner", "publisher.read")).toBe(true);
     expect(roleHasCapability("owner", "publisher.edit")).toBe(true);
     expect(roleHasCapability("owner", "claims.manage")).toBe(true);
