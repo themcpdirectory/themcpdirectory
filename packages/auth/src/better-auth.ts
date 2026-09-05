@@ -40,15 +40,17 @@ async function fetchGitHubUserInfo(fetchImpl: typeof fetch, accessToken: string)
 
   const profile = (await profileResponse.json()) as GithubProfile;
   const emails = (await emailResponse.json()) as GitHubEmailRecord[];
-  const primaryEmail =
-    emails.find((email) => email.primary && email.verified)?.email ?? profile.email ?? null;
+  const verifiedEmail =
+    emails.find((email) => email.primary && email.verified)?.email ??
+    emails.find((email) => email.verified)?.email ??
+    null;
 
   return {
     user: {
       name: profile.name ?? profile.login,
-      email: primaryEmail,
+      email: verifiedEmail,
       image: profile.avatar_url ?? undefined,
-      emailVerified: primaryEmail !== null,
+      emailVerified: verifiedEmail !== null,
     },
     data: profile,
   };

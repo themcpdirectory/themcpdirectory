@@ -1,12 +1,45 @@
 import { z } from "zod";
 
+export const PUBLISHER_RETENTION_DEFAULTS = Object.freeze({
+  auditDays: 730,
+  claimExpiryDays: 30,
+  claimEvidenceDays: 90,
+  outboxDays: 30,
+  expiredSessionGraceDays: 7,
+  dormantAccountDays: 365,
+});
+
 const RetentionEnvSchema = z.object({
-  PUBLISHER_AUDIT_RETENTION_DAYS: z.coerce.number().int().positive().default(730),
-  PUBLISHER_CLAIM_EXPIRY_DAYS: z.coerce.number().int().positive().default(30),
-  PUBLISHER_CLAIM_EVIDENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
-  PUBLISHER_OUTBOX_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
-  PUBLISHER_EXPIRED_SESSION_GRACE_DAYS: z.coerce.number().int().positive().default(7),
-  PUBLISHER_DORMANT_ACCOUNT_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
+  PUBLISHER_AUDIT_RETENTION_DAYS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(PUBLISHER_RETENTION_DEFAULTS.auditDays),
+  PUBLISHER_CLAIM_EXPIRY_DAYS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(PUBLISHER_RETENTION_DEFAULTS.claimExpiryDays),
+  PUBLISHER_CLAIM_EVIDENCE_RETENTION_DAYS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(PUBLISHER_RETENTION_DEFAULTS.claimEvidenceDays),
+  PUBLISHER_OUTBOX_RETENTION_DAYS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(PUBLISHER_RETENTION_DEFAULTS.outboxDays),
+  PUBLISHER_EXPIRED_SESSION_GRACE_DAYS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(PUBLISHER_RETENTION_DEFAULTS.expiredSessionGraceDays),
+  PUBLISHER_DORMANT_ACCOUNT_RETENTION_DAYS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(PUBLISHER_RETENTION_DEFAULTS.dormantAccountDays),
 });
 
 const SharedEnvSchema = z

@@ -73,6 +73,36 @@ describe("auth configuration", () => {
     });
   });
 
+  it("does not treat an unverified GitHub profile email as verified", async () => {
+    const fetchImpl = async (input: string | URL | Request) => {
+      const url = input instanceof Request ? input.url : String(input);
+
+      if (url === "https://api.github.com/user") {
+        return Response.json({
+          id: 12345678,
+          login: "octocat",
+          name: "Octo Cat",
+          email: "public@example.com",
+          avatar_url: "https://avatars.githubusercontent.com/u/12345678?v=4",
+        });
+      }
+
+      return Response.json([
+        { email: "public@example.com", primary: true, verified: false },
+      ]);
+    };
+    const auth = createAuth({
+      db: createDatabase(TEST_ENV.DATABASE_URL),
+      env: TEST_ENV,
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    const getUserInfo = auth.options.socialProviders?.github?.getUserInfo;
+    const result = await getUserInfo?.({ accessToken: "synthetic-token" } as never);
+
+    expect(result?.user).toMatchObject({ email: null, emailVerified: false });
+  });
+
   it("re-exports the publisher capability matrix from the package barrel", () => {
     expect(roleHasCapability("owner", "ownership.transfer")).toBe(true);
     expect(roleHasCapability("admin", "ownership.transfer")).toBe(false);
