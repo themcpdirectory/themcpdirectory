@@ -86,6 +86,17 @@ jobs:
       - name: Browser tests
         run: pnpm test:e2e
 
+      - name: Lighthouse release gate
+        run: pnpm test:lighthouse
+
+      - name: Upload Lighthouse report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-release-report
+          path: test-results/release/lighthouse.json
+          if-no-files-found: error
+
       - name: Dependency audit
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: pnpm audit --audit-level high

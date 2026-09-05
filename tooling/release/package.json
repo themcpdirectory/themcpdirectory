@@ -11,9 +11,13 @@
   },
   "devDependencies": {
     "@themcpdirectory/eslint-config": "workspace:*",
+    "@themcpdirectory/test-utils": "workspace:*",
     "@themcpdirectory/typescript-config": "workspace:*",
     "@types/node": "^20",
+    "chrome-launcher": "1.2.1",
     "eslint": "9.39.5",
+    "lighthouse": "13.4.1",
+    "playwright-core": "1.62.1",
     "tsx": "4.23.13",
     "typescript": "5.9.3",
     "vitest": "4.1.11"

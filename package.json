@@ -21,6 +21,7 @@
     "test:cli": "pnpm --filter @themcpdirectory/cli test",
     "test:e2e": "pnpm --filter @themcpdirectory/web test:e2e",
     "test:integration": "turbo test:integration",
+    "test:lighthouse": "pnpm --filter @themcpdirectory/release-tools exec tsx src/run-lighthouse.ts",
     "typecheck": "turbo typecheck"
   },
   "devDependencies": {
