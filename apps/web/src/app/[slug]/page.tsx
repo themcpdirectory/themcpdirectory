@@ -1,4 +1,5 @@
 import type { Metadata, Route } from "next";
+import { headers } from "next/headers";
 import { notFound, permanentRedirect } from "next/navigation";
 import {
   getServerByIdentifier,
@@ -95,6 +96,7 @@ function normalizeStoredUrl(value: string | null): string | null {
 
 export default async function ServerDetailPage({ params }: Props) {
   const { slug } = await params;
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const db = getDb();
   const match = await getServerByIdentifier(db, slug);
 
@@ -144,10 +146,12 @@ export default async function ServerDetailPage({ params }: Props) {
   return (
     <main id="main-content" tabIndex={-1} style={{ minHeight: "100vh" }}>
       <script
+        nonce={nonce}
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(softwareJsonLd) }}
       />
       <script
+        nonce={nonce}
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />

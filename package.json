@@ -17,12 +17,16 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "turbo lint",
+    "release:dependency-audit": "pnpm --filter @themcpdirectory/release-tools exec tsx src/verify-dependency-audit.ts",
+    "release:lockfile-integrity": "pnpm --filter @themcpdirectory/release-tools exec tsx src/verify-lockfile-integrity.ts",
+    "release:secret-scan": "pnpm --filter @themcpdirectory/release-tools exec tsx src/verify-secret-scanning.ts",
     "test": "turbo test",
     "test:cli": "pnpm --filter @themcpdirectory/cli test",
     "test:e2e": "pnpm --filter @themcpdirectory/web test:e2e",
     "test:integration": "turbo test:integration",
     "test:lighthouse": "pnpm --filter @themcpdirectory/release-tools exec tsx src/run-lighthouse.ts",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "web:security-release": "WEB_E2E_MODE=production pnpm --filter @themcpdirectory/web exec playwright test e2e/security.release.spec.ts"
   },
   "devDependencies": {
     "@themcpdirectory/cli": "workspace:*",

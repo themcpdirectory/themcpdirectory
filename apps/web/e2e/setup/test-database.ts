@@ -61,7 +61,7 @@ export const TEST_PORT = process.env.TEST_PORT ?? "3099";
  * Better Auth session cookie (see `publisher-session-fixtures.ts`); the
  * GitHub values are never exchanged with GitHub in these tests.
  */
-export const TEST_BETTER_AUTH_SECRET = "e2e-fixture-secret-0123456789abcdef0123456789ab";
+export const TEST_BETTER_AUTH_SECRET = "e2e-fixture-secret-0123456789abcdef0123456789ab"; // gitleaks:allow
 export const TEST_GITHUB_APP_ENV = {
   GITHUB_CLIENT_ID: "e2e-fixture-github-client-id",
   GITHUB_CLIENT_SECRET: "e2e-fixture-github-client-secret",

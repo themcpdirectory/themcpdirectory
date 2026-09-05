@@ -27,7 +27,7 @@ export default defineConfig({
     command: "tsx e2e/setup/start-test-server.ts",
     url: BASE_URL,
     reuseExistingServer: false,
-    timeout: 120_000,
+    timeout: process.env.WEB_E2E_MODE === "production" ? 240_000 : 120_000,
     stdout: "pipe",
     stderr: "pipe",
   },

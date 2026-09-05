@@ -56,6 +56,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify lockfile integrity
+        run: pnpm release:lockfile-integrity
+
       - name: Format check
         run: pnpm format:check
 
@@ -86,6 +89,9 @@ jobs:
       - name: Browser tests
         run: pnpm test:e2e
 
+      - name: Browser security release gate
+        run: pnpm web:security-release
+
       - name: Lighthouse release gate
         run: pnpm test:lighthouse
 
@@ -98,11 +104,7 @@ jobs:
           if-no-files-found: error
 
       - name: Dependency audit
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: pnpm audit --audit-level high
+        run: pnpm release:dependency-audit
 
       - name: Secret scan
-        run: >-
-          docker run --rm -v "$PWD:/repo"
-          zricethezav/gitleaks:v8.24.2
-          detect --source=/repo --redact
+        run: pnpm release:secret-scan
