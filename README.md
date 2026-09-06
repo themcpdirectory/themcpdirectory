@@ -1,48 +1,148 @@
-![The MCP Directory Logo](assets/wordmark-with-bg-1000x216.svg)
+<p align="center">
+  <a href="https://themcpdirectory.org">
+    <img src="assets/wordmark-with-bg-1000x216.svg" alt="The MCP Directory" width="760">
+  </a>
+</p>
 
-The MCP Directory is an open directory for discovering and installing Model Context Protocol (MCP) servers. The repository includes Registry ingestion, deterministic normalization, PostgreSQL search, GitHub repository enrichment, a versioned public API, and the `mcpdir` CLI.
+<p align="center"><strong>Find it. Trust it. Install it.</strong></p>
 
-## Current Features
+<p align="center">
+  The open discovery and installation layer for the Model Context Protocol ecosystem.
+  Search MCP servers, inspect the evidence behind each listing, and manage installations across your development tools with one CLI.
+</p>
 
-- Public directory pages for search, categories, server details, aliases, robots, and sitemap
-- Official MCP Registry client with validated pagination and typed failures
-- Transactional, idempotent Registry ingestion with immutable raw snapshots
-- PostgreSQL full-text and trigram search with deterministic ranking
-- Optional authenticated GitHub enrichment with append-only repository snapshots
-- PostgreSQL-backed `pg-boss` worker queues
-- Deterministic local seed data and isolated Playwright browser tests
-- Versioned public discovery and install-manifest contracts under `/api/v1`
-- `mcpdir` support for Claude Code, Codex, Cursor, and VS Code
+<p align="center">
+  <a href="https://themcpdirectory.org">Explore the directory</a>
+  ·
+  <a href="#install-the-cli">Install the CLI</a>
+  ·
+  <a href="#how-it-works">How it works</a>
+  ·
+  <a href="#development">Development</a>
+</p>
 
-## CLI
+<p align="center">
+  <a href="https://www.npmjs.com/package/@themcpdirectory/cli"><img src="https://img.shields.io/npm/v/@themcpdirectory/cli?style=flat-square&amp;label=mcpdir&amp;color=111111" alt="mcpdir version on npm"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/clients-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Cursor%20%C2%B7%20VS%20Code-111111?style=flat-square" alt="Supports Claude Code, Codex, Cursor, and Visual Studio Code">
+</p>
 
-Install the published CLI with Node.js 24:
+## Install the CLI
+
+Install `mcpdir` with Node.js 24, then search and install from the same terminal:
 
 ```sh
 npm install --global @themcpdirectory/cli
-mcpdir --help
+
+mcpdir search github
+mcpdir info github
+mcpdir add github --to cursor
 ```
 
-To build the executable from this repository instead:
+One command surface works across **Claude Code**, **Codex**, **Cursor**, and **Visual Studio Code**.
+
+```text
+Search  →  Inspect  →  Review  →  Install
+```
+
+Use `mcpdir` to manage the rest of the lifecycle:
 
 ```sh
-pnpm --filter @themcpdirectory/cli build
-pnpm --filter @themcpdirectory/cli exec mcpdir --help
+mcpdir list
+mcpdir update
+mcpdir doctor
+mcpdir remove github
 ```
 
-The CLI provides `search`, `info`, `add`, `list`, `remove`, `update`, and `doctor`. It uses `http://127.0.0.1:3001/api/v1` by default; set `MCPDIR_API_BASE_URL` to use another Directory API.
+Run `mcpdir` without arguments for an interactive experience, or use explicit commands and `--json` for scripts and automation.
 
-Install and removal plans are restricted to adapter-owned executables, configuration roots, capabilities, and deeplinks. Mutating commands show or require confirmation unless `--yes` is supplied, receipts are written only after successful verification, and `doctor` performs read-only configuration inspection without starting installed MCP servers. Output and receipts never contain environment values or persisted secrets.
+## Why The MCP Directory?
 
-`pnpm release:cli-tarball` builds, inspects, hashes, installs, and smoke-tests the packed CLI in an isolated temporary environment before publication.
+An MCP server listing should help you make a decision, not just add another name to a long list.
 
-## Quick Start
+### Find it
 
-Requirements:
+Search a normalized mirror of the Official MCP Registry by name, capability, category, and client compatibility. Stable aliases keep listings discoverable when packages or repositories move.
+
+### Trust it
+
+Inspect factual signals such as Registry provenance, publisher authority, source availability, repository activity, version metadata, and observed endpoint health. Signals remain explainable: there is no opaque trust score, paid verification, or implied endorsement.
+
+### Install it
+
+Preview client-aware configuration changes before they happen. `mcpdir` validates its plan, asks for confirmation, applies only adapter-owned changes, and verifies the result before writing a receipt.
+
+## Built for Review, Not Blind Execution
+
+- **Plans before mutation.** Use `--dry-run` to inspect validated install, update, and removal plans.
+- **Explicit approval.** Mutating commands ask for confirmation unless you provide `--yes`.
+- **Bounded changes.** Adapters restrict which executables, configuration roots, capabilities, and deeplinks a plan may use.
+- **Secrets stay out of output.** Environment values and persisted secrets are excluded from rendered plans and receipts.
+- **Read-only diagnosis.** `mcpdir doctor` inspects configuration without starting installed MCP servers.
+- **Stable automation.** Versioned JSON envelopes and public API contracts support tooling without scraping terminal output.
+
+The Directory presents evidence, not certification. Every trust and health signal is an observation with source and context, not a security guarantee.
+
+## How It Works
+
+```text
+Official MCP Registry ──> normalized listings ──> search and server pages
+          GitHub API ──> repository evidence ──> trust and health signals
+                                                     │
+Public API <─────────────────────────────────────────┘
+    │
+    └──> mcpdir ──> reviewed adapter plan ──> local client configuration
+```
+
+The platform combines five open-source systems:
+
+- **Directory:** fast public search, categories, server details, aliases, and source provenance
+- **Registry pipeline:** validated ingestion, deterministic normalization, and immutable raw snapshots
+- **Evidence layer:** repository enrichment and bounded health observations without hidden scoring
+- **Public API:** versioned discovery and install-manifest contracts under `/api/v1`
+- **CLI:** search, inspect, add, list, update, diagnose, and remove across supported clients
+
+## CLI Reference
+
+| Command                  | Purpose                                            |
+| ------------------------ | -------------------------------------------------- |
+| `mcpdir search <query>`  | Search directory listings                          |
+| `mcpdir info <slug>`     | Inspect one server and its metadata                |
+| `mcpdir add <slug>`      | Review and install an MCP server                   |
+| `mcpdir list`            | List Directory-managed installations               |
+| `mcpdir update [server]` | Preview and apply available updates                |
+| `mcpdir doctor`          | Diagnose Directory and client configuration health |
+| `mcpdir remove <slug>`   | Review and remove an installation                  |
+
+The CLI connects to `https://api.themcpdirectory.org/api/v1` by default. Set `MCPDIR_API_BASE_URL` to use another Directory API or `MCPDIR_STATE_DIR` to isolate receipt state.
+
+## Architecture
+
+This repository is a pnpm monorepo. The main ownership boundaries are:
+
+- `apps/web`: Next.js public directory and publisher surfaces
+- `apps/api`: versioned Hono public API
+- `apps/worker`: Registry and GitHub background jobs
+- `packages/domain`: framework-independent directory, ingestion, and enrichment behavior
+- `packages/db`: Drizzle schema, migrations, and PostgreSQL client
+- `packages/search`: full-text and trigram query construction and deterministic ranking
+- `packages/api-contract`: versioned public API and install-manifest schemas
+- `packages/cli`: bundled `mcpdir` command-line client
+- `packages/client-adapters`: Claude Code, Codex, Cursor, and VS Code integration
+- `packages/install-engine`: deterministic intent, hashing, and plan validation
+- `packages/security`: outbound URL and SSRF protections
+
+Authoritative product and engineering specifications live in [`docs/ai-docs`](docs/ai-docs). They include later-phase designs; this README describes implemented behavior.
+
+## Development
+
+### Requirements
 
 - Node.js 24
-- pnpm 11.17.0 (selected by Corepack from `packageManager`)
+- pnpm 11.17.0, selected by Corepack from `packageManager`
 - Docker with Docker Compose
+
+### Run the directory locally
 
 ```sh
 corepack enable
@@ -57,68 +157,28 @@ pnpm db:seed
 pnpm --filter @themcpdirectory/web dev
 ```
 
-Open the web directory at <http://localhost:3000>.
+Open <http://localhost:3000>.
 
-The copied `.env.example` is sufficient for the anonymous web app and shared database commands, but not for `pnpm dev`. The all-process command also starts the API and worker: the API requires `API_CURSOR_SIGNING_SECRET`, while the worker and publisher surfaces require dedicated development GitHub OAuth and GitHub App credentials. Starting the worker creates an initial live Registry synchronization job against `MCP_REGISTRY_BASE_URL`. Configure those process-specific values as described in [Local development](docs/development.md) before starting the affected processes.
+The copied `.env.example` supports the anonymous web app and shared database commands. The API, worker, and publisher surfaces need additional process-specific credentials. See [Local development](docs/development.md) for environment setup, database resets, migrations, ingestion, process commands, and test workflows.
 
-See [Local development](docs/development.md) for database reset, migrations, fixture and live ingestion, process commands, tests, and production builds.
+### Build the repository CLI
 
-## Deployment
-
-A reference deployment topology targets Portainer Business Edition on Docker Standalone. GitHub Actions can publish the workspace image to GHCR, and the stack can pull it, run migrations, start the public web directory and Registry worker, keep PostgreSQL private, and connect the web service to an existing Nginx Proxy Manager network.
-
-See [Portainer deployment](docs/deployment.md) for required environment variables, stack settings, proxy configuration, updates, backups, and rollback constraints.
-
-**Production deployment is blocked.** The current Portainer stack defines PostgreSQL, migrations, the web application, and the worker, but it does not deploy or proxy the standalone public API and does not pass the required publisher-authentication configuration to the web and worker services. Do not execute the deployment procedure until every applicable item in [Production authorisation blockers](docs/production-authorisation-blockers.md) is resolved and each external action is explicitly approved.
-
-## Architecture
-
-```text
-Official MCP Registry ----> registry-client ----> registry-normalizer
-                                                    |
-GitHub API --------------------> domain <------------+
-                                   |
-                +------------------+------------------+
-                |                  |                  |
-              web                worker            search
-                |                  |                  |
-                +------------------+------------------+
-                                   |
-                           PostgreSQL / pg-boss
+```sh
+pnpm --filter @themcpdirectory/cli build
+pnpm --filter @themcpdirectory/cli exec mcpdir --help
 ```
 
-- `apps/web`: Next.js public directory
-- `apps/api`: Hono health API running on Node.js
-- `apps/worker`: Registry and GitHub background jobs
-- `packages/db`: Drizzle schema, migrations, and database client
-- `packages/domain`: framework-independent directory, ingestion, and enrichment behavior
-- `packages/registry-client`: validated Official Registry HTTP client
-- `packages/registry-normalizer`: deterministic Registry normalization
-- `packages/search`: PostgreSQL query construction and ranking
-- `packages/security`: outbound URL and SSRF protections
-- `packages/api-contract`: versioned public API and install-manifest schemas
-- `packages/cli`: bundled `mcpdir` command-line client
-- `packages/client-adapters`: Claude Code, Codex, Cursor, and VS Code integration
-- `packages/directory-client`: validated public API transport
-- `packages/install-engine`: deterministic intent, hashing, and plan validation
-- `packages/ui`: shared visual tokens and UI primitives
-- `tooling/db-seed`: deterministic local fixture seed
-
-Authoritative product and engineering specifications live in [`docs/ai-docs`](docs/ai-docs). They include later-phase designs; this README describes only implemented behavior.
+`pnpm release:cli-tarball` builds, inspects, hashes, installs, and smoke-tests the packed CLI in an isolated temporary environment before publication.
 
 ## Verification
 
-Run the complete release-candidate gate from the repository root on supported Node.js 24:
+Run the complete release-candidate gate from the repository root:
 
 ```sh
 pnpm verify:release
 ```
 
-pnpm verify:release does not publish to npm or deploy the stack.
-
-See [`docs/release-runbook.md`](docs/release-runbook.md) for versioning, release evidence, migration and deployment order, health and smoke checks, and recovery decisions. See [`docs/production-authorisation-blockers.md`](docs/production-authorisation-blockers.md) for the external approvals and production configuration that remain outstanding.
-
-Individual development checks remain available:
+This command does not publish to npm or deploy the stack. Individual checks remain available:
 
 ```sh
 pnpm format:check
@@ -130,20 +190,21 @@ pnpm build
 pnpm test:e2e
 ```
 
-Run the focused CLI integration and binary checks with:
+See the [release runbook](docs/release-runbook.md) for versioning, release evidence, migration and deployment order, health checks, smoke tests, and recovery decisions.
 
-```sh
-pnpm --filter @themcpdirectory/cli exec vitest run src/__tests__/integration-cli.test.ts src/__tests__/binary-smoke.test.ts
-pnpm --filter @themcpdirectory/cli build
-pnpm --filter @themcpdirectory/cli exec mcpdir --help
-```
+## Deployment Status
 
-The browser suite creates, migrates, seeds, and drops an isolated PostgreSQL database. Install its Chromium runtime once with `pnpm --filter @themcpdirectory/web exec playwright install chromium`.
+A reference deployment targets Portainer Business Edition on Docker Standalone, with GHCR images, private PostgreSQL, migrations, the public web directory, and background workers. See [Portainer deployment](docs/deployment.md) for the topology and operational procedure.
+
+> [!WARNING]
+> Production deployment is currently blocked. The reference stack does not yet deploy or proxy the standalone public API or pass all required publisher-authentication configuration. Do not execute the production procedure until every applicable [production authorisation blocker](docs/production-authorisation-blockers.md) is resolved and each external action is explicitly approved.
 
 ## Contributing and Security
 
-External code contributions are paused until the project finalizes its contribution terms. Maintainers and invited contributors should read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change. Follow the private process in [SECURITY.md](SECURITY.md) for vulnerability details; never put technical vulnerability information in a public issue.
+External code contributions are paused while the project finalizes its contribution terms. Maintainers and invited contributors should read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change.
+
+Report vulnerabilities through the private process in [SECURITY.md](SECURITY.md). Never include technical vulnerability details in a public issue.
 
 ## License
 
-The project is available under the [MIT License](LICENSE).
+The MCP Directory is open source under the [MIT License](LICENSE).
