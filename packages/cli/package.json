@@ -1,17 +1,20 @@
 {
   "name": "@themcpdirectory/cli",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "description": "Command-line client for The MCP Directory.",
   "type": "module",
   "bin": {
     "mcpdir": "dist/index.js"
   },
+  "publishConfig": {
+  "access": "public"
+},
   "files": [
     "dist",
     "README.md"
   ],
-  "license": "UNLICENSED",
+  "license": "MIT",
   "homepage": "https://github.com/themcpdirectory/themcpdirectory#readme",
   "repository": {
     "type": "git",
