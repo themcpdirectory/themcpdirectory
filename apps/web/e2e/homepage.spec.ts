@@ -2,12 +2,32 @@ import AxeBuilder from "@axe-core/playwright";
 import { test, expect } from "@playwright/test";
 
 test.describe("Homepage", () => {
-  test("renders the discovery hero with product identity", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1, name: "The MCP Directory" })).toBeVisible();
-    await expect(page.getByText("mcp>_", { exact: true })).toBeVisible();
-    await expect(page.getByText("Find it. Trust it. Install it.", { exact: true })).toBeVisible();
-  });
+  for (const colorScheme of ["light", "dark"] as const) {
+    test(`renders the discovery hero with product identity in ${colorScheme} mode`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme });
+      await page.addInitScript(() => localStorage.removeItem("mcp-directory-theme"));
+      await page.goto("/");
+
+      await expect(
+        page.getByRole("heading", { level: 1, name: "The MCP Directory" }),
+      ).toBeVisible();
+      const logo = page.locator(".home-hero__logo:visible");
+      await expect(logo).toHaveAttribute(
+        "src",
+        colorScheme === "light"
+          ? "/standard-logo-transparent-black.svg"
+          : "/standard-logo-transparent-color.svg",
+      );
+      await expect(page.locator(".home-hero__signature")).toHaveCSS(
+        "background-color",
+        "rgba(0, 0, 0, 0)",
+      );
+      await expect(page.getByText("mcp>_", { exact: true })).toHaveCount(0);
+      await expect(page.getByText("Find it. Trust it. Install it.", { exact: true })).toBeVisible();
+    });
+  }
 
   test("has skip link as first focusable element", async ({ page }) => {
     await page.goto("/");

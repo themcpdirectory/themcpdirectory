@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-const cli = "node packages/cli/dist/index.js";
+const cli = "npx @themcpdirectory/cli";
 
 test("CLI docs project commands, clients, safety, and current distribution state", async ({
   page,
@@ -33,7 +33,7 @@ test("CLI docs project commands, clients, safety, and current distribution state
   await expect(
     page.getByText(/unsupported clients and ambiguous servers fail clearly/i),
   ).toBeVisible();
-  await expect(page.getByText(/not published to a package registry/i)).toBeVisible();
+  await expect(page.getByText(/published publicly on npm/i)).toBeVisible();
   await expect(page.getByRole("region", { name: "Exit codes" })).toContainText(
     "2 means invalid command usage",
   );

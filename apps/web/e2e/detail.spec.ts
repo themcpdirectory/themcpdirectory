@@ -271,7 +271,9 @@ test.describe("Server detail page", () => {
 
   test("shows a real install command when installation is available", async ({ page }) => {
     await page.goto("/github");
-    await expect(page.locator(".install-command__code")).toHaveText("mcpdir add github");
+    await expect(page.locator(".install-command__code")).toHaveText(
+      "npx @themcpdirectory/cli add github",
+    );
   });
 
   test("no horizontal overflow at 320px", async ({ page }) => {

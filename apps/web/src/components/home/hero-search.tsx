@@ -1,4 +1,3 @@
-import { BrandMark } from "@/components/brand-mark";
 import { CommandBlock } from "@/components/command-block";
 import { SearchBox } from "@/components/search-box";
 import { PUBLIC_CLI_TARGETS } from "@/lib/public-cli-command";
@@ -19,8 +18,20 @@ export function HeroSearch({ command }: HeroSearchProps) {
       <div className="page-container home-hero__layout">
         <div className="home-hero__content">
           <div className="home-hero__signature">
-            <BrandMark kind="mark" aria-hidden="true" className="home-hero__mark" />
-            <p className="home-hero__prompt">{"mcp>_"}</p>
+            <img
+              src="/standard-logo-transparent-black.svg"
+              alt=""
+              width="700"
+              height="191"
+              className="home-hero__logo home-hero__logo--light"
+            />
+            <img
+              src="/standard-logo-transparent-color.svg"
+              alt=""
+              width="700"
+              height="191"
+              className="home-hero__logo home-hero__logo--dark"
+            />
           </div>
 
           <h1 id="home-heading" className="home-title">

@@ -1,6 +1,7 @@
 import { SUPPORTED_CLIENTS } from "@themcpdirectory/client-adapters";
 
 export const CLI_EXECUTABLE_NAME = "mcpdir";
+export const CLI_PUBLIC_INVOCATION = "npx @themcpdirectory/cli";
 export const CLI_REPOSITORY_INVOCATION = "node packages/cli/dist/index.js";
 
 export interface CliOptionMetadata {
@@ -134,17 +135,16 @@ export const CLI_SUPPORTED_CLIENTS = Object.freeze(
 );
 
 export const CLI_DOCUMENTATION = Object.freeze({
-  invocation: CLI_REPOSITORY_INVOCATION,
+  invocation: CLI_PUBLIC_INVOCATION,
   commands: CLI_COMMANDS,
   clients: CLI_SUPPORTED_CLIENTS,
   install: Object.freeze([
-    "Run from the repository root with Node.js 24 and pnpm 11.",
-    "Install workspace dependencies: pnpm install",
-    "Build the repository-local executable: pnpm --filter @themcpdirectory/cli build",
+    "Requires Node.js 22 or newer.",
+    "No global installation is required when the CLI is run through npx.",
   ] as const),
   distribution: Object.freeze([
-    "The @themcpdirectory/cli package is private and is not published to a package registry.",
-    `Invoke the repository-local executable with: ${CLI_REPOSITORY_INVOCATION}`,
+    "The @themcpdirectory/cli package is published publicly on npm under the MIT licence.",
+    `Invoke the published package with: ${CLI_PUBLIC_INVOCATION}`,
   ] as const),
   receipts: Object.freeze({
     fields:
@@ -182,9 +182,9 @@ export const CLI_DOCUMENTATION = Object.freeze({
     }),
   ]),
   uninstall: Object.freeze([
-    "Remove managed servers with the repository-local remove command before deleting the checkout if they should no longer remain configured.",
-    "Delete packages/cli/dist to remove the built repository-local executable, or delete the repository checkout after removing any managed servers you no longer want configured.",
-    "Deleting the executable does not remove client configuration or receipt state.",
+    `Remove managed servers with ${CLI_PUBLIC_INVOCATION} remove <slug> before uninstalling the CLI if they should no longer remain configured.`,
+    "No CLI uninstall is required when it is run through npx. Remove a global installation with npm uninstall --global @themcpdirectory/cli.",
+    "Uninstalling the package does not remove client configuration or receipt state.",
   ] as const),
 });
 

@@ -8,7 +8,7 @@ test("legal and governance routes preserve repository truth", async ({ page }) =
     ["/terms", "Terms of service"],
     ["/imprint", "Operator information"],
     ["/about", "About The MCP Directory"],
-    ["/open-source", "Open source status"],
+    ["/open-source", "Source and licensing"],
   ] as const;
 
   for (const [path, heading] of routes) {
@@ -49,5 +49,6 @@ test("legal and governance routes preserve repository truth", async ({ page }) =
 
   await page.goto("/open-source");
   await expect(page.getByText("No open-source licence has been selected yet.")).toBeVisible();
+  await expect(page.getByText(/CLI npm package declares the MIT licence/i)).toBeVisible();
   await expect(page.getByText(/External code contributions are paused/i)).toBeVisible();
 });

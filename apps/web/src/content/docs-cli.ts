@@ -1,11 +1,8 @@
-import {
-  CLI_DOCUMENTATION,
-  CLI_REPOSITORY_INVOCATION,
-} from "@themcpdirectory/cli/command-metadata";
+import { CLI_DOCUMENTATION } from "@themcpdirectory/cli/command-metadata";
 import type { ReleaseDocument } from "@/content/document-model";
 
 const commandFacts = CLI_DOCUMENTATION.commands.flatMap((command) => [
-  command.usage.replace("Usage: mcpdir", `Usage: ${CLI_REPOSITORY_INVOCATION}`),
+  command.usage.replace("Usage: mcpdir", `Usage: ${CLI_DOCUMENTATION.invocation}`),
   ...(command.aliases.length === 0 ? [] : [`Aliases: ${command.aliases.join(", ")}.`]),
   command.summary,
   ...(command.options.length === 0
@@ -20,7 +17,7 @@ const supportedClientFacts = CLI_DOCUMENTATION.clients.map((client) =>
 );
 
 function run(argumentsText: string): string {
-  return `${CLI_REPOSITORY_INVOCATION} ${argumentsText}`;
+  return `${CLI_DOCUMENTATION.invocation} ${argumentsText}`;
 }
 
 export function getCliReferenceDocument(): ReleaseDocument {

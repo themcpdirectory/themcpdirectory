@@ -150,7 +150,7 @@ export const PUBLIC_SITE_ROUTE_REFERENCE: readonly PublicSiteRouteReference[] = 
   },
   {
     path: "/open-source",
-    title: "Open source status",
+    title: "Source and licensing",
     auth: "anonymous",
     index: true,
     availability: "available",

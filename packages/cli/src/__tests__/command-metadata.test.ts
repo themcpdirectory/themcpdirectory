@@ -3,6 +3,7 @@ import {
   CLI_COMMANDS,
   CLI_DOCUMENTATION,
   CLI_HELP_TEXT,
+  CLI_PUBLIC_INVOCATION,
   CLI_REPOSITORY_INVOCATION,
   CLI_SUPPORTED_CLIENTS,
 } from "../index.js";
@@ -89,8 +90,10 @@ describe("CLI command metadata", () => {
         scopeSupport: { mode: "static", scopes: ["user", "project"] },
       },
     ]);
+    expect(CLI_PUBLIC_INVOCATION).toBe("npx @themcpdirectory/cli");
     expect(CLI_REPOSITORY_INVOCATION).toBe("node packages/cli/dist/index.js");
     expect(CLI_DOCUMENTATION).toMatchObject({
+      invocation: "npx @themcpdirectory/cli",
       exitCodes: [
         { code: 0, meaning: expect.stringContaining("success") },
         { code: 1, meaning: expect.stringContaining("Operational") },
@@ -104,8 +107,8 @@ describe("CLI command metadata", () => {
       },
       secrets: expect.arrayContaining([expect.stringMatching(/never written to receipts/i)]),
       distribution: expect.arrayContaining([
-        expect.stringMatching(/private.*not published to a package registry/i),
-        expect.stringMatching(/repository-local/i),
+        expect.stringMatching(/public.*npm/i),
+        expect.stringMatching(/npx @themcpdirectory\/cli/i),
       ]),
     });
     const parsers = [

@@ -2,14 +2,16 @@ import type { Metadata, Route } from "next";
 import { headers } from "next/headers";
 import { notFound, permanentRedirect } from "next/navigation";
 import {
+  getRelatedServers,
   getServerByIdentifier,
   getServerDetail,
   getServerDetailBySlug,
+  type ServerDetail,
 } from "@themcpdirectory/domain";
 import { normalizeHttpUrl } from "@themcpdirectory/security";
-import { CLI_EXECUTABLE_NAME } from "@themcpdirectory/cli/command-metadata";
 import { DeletedUpstreamBanner } from "@/components/deleted-upstream-banner";
 import { InstallCommand } from "@/components/install-command";
+import { ServerGrid } from "@/components/server-grid";
 import { ServerDetailHeader } from "@/components/server-detail-header";
 import { ServerEvidenceSummary } from "@/components/server-evidence-summary";
 import { getDb } from "@/lib/db";
@@ -96,6 +98,69 @@ function normalizeStoredUrl(value: string | null): string | null {
   return value === null ? null : normalizeHttpUrl(value);
 }
 
+function InstallRequirements({
+  detail,
+}: {
+  readonly detail: Pick<ServerDetail, "packages" | "remotes">;
+}) {
+  const requiredEnvironmentVariables = [
+    ...new Set(
+      detail.packages.flatMap((pkg) =>
+        isEnvVarArray(pkg.environmentVariables)
+          ? pkg.environmentVariables
+              .filter((variable) => variable.isRequired)
+              .map(({ name }) => name)
+          : [],
+      ),
+    ),
+  ];
+  const hasRequirements =
+    detail.packages.length > 0 ||
+    detail.remotes.length > 0 ||
+    requiredEnvironmentVariables.length > 0;
+
+  return (
+    <section aria-labelledby="requirements-heading" className="detail-requirements">
+      <h2 id="requirements-heading">Requirements</h2>
+      {hasRequirements ? (
+        <dl className="detail-requirements__list">
+          {detail.packages.map((pkg) => (
+            <div key={pkg.id}>
+              <dt>Package</dt>
+              <dd>
+                <code>
+                  {pkg.identifier}
+                  {pkg.version ? `@${pkg.version}` : ""}
+                </code>
+              </dd>
+            </div>
+          ))}
+          {detail.remotes.map((remote) => (
+            <div key={remote.id}>
+              <dt>Remote</dt>
+              <dd>
+                <code>{remote.urlTemplate}</code>
+              </dd>
+            </div>
+          ))}
+          {requiredEnvironmentVariables.length > 0 ? (
+            <div>
+              <dt>Required environment</dt>
+              <dd className="detail-requirements__values">
+                {requiredEnvironmentVariables.map((name) => (
+                  <code key={name}>{name}</code>
+                ))}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : (
+        <p className="detail-empty-state">No additional requirements are listed.</p>
+      )}
+    </section>
+  );
+}
+
 export default async function ServerDetailPage({ params }: Props) {
   const { slug } = await params;
   const nonce = (await headers()).get("x-nonce") ?? undefined;
@@ -123,6 +188,7 @@ export default async function ServerDetailPage({ params }: Props) {
     notFound();
   }
   const { detail, publicDetail } = snapshot;
+  const relatedServers = await getRelatedServers(db, match.canonicalSlug, 3);
 
   const canonicalUrl = buildCanonicalUrl(`/${detail.slug}`);
   const repositoryUrl = normalizeStoredUrl(detail.repositoryUrl);
@@ -158,7 +224,7 @@ export default async function ServerDetailPage({ params }: Props) {
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
 
-      <div className="page-container page-container--narrow">
+      <div className="page-container">
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="breadcrumb">
           <Link href="/">The MCP Directory</Link>
@@ -170,223 +236,241 @@ export default async function ServerDetailPage({ params }: Props) {
 
         <DeletedUpstreamBanner listingStatus={publicDetail.listingStatus} />
 
-        <ServerEvidenceSummary
-          trustProfile={publicDetail.trustProfile}
-          health={publicDetail.latestHealth}
-          compatibility={publicDetail.compatibility}
-        />
+        <div className="detail-page-layout">
+          <aside className="detail-page__install-rail" aria-label="Installation preparation">
+            <InstallRequirements detail={detail} />
+            <InstallCommand
+              slug={detail.slug}
+              installAvailability={publicDetail.installAvailability}
+            />
+          </aside>
 
-        <InstallCommand
-          slug={detail.slug}
-          cliExecutableName={CLI_EXECUTABLE_NAME}
-          installAvailability={publicDetail.installAvailability}
-        />
+          <div className="detail-page__main">
+            <ServerEvidenceSummary
+              trustProfile={publicDetail.trustProfile}
+              health={publicDetail.latestHealth}
+              compatibility={publicDetail.compatibility}
+            />
 
-        <div className="detail-section-grid">
-          {/* Package information */}
-          {detail.packages.length > 0 && (
-            <section aria-labelledby="packages-heading" className="detail-section">
-              <h2 id="packages-heading">Package</h2>
-              {detail.packages.map((pkg) => (
-                <div key={pkg.id} className="detail-stack">
-                  <code className="detail-code">
-                    {pkg.identifier}
-                    {pkg.version ? `@${pkg.version}` : ""}
-                  </code>
-                  <dl className="detail-fact-list">
-                    <div>
-                      <dt>Registry</dt>
-                      <dd>{pkg.registryType}</dd>
+            <div className="detail-section-grid">
+              {/* Package information */}
+              {detail.packages.length > 0 && (
+                <section aria-labelledby="packages-heading" className="detail-section">
+                  <h2 id="packages-heading">Package</h2>
+                  {detail.packages.map((pkg) => (
+                    <div key={pkg.id} className="detail-stack">
+                      <code className="detail-code">
+                        {pkg.identifier}
+                        {pkg.version ? `@${pkg.version}` : ""}
+                      </code>
+                      <dl className="detail-fact-list">
+                        <div>
+                          <dt>Registry</dt>
+                          <dd>{pkg.registryType}</dd>
+                        </div>
+                        <div>
+                          <dt>Transport</dt>
+                          <dd>{pkg.transportType}</dd>
+                        </div>
+                        {pkg.runtimeHint && (
+                          <div>
+                            <dt>Runtime</dt>
+                            <dd className="machine-value">{pkg.runtimeHint}</dd>
+                          </div>
+                        )}
+                      </dl>
                     </div>
-                    <div>
-                      <dt>Transport</dt>
-                      <dd>{pkg.transportType}</dd>
-                    </div>
-                    {pkg.runtimeHint && (
-                      <div>
-                        <dt>Runtime</dt>
-                        <dd className="machine-value">{pkg.runtimeHint}</dd>
-                      </div>
-                    )}
-                  </dl>
-                </div>
-              ))}
-            </section>
-          )}
+                  ))}
+                </section>
+              )}
 
-          {/* Remote endpoints */}
-          {detail.remotes.length > 0 && (
-            <section aria-labelledby="remotes-heading" className="detail-section">
-              <h2 id="remotes-heading">Remote endpoint</h2>
-              {detail.remotes.map((remote) => (
-                <div key={remote.id} className="detail-stack">
-                  <code className="detail-code">{remote.urlTemplate}</code>
-                  <dl className="detail-fact-list">
-                    <div>
-                      <dt>Transport</dt>
-                      <dd>{remote.transportType}</dd>
-                    </div>
-                  </dl>
-                  {isRemoteVarsRecord(remote.variables) &&
-                    Object.keys(remote.variables).length > 0 && (
-                      <div className="detail-subsection">
-                        <p>URL variables</p>
-                        <ul className="detail-list">
-                          {Object.entries(remote.variables as Record<string, RemoteVar>).map(
-                            ([name, varInfo]) => (
-                              <li key={name} className="detail-list-item detail-inline">
-                                <code>{`{${name}}`}</code>
-                                {varInfo.description && <span>{varInfo.description}</span>}
-                                {varInfo.isRequired && (
+              {/* Remote endpoints */}
+              {detail.remotes.length > 0 && (
+                <section aria-labelledby="remotes-heading" className="detail-section">
+                  <h2 id="remotes-heading">Remote endpoint</h2>
+                  {detail.remotes.map((remote) => (
+                    <div key={remote.id} className="detail-stack">
+                      <code className="detail-code">{remote.urlTemplate}</code>
+                      <dl className="detail-fact-list">
+                        <div>
+                          <dt>Transport</dt>
+                          <dd>{remote.transportType}</dd>
+                        </div>
+                      </dl>
+                      {isRemoteVarsRecord(remote.variables) &&
+                        Object.keys(remote.variables).length > 0 && (
+                          <div className="detail-subsection">
+                            <p>URL variables</p>
+                            <ul className="detail-list">
+                              {Object.entries(remote.variables as Record<string, RemoteVar>).map(
+                                ([name, varInfo]) => (
+                                  <li key={name} className="detail-list-item detail-inline">
+                                    <code>{`{${name}}`}</code>
+                                    {varInfo.description && <span>{varInfo.description}</span>}
+                                    {varInfo.isRequired && (
+                                      <span className="detail-required">required</span>
+                                    )}
+                                  </li>
+                                ),
+                              )}
+                            </ul>
+                          </div>
+                        )}
+                      {isRemoteHeaderArray(remote.headers) && remote.headers.length > 0 && (
+                        <div className="detail-subsection">
+                          <h3>Request headers</h3>
+                          <ul className="detail-list">
+                            {remote.headers.map((header) => (
+                              <li key={header.name} className="detail-list-item detail-inline">
+                                <code>{header.name}</code>
+                                {header.description && <span>{header.description}</span>}
+                                {header.isRequired && (
                                   <span className="detail-required">required</span>
                                 )}
                               </li>
-                            ),
-                          )}
-                        </ul>
-                      </div>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </section>
+              )}
+
+              {/* Environment variables */}
+              {detail.packages.some(
+                (p) => isEnvVarArray(p.environmentVariables) && p.environmentVariables.length > 0,
+              ) && (
+                <section aria-labelledby="envvars-heading" className="detail-section">
+                  <h2 id="envvars-heading">Environment variables</h2>
+                  <ul className="detail-list">
+                    {detail.packages.flatMap((pkg) =>
+                      isEnvVarArray(pkg.environmentVariables)
+                        ? pkg.environmentVariables.map((ev: EnvVar) => (
+                            <li key={ev.name} className="detail-list-item">
+                              <div className="detail-inline">
+                                <code>{ev.name}</code>
+                                {ev.isRequired && <span className="detail-required">required</span>}
+                                {ev.isSecret && <span className="detail-secret">secret</span>}
+                              </div>
+                              {ev.description && <span>{ev.description}</span>}
+                            </li>
+                          ))
+                        : [],
                     )}
-                  {isRemoteHeaderArray(remote.headers) && remote.headers.length > 0 && (
-                    <div className="detail-subsection">
-                      <h3>Request headers</h3>
-                      <ul className="detail-list">
-                        {remote.headers.map((header) => (
-                          <li key={header.name} className="detail-list-item detail-inline">
-                            <code>{header.name}</code>
-                            {header.description && <span>{header.description}</span>}
-                            {header.isRequired && <span className="detail-required">required</span>}
-                          </li>
-                        ))}
-                      </ul>
+                  </ul>
+                </section>
+              )}
+
+              {/* Server info */}
+              <section aria-labelledby="server-info-heading" className="detail-section">
+                <h2 id="server-info-heading">Server info</h2>
+                <dl className="detail-fact-list">
+                  {detail.currentVersion && (
+                    <div>
+                      <dt>Version</dt>
+                      <dd className="machine-value">{detail.currentVersion}</dd>
                     </div>
                   )}
-                </div>
-              ))}
-            </section>
-          )}
+                  <div>
+                    <dt>Last observed</dt>
+                    <dd>
+                      <time dateTime={detail.lastSeenAt.toISOString()}>{formattedLastSeen}</time>
+                    </dd>
+                  </div>
+                  {detail.licenseSpdx && (
+                    <div>
+                      <dt>License</dt>
+                      <dd className="machine-value">{detail.licenseSpdx}</dd>
+                    </div>
+                  )}
+                  {repositoryUrl && (
+                    <div>
+                      <dt>Repository</dt>
+                      <dd>
+                        <a href={repositoryUrl} target="_blank" rel="noopener noreferrer">
+                          {repositoryUrl.replace(/^https?:\/\//, "")}
+                        </a>
+                      </dd>
+                    </div>
+                  )}
+                  {homepageUrl && (
+                    <div>
+                      <dt>Homepage</dt>
+                      <dd>
+                        <a href={homepageUrl} target="_blank" rel="noopener noreferrer">
+                          {homepageUrl.replace(/^https?:\/\//, "")}
+                        </a>
+                      </dd>
+                    </div>
+                  )}
+                  <div>
+                    <dt>Source</dt>
+                    <dd>{getSourceAvailabilityLabel(detail.openSource, detail.sourceAvailable)}</dd>
+                  </div>
+                  {detail.canonicalRegistryName && (
+                    <div>
+                      <dt>Registry name</dt>
+                      <dd className="machine-value">{detail.canonicalRegistryName}</dd>
+                    </div>
+                  )}
+                </dl>
+              </section>
 
-          {/* Environment variables */}
-          {detail.packages.some(
-            (p) => isEnvVarArray(p.environmentVariables) && p.environmentVariables.length > 0,
-          ) && (
-            <section aria-labelledby="envvars-heading" className="detail-section">
-              <h2 id="envvars-heading">Environment variables</h2>
-              <ul className="detail-list">
-                {detail.packages.flatMap((pkg) =>
-                  isEnvVarArray(pkg.environmentVariables)
-                    ? pkg.environmentVariables.map((ev: EnvVar) => (
-                        <li key={ev.name} className="detail-list-item">
-                          <div className="detail-inline">
-                            <code>{ev.name}</code>
-                            {ev.isRequired && <span className="detail-required">required</span>}
-                            {ev.isSecret && <span className="detail-secret">secret</span>}
-                          </div>
-                          {ev.description && <span>{ev.description}</span>}
-                        </li>
-                      ))
-                    : [],
-                )}
-              </ul>
-            </section>
-          )}
+              {/* Categories */}
+              {detail.categorySlugs.length > 0 && (
+                <section aria-labelledby="categories-heading" className="detail-section">
+                  <h2 id="categories-heading">Categories</h2>
+                  <div className="detail-tag-list">
+                    {detail.categorySlugs.map((catSlug, i) => (
+                      <Link
+                        key={catSlug}
+                        href={`/categories/${catSlug}` as Route}
+                        className="detail-tag"
+                      >
+                        {detail.categoryNames[i] ?? catSlug}
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+              )}
 
-          {/* Server info */}
-          <section aria-labelledby="server-info-heading" className="detail-section">
-            <h2 id="server-info-heading">Server info</h2>
-            <dl className="detail-fact-list">
-              {detail.currentVersion && (
-                <div>
-                  <dt>Version</dt>
-                  <dd className="machine-value">{detail.currentVersion}</dd>
-                </div>
+              {/* Aliases */}
+              {detail.aliases.length > 0 && (
+                <section aria-labelledby="aliases-heading" className="detail-section">
+                  <h2 id="aliases-heading">Also known as</h2>
+                  <div className="detail-tag-list">
+                    {detail.aliases.map((alias) => (
+                      <code key={alias} className="detail-tag">
+                        /{alias}
+                      </code>
+                    ))}
+                  </div>
+                </section>
               )}
-              <div>
-                <dt>Last observed</dt>
-                <dd>
-                  <time dateTime={detail.lastSeenAt.toISOString()}>{formattedLastSeen}</time>
-                </dd>
-              </div>
-              {detail.licenseSpdx && (
-                <div>
-                  <dt>License</dt>
-                  <dd className="machine-value">{detail.licenseSpdx}</dd>
-                </div>
-              )}
-              {repositoryUrl && (
-                <div>
-                  <dt>Repository</dt>
-                  <dd>
-                    <a href={repositoryUrl} target="_blank" rel="noopener noreferrer">
-                      {repositoryUrl.replace(/^https?:\/\//, "")}
-                    </a>
-                  </dd>
-                </div>
-              )}
-              {homepageUrl && (
-                <div>
-                  <dt>Homepage</dt>
-                  <dd>
-                    <a href={homepageUrl} target="_blank" rel="noopener noreferrer">
-                      {homepageUrl.replace(/^https?:\/\//, "")}
-                    </a>
-                  </dd>
-                </div>
-              )}
-              <div>
-                <dt>Source</dt>
-                <dd>{getSourceAvailabilityLabel(detail.openSource, detail.sourceAvailable)}</dd>
-              </div>
-              {detail.canonicalRegistryName && (
-                <div>
-                  <dt>Registry name</dt>
-                  <dd className="machine-value">{detail.canonicalRegistryName}</dd>
-                </div>
-              )}
-            </dl>
-          </section>
 
-          {/* Categories */}
-          {detail.categorySlugs.length > 0 && (
-            <section aria-labelledby="categories-heading" className="detail-section">
-              <h2 id="categories-heading">Categories</h2>
-              <div className="detail-tag-list">
-                {detail.categorySlugs.map((catSlug, i) => (
-                  <Link
-                    key={catSlug}
-                    href={`/categories/${catSlug}` as Route}
-                    className="detail-tag"
-                  >
-                    {detail.categoryNames[i] ?? catSlug}
-                  </Link>
-                ))}
-              </div>
-            </section>
-          )}
+              {/* Long description */}
+              {detail.longDescription && (
+                <section
+                  aria-labelledby="description-heading"
+                  className="detail-section detail-section--wide"
+                >
+                  <h2 id="description-heading">Description</h2>
+                  <p className="detail-long-copy">{detail.longDescription}</p>
+                </section>
+              )}
+            </div>
 
-          {/* Aliases */}
-          {detail.aliases.length > 0 && (
-            <section aria-labelledby="aliases-heading" className="detail-section">
-              <h2 id="aliases-heading">Also known as</h2>
-              <div className="detail-tag-list">
-                {detail.aliases.map((alias) => (
-                  <code key={alias} className="detail-tag">
-                    /{alias}
-                  </code>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Long description */}
-          {detail.longDescription && (
-            <section
-              aria-labelledby="description-heading"
-              className="detail-section detail-section--wide"
-            >
-              <h2 id="description-heading">Description</h2>
-              <p className="detail-long-copy">{detail.longDescription}</p>
-            </section>
-          )}
+            {relatedServers.length > 0 ? (
+              <section aria-labelledby="related-servers-heading" className="detail-related-servers">
+                <div className="detail-related-servers__heading">
+                  <h2 id="related-servers-heading">Related servers</h2>
+                  <p>Shared categories or publisher, ordered from current directory facts.</p>
+                </div>
+                <ServerGrid servers={relatedServers} emptyMessage="No related servers found." />
+              </section>
+            ) : null}
+          </div>
         </div>
       </div>
     </main>
