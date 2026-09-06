@@ -15,127 +15,24 @@ import {
   servers,
   type Database,
 } from "@themcpdirectory/db";
-import { refreshServerSearchDocument } from "../index.js";
-import * as searchModule from "../index.js";
+import {
+  browseServers,
+  getCollection,
+  getDiscoverySections,
+  getEcosystemFacts,
+  getPublicPublisher,
+  getRelatedServers,
+  getVisibleCollections,
+  refreshServerSearchDocument,
+  type BrowseServersResult,
+  type CollectionDetail,
+  type CollectionSummary,
+  type DiscoverySections,
+  type DiscoveryServer,
+  type EcosystemFacts,
+  type PublicPublisherDetail,
+} from "../index.js";
 import { createTempDatabase } from "./postgres-test-db.js";
-
-type DiscoverySort = "recommended" | "relevance" | "recent" | "updated" | "stars" | "name";
-
-interface BrowseServersInput {
-  readonly query?: string;
-  readonly category?: string;
-  readonly publisher?: string;
-  readonly client?: SupportedClientId;
-  readonly transport?: string;
-  readonly registryType?: string;
-  readonly officialRegistry?: boolean;
-  readonly verified?: boolean;
-  readonly sourceAvailable?: boolean;
-  readonly openSource?: boolean;
-  readonly healthy?: boolean;
-  readonly sort?: DiscoverySort;
-  readonly page?: number;
-  readonly pageSize?: number;
-}
-
-interface DiscoveryServer {
-  readonly id: string;
-  readonly slug: string;
-  readonly title: string;
-  readonly shortDescription: string;
-  readonly publisher: { slug: string; name: string; verified: boolean } | null;
-  readonly categorySlugs: readonly string[];
-  readonly officialRegistry: boolean;
-  readonly sourceAvailable: boolean | null;
-  readonly openSource: boolean | null;
-  readonly supportedClients: readonly SupportedClientId[];
-  readonly transports: readonly string[];
-  readonly firstSeenAt: Date;
-  readonly updatedAt: Date;
-  readonly stars: number | null;
-}
-
-interface BrowseServersResult {
-  readonly items: readonly DiscoveryServer[];
-  readonly page: number;
-  readonly pageSize: number;
-  readonly total: number;
-  readonly totalPages: number;
-}
-
-interface EcosystemFacts {
-  readonly activeServers: number;
-  readonly officialServers: number;
-  readonly verifiedPublishers: number;
-  readonly supportedClientTargets: number;
-}
-
-interface CollectionSummary {
-  readonly slug: string;
-  readonly name: string;
-  readonly description: string;
-  readonly serverCount: number;
-}
-
-interface CollectionDetail extends CollectionSummary {
-  readonly inclusionRule: string;
-  readonly filters: Omit<BrowseServersInput, "page" | "pageSize" | "query">;
-  readonly items: readonly DiscoveryServer[];
-  readonly page: number;
-  readonly pageSize: number;
-  readonly total: number;
-  readonly totalPages: number;
-}
-
-interface DiscoverySections {
-  readonly recommended: readonly DiscoveryServer[];
-  readonly recentlyAdded: readonly DiscoveryServer[];
-  readonly collections: readonly CollectionSummary[];
-  readonly categories: readonly {
-    slug: string;
-    name: string;
-    description: string | null;
-    sortOrder: number;
-    serverCount: number;
-  }[];
-}
-
-interface PublicPublisherDetail {
-  readonly publisher: {
-    slug: string;
-    name: string;
-    verified: boolean;
-    websiteUrl: string | null;
-  };
-  readonly items: readonly DiscoveryServer[];
-  readonly page: number;
-  readonly pageSize: number;
-  readonly total: number;
-  readonly totalPages: number;
-}
-
-type BrowseServersFn = (
-  db: Database,
-  input?: BrowseServersInput,
-) => Promise<BrowseServersResult>;
-type GetEcosystemFactsFn = (db: Database) => Promise<EcosystemFacts>;
-type GetDiscoverySectionsFn = (db: Database) => Promise<DiscoverySections>;
-type GetRelatedServersFn = (
-  db: Database,
-  slug: string,
-  limit?: number,
-) => Promise<readonly DiscoveryServer[]>;
-type GetVisibleCollectionsFn = (db: Database) => Promise<readonly CollectionSummary[]>;
-type GetCollectionFn = (
-  db: Database,
-  slug: string,
-  input?: { page?: number; pageSize?: number },
-) => Promise<CollectionDetail | null>;
-type GetPublicPublisherFn = (
-  db: Database,
-  slug: string,
-  input?: { page?: number; pageSize?: number },
-) => Promise<PublicPublisherDetail | null>;
 
 type HealthOutcome =
   | "healthy"
@@ -200,19 +97,6 @@ interface SeedDiscoveryServerInput {
   readonly documentationUrl?: string | null;
   readonly licenseSpdx?: string | null;
   readonly canonicalRegistryName?: string | null;
-}
-
-function getDiscoveryExports() {
-  const moduleRecord = searchModule as unknown as Record<string, unknown>;
-  return {
-    browseServers: moduleRecord.browseServers as BrowseServersFn | undefined,
-    getEcosystemFacts: moduleRecord.getEcosystemFacts as GetEcosystemFactsFn | undefined,
-    getDiscoverySections: moduleRecord.getDiscoverySections as GetDiscoverySectionsFn | undefined,
-    getRelatedServers: moduleRecord.getRelatedServers as GetRelatedServersFn | undefined,
-    getVisibleCollections: moduleRecord.getVisibleCollections as GetVisibleCollectionsFn | undefined,
-    getCollection: moduleRecord.getCollection as GetCollectionFn | undefined,
-    getPublicPublisher: moduleRecord.getPublicPublisher as GetPublicPublisherFn | undefined,
-  };
 }
 
 async function ensurePublisher(
@@ -426,10 +310,6 @@ describe("discovery queries", () => {
   });
 
   it("browses only active public listings and applies all supported filters and sorts", async () => {
-    const { browseServers } = getDiscoveryExports();
-    expect(browseServers).toBeTypeOf("function");
-    if (!browseServers) return;
-
     await seedDiscoveryServer(db, sourceIds, {
       slug: "alpha-official",
       title: "Alpha Official",
@@ -554,7 +434,7 @@ describe("discovery queries", () => {
 
     await refreshServerSearchDocument(db);
 
-    const recommended = await browseServers(db, { sort: "recommended" });
+    const recommended: BrowseServersResult = await browseServers(db, { sort: "recommended" });
     expect(recommended.total).toBe(3);
     expect(recommended.items[0]).toMatchObject({
       slug: "alpha-official",
@@ -641,12 +521,46 @@ describe("discovery queries", () => {
     ]);
   });
 
-  it("computes ecosystem facts and homepage sections from active factual data only", async () => {
-    const { getEcosystemFacts, getDiscoverySections } = getDiscoveryExports();
-    expect(getEcosystemFacts).toBeTypeOf("function");
-    expect(getDiscoverySections).toBeTypeOf("function");
-    if (!getEcosystemFacts || !getDiscoverySections) return;
+  it("prefers the newest checkedAt compatibility fact for projection and filtering", async () => {
+    await seedDiscoveryServer(db, sourceIds, {
+      slug: "cursor-factual",
+      title: "Cursor Factual",
+      shortDescription: "Latest checked compatibility stays authoritative",
+      compatibility: [
+        {
+          clientId: "cursor",
+          status: "unsupported",
+          checkedAt: "2026-09-01T10:00:00.000Z",
+          createdAt: "2026-09-01T10:00:00.000Z",
+          updatedAt: "2026-09-08T10:00:00.000Z",
+        },
+        {
+          clientId: "cursor",
+          status: "supported",
+          checkedAt: "2026-09-05T10:00:00.000Z",
+          createdAt: "2026-09-05T10:00:00.000Z",
+          updatedAt: "2026-09-05T10:05:00.000Z",
+        },
+      ],
+      officialSource: true,
+      firstSeenAt: "2026-09-02T09:00:00.000Z",
+    });
 
+    const allServers: BrowseServersResult = await browseServers(db, { sort: "name" });
+    expect(allServers.items).toHaveLength(1);
+    expect(allServers.items[0]).toMatchObject({
+      slug: "cursor-factual",
+      supportedClients: ["cursor"],
+    });
+
+    const cursorFiltered: BrowseServersResult = await browseServers(db, {
+      client: "cursor",
+      sort: "name",
+    });
+    expect(cursorFiltered.items.map((item) => item.slug)).toEqual(["cursor-factual"]);
+  });
+
+  it("computes ecosystem facts and homepage sections from active factual data only", async () => {
     await ensureCategory(db, {
       slug: "empty-category",
       name: "Empty Category",
@@ -709,7 +623,7 @@ describe("discovery queries", () => {
 
     await refreshServerSearchDocument(db);
 
-    const facts = await getEcosystemFacts(db);
+    const facts: EcosystemFacts = await getEcosystemFacts(db);
     expect(facts).toEqual({
       activeServers: 2,
       officialServers: 1,
@@ -717,7 +631,7 @@ describe("discovery queries", () => {
       supportedClientTargets: 4,
     });
 
-    const sections = await getDiscoverySections(db);
+    const sections: DiscoverySections = await getDiscoverySections(db);
     expect(sections.recommended[0]?.slug).toBe("official-curated");
     expect(sections.recentlyAdded[0]?.slug).toBe("recent-remote");
     expect(sections.collections.map((collection) => collection.slug)).toContain(
@@ -730,11 +644,6 @@ describe("discovery queries", () => {
   });
 
   it("shows only non-empty collections and resolves collection membership from latest facts", async () => {
-    const { getVisibleCollections, getCollection } = getDiscoveryExports();
-    expect(getVisibleCollections).toBeTypeOf("function");
-    expect(getCollection).toBeTypeOf("function");
-    if (!getVisibleCollections || !getCollection) return;
-
     await seedDiscoveryServer(db, sourceIds, {
       slug: "cursor-live",
       title: "Cursor Live",
@@ -783,19 +692,22 @@ describe("discovery queries", () => {
 
     await refreshServerSearchDocument(db);
 
-    const collections = await getVisibleCollections(db);
+    const collections: readonly CollectionSummary[] = await getVisibleCollections(db);
     expect(collections.map((collection) => collection.slug)).toContain("works-with-cursor");
     expect(collections.map((collection) => collection.slug)).toContain("official-registry-essentials");
     expect(collections.map((collection) => collection.slug)).not.toContain("works-with-codex");
 
-    const cursorCollection = await getCollection(db, "works-with-cursor");
+    const cursorCollection: CollectionDetail | null = await getCollection(db, "works-with-cursor");
     expect(cursorCollection).toMatchObject({
       slug: "works-with-cursor",
       serverCount: 1,
       items: [expect.objectContaining({ slug: "cursor-live" })],
     });
 
-    const recentCollection = await getCollection(db, "recently-added", { page: 1, pageSize: 1 });
+    const recentCollection: CollectionDetail | null = await getCollection(db, "recently-added", {
+      page: 1,
+      pageSize: 1,
+    });
     expect(recentCollection).toMatchObject({
       slug: "recently-added",
       items: [expect.objectContaining({ slug: "cursor-regressed" })],
@@ -806,11 +718,7 @@ describe("discovery queries", () => {
     await expect(getCollection(db, "works-with-codex")).resolves.toBeNull();
   });
 
-  it("ranks related servers by shared categories before same publisher only matches", async () => {
-    const { getRelatedServers } = getDiscoveryExports();
-    expect(getRelatedServers).toBeTypeOf("function");
-    if (!getRelatedServers) return;
-
+  it("ranks related servers by bucket, then recommendation for same-bucket candidates", async () => {
     await seedDiscoveryServer(db, sourceIds, {
       slug: "subject-server",
       title: "Subject Server",
@@ -869,6 +777,16 @@ describe("discovery queries", () => {
     });
 
     await seedDiscoveryServer(db, sourceIds, {
+      slug: "shared-category-basic",
+      title: "Shared Category Basic",
+      shortDescription: "Same category bucket with lower recommendation",
+      categories: [{ slug: "ai", name: "AI", sortOrder: 2 }],
+      package: { identifier: "shared-category-basic" },
+      officialSource: false,
+      firstSeenAt: "2026-09-03T10:00:00.000Z",
+    });
+
+    await seedDiscoveryServer(db, sourceIds, {
       slug: "same-publisher-only",
       title: "Same Publisher Only",
       shortDescription: "Shares publisher only",
@@ -908,19 +826,16 @@ describe("discovery queries", () => {
 
     await refreshServerSearchDocument(db);
 
-    const related = await getRelatedServers(db, "subject-server", 10);
+    const related: readonly DiscoveryServer[] = await getRelatedServers(db, "subject-server", 10);
     expect(related.map((server) => server.slug)).toEqual([
       "both-match",
       "shared-category",
+      "shared-category-basic",
       "same-publisher-only",
     ]);
   });
 
   it("returns only public publisher identity and active listings", async () => {
-    const { getPublicPublisher } = getDiscoveryExports();
-    expect(getPublicPublisher).toBeTypeOf("function");
-    if (!getPublicPublisher) return;
-
     await seedDiscoveryServer(db, sourceIds, {
       slug: "publisher-active",
       title: "Publisher Active",
@@ -978,7 +893,7 @@ describe("discovery queries", () => {
 
     await refreshServerSearchDocument(db);
 
-    const detail = await getPublicPublisher(db, " GITHUB ");
+    const detail: PublicPublisherDetail | null = await getPublicPublisher(db, " GITHUB ");
     expect(detail).toMatchObject({
       publisher: {
         slug: "github",

@@ -229,15 +229,10 @@ function supportedClientsSql() {
         and lower(cc.client_id) in (${sql.join(SUPPORTED_CLIENT_IDS.map((clientId) => sql`${clientId}`), sql`, `)})
       order by
         lower(cc.client_id),
+        cc.checked_at desc nulls last,
         cc.updated_at desc,
         cc.created_at desc,
-        case cc.status
-          when 'unsupported' then 0
-          when 'supported_with_configuration' then 1
-          when 'unknown' then 2
-          else 3
-        end,
-        cc.id asc
+        cc.id desc
     ) effective
     where effective.status in (${sql.join(CLIENT_SUPPORTED_STATUSES.map((status) => sql`${status}`), sql`, `)})
   ), array[]::text[])`;
@@ -314,15 +309,10 @@ function supportedClientWhereSql(clientId: SupportedClientId): SQL<boolean> {
         where effective.server_id = compatibility.server_id
           and lower(effective.client_id) = lower(compatibility.client_id)
         order by
+          effective.checked_at desc nulls last,
           effective.updated_at desc,
           effective.created_at desc,
-          case effective.status
-            when 'unsupported' then 0
-            when 'supported_with_configuration' then 1
-            when 'unknown' then 2
-            else 3
-          end,
-          effective.id asc
+          effective.id desc
         limit 1
       )
   )`;
@@ -771,7 +761,6 @@ export async function getCollection(
 export async function getPublicPublisher(
   db: Database,
   slug: string,
-  input: PageInput = {},
 ): Promise<PublicPublisherDetail | null> {
   const normalizedSlug = normalizeText(slug);
   if (!normalizedSlug) return null;
@@ -791,8 +780,6 @@ export async function getPublicPublisher(
   const page = await browseServersInternal(db, {
     publisher: row.slug,
     sort: "recommended",
-    ...(input.page !== undefined ? { page: input.page } : {}),
-    ...(input.pageSize !== undefined ? { pageSize: input.pageSize } : {}),
   });
   if (page.total === 0) return null;
 
