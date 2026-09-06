@@ -1,12 +1,6 @@
 import type { SupportedClientId } from "@themcpdirectory/api-contract";
 
-export type DiscoverySort =
-  | "recommended"
-  | "relevance"
-  | "recent"
-  | "updated"
-  | "stars"
-  | "name";
+export type DiscoverySort = "recommended" | "relevance" | "recent" | "updated" | "stars" | "name";
 
 export interface BrowseServersInput {
   readonly query?: string;
@@ -59,6 +53,23 @@ export interface BrowseServersResult {
   readonly pageSize: number;
   readonly total: number;
   readonly totalPages: number;
+}
+
+export interface SearchSuggestionsInput {
+  readonly query: string;
+}
+
+export interface SearchSuggestionServer {
+  readonly id: string;
+  readonly slug: string;
+  readonly title: string;
+  readonly shortDescription: string;
+}
+
+export interface SearchSuggestionsResult {
+  readonly servers: readonly SearchSuggestionServer[];
+  readonly categories: readonly DiscoveryCategorySummary[];
+  readonly collections: readonly CollectionSummary[];
 }
 
 export interface EcosystemFacts {

@@ -32,6 +32,7 @@ import {
   type EcosystemFacts,
   type PublicPublisherDetail,
 } from "../index.js";
+import * as discoveryModule from "../index.js";
 import { createTempDatabase } from "./postgres-test-db.js";
 
 type HealthOutcome =
@@ -493,32 +494,30 @@ describe("discovery queries", () => {
       pageSize: 1,
     });
 
-    expect((await browseServers(db, { publisher: "github" })).items.map((item) => item.slug)).toEqual([
-      "alpha-official",
-    ]);
+    expect(
+      (await browseServers(db, { publisher: "github" })).items.map((item) => item.slug),
+    ).toEqual(["alpha-official"]);
     expect((await browseServers(db, { client: "cursor" })).items.map((item) => item.slug)).toEqual([
       "alpha-official",
     ]);
     expect(
       (await browseServers(db, { transport: "streamable-http" })).items.map((item) => item.slug),
     ).toEqual(["alpha-official"]);
-    expect((await browseServers(db, { registryType: "npm" })).items.map((item) => item.slug)).toEqual([
-      "alpha-official",
-    ]);
+    expect(
+      (await browseServers(db, { registryType: "npm" })).items.map((item) => item.slug),
+    ).toEqual(["alpha-official"]);
     expect((await browseServers(db, { verified: true })).items.map((item) => item.slug)).toEqual([
       "alpha-official",
     ]);
     expect(
       (await browseServers(db, { sourceAvailable: true })).items.map((item) => item.slug),
     ).toEqual(["alpha-official"]);
-    expect((await browseServers(db, { openSource: true, sort: "name" })).items.map((item) => item.slug)).toEqual([
-      "alpha-official",
-      "gamma-remote",
-    ]);
-    expect((await browseServers(db, { healthy: true, sort: "name" })).items.map((item) => item.slug)).toEqual([
-      "alpha-official",
-      "gamma-remote",
-    ]);
+    expect(
+      (await browseServers(db, { openSource: true, sort: "name" })).items.map((item) => item.slug),
+    ).toEqual(["alpha-official", "gamma-remote"]);
+    expect(
+      (await browseServers(db, { healthy: true, sort: "name" })).items.map((item) => item.slug),
+    ).toEqual(["alpha-official", "gamma-remote"]);
   });
 
   it("prefers the newest checkedAt compatibility fact for projection and filtering", async () => {
@@ -694,7 +693,9 @@ describe("discovery queries", () => {
 
     const collections: readonly CollectionSummary[] = await getVisibleCollections(db);
     expect(collections.map((collection) => collection.slug)).toContain("works-with-cursor");
-    expect(collections.map((collection) => collection.slug)).toContain("official-registry-essentials");
+    expect(collections.map((collection) => collection.slug)).toContain(
+      "official-registry-essentials",
+    );
     expect(collections.map((collection) => collection.slug)).not.toContain("works-with-codex");
 
     const cursorCollection: CollectionDetail | null = await getCollection(db, "works-with-cursor");
@@ -716,6 +717,86 @@ describe("discovery queries", () => {
     });
 
     await expect(getCollection(db, "works-with-codex")).resolves.toBeNull();
+  });
+
+  it("builds bounded suggestions from visible servers, categories, and collections", async () => {
+    for (const [index, clientId] of ["claude-code", "codex", "cursor", "vscode"].entries()) {
+      await seedDiscoveryServer(db, sourceIds, {
+        slug: `workflow-${index + 1}`,
+        title: `Workflow Server ${index + 1}`,
+        shortDescription: "Workflow automation for developer tasks",
+        publisher: {
+          slug: `publisher-${index + 1}`,
+          displayName: `Publisher ${index + 1}`,
+          verified: index % 2 === 0,
+        },
+        categories: [
+          {
+            slug: `developer-workflows-${index + 1}`,
+            name: `Developer Workflows ${index + 1}`,
+            sortOrder: index + 1,
+          },
+        ],
+        package: {
+          identifier: `@workflow/server-${index + 1}`,
+          registryType: "npm",
+        },
+        compatibility: [
+          {
+            clientId: clientId as SupportedClientId,
+            status: "supported",
+            createdAt: `2026-09-0${index + 1}T10:00:00.000Z`,
+            checkedAt: `2026-09-0${index + 1}T10:00:00.000Z`,
+          },
+        ],
+        officialSource: true,
+        sourceAvailable: true,
+        openSource: true,
+      });
+    }
+
+    for (const index of [5, 6]) {
+      await seedDiscoveryServer(db, sourceIds, {
+        slug: `workflow-${index}`,
+        title: `Workflow Server ${index}`,
+        shortDescription: "Workflow automation for developer tasks",
+        categories: [
+          {
+            slug: `developer-workflows-${index}`,
+            name: `Developer Workflows ${index}`,
+            sortOrder: index,
+          },
+        ],
+        package: {
+          identifier: `@workflow/server-${index}`,
+          registryType: "npm",
+        },
+        officialSource: true,
+      });
+    }
+
+    await refreshServerSearchDocument(db);
+
+    expect(discoveryModule.getSearchSuggestions).toBeTypeOf("function");
+    if (!discoveryModule.getSearchSuggestions) return;
+
+    const workflowSuggestions = await discoveryModule.getSearchSuggestions(db, {
+      query: "workflow",
+    });
+    expect(workflowSuggestions.servers).toHaveLength(5);
+
+    const categorySuggestions = await discoveryModule.getSearchSuggestions(db, {
+      query: "developer",
+    });
+    expect(categorySuggestions.categories).toHaveLength(3);
+
+    const collectionSuggestions = await discoveryModule.getSearchSuggestions(db, {
+      query: "works",
+    });
+    expect(collectionSuggestions.collections).toHaveLength(3);
+    expect(collectionSuggestions.collections.map((collection) => collection.slug)).not.toContain(
+      "recently-added",
+    );
   });
 
   it("ranks related servers by bucket, then recommendation for same-bucket candidates", async () => {

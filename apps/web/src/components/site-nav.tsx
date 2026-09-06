@@ -7,7 +7,7 @@ import { ThemeControl } from "@/components/theme-control";
 const GITHUB_HREF = "https://github.com/themcpdirectory/themcpdirectory";
 
 const NAV_ITEMS = [
-  { href: "/search", label: "Search" },
+  { href: "/browse", label: "Browse" },
   { href: "/collections", label: "Collections" },
   { href: "/docs", label: "Docs" },
   { href: "/publish", label: "Publish" },

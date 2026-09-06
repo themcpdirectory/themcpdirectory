@@ -1,6 +1,6 @@
 import { BrandMark } from "@/components/brand-mark";
 import { CommandBlock } from "@/components/command-block";
-import { SearchForm } from "@/components/search-form";
+import { SearchBox } from "@/components/search-box";
 import { PUBLIC_CLI_TARGETS } from "@/lib/public-cli-command";
 
 interface HeroSearchProps {
@@ -33,7 +33,8 @@ export function HeroSearch({ command }: HeroSearchProps) {
           </p>
 
           <div className="home-hero__search">
-            <SearchForm
+            <SearchBox
+              action="/browse"
               placeholder="Search by server, publisher, or task"
               submitLabel="Find servers"
               variant="hero"

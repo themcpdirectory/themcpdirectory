@@ -27,6 +27,8 @@ import type {
   EcosystemFacts,
   PageInput,
   PublicPublisherDetail,
+  SearchSuggestionsInput,
+  SearchSuggestionsResult,
 } from "./types.js";
 
 export const SEARCH_RANKING_WEIGHTS = {
@@ -50,6 +52,9 @@ const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 30;
 const MAX_PAGE_SIZE = 100;
 const HOMEPAGE_SECTION_LIMIT = 6;
+const SERVER_SUGGESTION_LIMIT = 5;
+const CATEGORY_SUGGESTION_LIMIT = 3;
+const COLLECTION_SUGGESTION_LIMIT = 3;
 const HEALTH_OUTCOMES = [
   "healthy",
   "degraded",
@@ -198,7 +203,10 @@ function latestHealthOutcomeSql() {
     where health.server_id = ${servers.id}
       and health.server_version_id = ${servers.currentVersionId}
       and health.check_type = 'remote_probe'
-      and health.status in (${sql.join(HEALTH_OUTCOMES.map((status) => sql`${status}`), sql`, `)})
+      and health.status in (${sql.join(
+        HEALTH_OUTCOMES.map((status) => sql`${status}`),
+        sql`, `,
+      )})
     order by health.checked_at desc, health.created_at desc, health.id desc
     limit 1
   )`;
@@ -226,7 +234,10 @@ function supportedClientsSql() {
         cc.status
       from ${clientCompatibility} cc
       where cc.server_id = ${servers.id}
-        and lower(cc.client_id) in (${sql.join(SUPPORTED_CLIENT_IDS.map((clientId) => sql`${clientId}`), sql`, `)})
+        and lower(cc.client_id) in (${sql.join(
+          SUPPORTED_CLIENT_IDS.map((clientId) => sql`${clientId}`),
+          sql`, `,
+        )})
       order by
         lower(cc.client_id),
         cc.checked_at desc nulls last,
@@ -234,7 +245,10 @@ function supportedClientsSql() {
         cc.created_at desc,
         cc.id desc
     ) effective
-    where effective.status in (${sql.join(CLIENT_SUPPORTED_STATUSES.map((status) => sql`${status}`), sql`, `)})
+    where effective.status in (${sql.join(
+      CLIENT_SUPPORTED_STATUSES.map((status) => sql`${status}`),
+      sql`, `,
+    )})
   ), array[]::text[])`;
 }
 
@@ -302,7 +316,10 @@ function supportedClientWhereSql(clientId: SupportedClientId): SQL<boolean> {
     from ${clientCompatibility} compatibility
     where compatibility.server_id = ${servers.id}
       and lower(compatibility.client_id) = ${normalizedClientId}
-      and compatibility.status in (${sql.join(CLIENT_SUPPORTED_STATUSES.map((status) => sql`${status}`), sql`, `)})
+      and compatibility.status in (${sql.join(
+        CLIENT_SUPPORTED_STATUSES.map((status) => sql`${status}`),
+        sql`, `,
+      )})
       and compatibility.id = (
         select effective.id
         from ${clientCompatibility} effective
@@ -380,7 +397,9 @@ function buildWhere(criteria: DiscoveryBrowseCriteria, normalizedQuery: string |
 
   if (criteria.officialRegistry !== undefined) {
     whereClauses.push(
-      criteria.officialRegistry ? currentOfficialRegistrySql() : sql`not ${currentOfficialRegistrySql()}`,
+      criteria.officialRegistry
+        ? currentOfficialRegistrySql()
+        : sql`not ${currentOfficialRegistrySql()}`,
     );
   }
 
@@ -402,7 +421,9 @@ function buildWhere(criteria: DiscoveryBrowseCriteria, normalizedQuery: string |
 
   if (criteria.openSource !== undefined) {
     whereClauses.push(
-      criteria.openSource ? sql`${servers.openSource} is true` : sql`${servers.openSource} is false`,
+      criteria.openSource
+        ? sql`${servers.openSource} is true`
+        : sql`${servers.openSource} is false`,
     );
   }
 
@@ -462,9 +483,8 @@ function buildOrderBy(sort: DiscoverySort, score: ReturnType<typeof searchScoreS
 }
 
 function mapDiscoveryServerRow(row: DiscoveryServerRow): DiscoveryServer {
-  const supportedClients = row.supportedClients.filter(
-    (clientId): clientId is SupportedClientId =>
-      SUPPORTED_CLIENT_ID_SET.has(clientId as SupportedClientId),
+  const supportedClients = row.supportedClients.filter((clientId): clientId is SupportedClientId =>
+    SUPPORTED_CLIENT_ID_SET.has(clientId as SupportedClientId),
   );
 
   return {
@@ -627,6 +647,55 @@ export async function getDiscoverySections(db: Database): Promise<DiscoverySecti
   };
 }
 
+export async function getSearchSuggestions(
+  db: Database,
+  input: SearchSuggestionsInput,
+): Promise<SearchSuggestionsResult> {
+  const query = input.query.trim();
+  if (query.length === 0) {
+    return {
+      servers: [],
+      categories: [],
+      collections: [],
+    };
+  }
+
+  const normalizedQuery = query.toLowerCase();
+  const { searchServers } = await import("../index.js");
+  const [serverResults, categories, collections] = await Promise.all([
+    searchServers(db, {
+      query,
+      limit: SERVER_SUGGESTION_LIMIT,
+      offset: 0,
+    }),
+    listActiveCategories(db),
+    getVisibleCollections(db),
+  ]);
+
+  return {
+    servers: serverResults.slice(0, SERVER_SUGGESTION_LIMIT).map((server) => ({
+      id: server.id,
+      slug: server.slug,
+      title: server.title,
+      shortDescription: server.shortDescription,
+    })),
+    categories: categories
+      .filter((category) => {
+        const haystack =
+          `${category.slug} ${category.name} ${category.description ?? ""}`.toLowerCase();
+        return haystack.includes(normalizedQuery);
+      })
+      .slice(0, CATEGORY_SUGGESTION_LIMIT),
+    collections: collections
+      .filter((collection) => {
+        const haystack =
+          `${collection.slug} ${collection.name} ${collection.description}`.toLowerCase();
+        return haystack.includes(normalizedQuery);
+      })
+      .slice(0, COLLECTION_SUGGESTION_LIMIT),
+  };
+}
+
 export async function getRelatedServers(
   db: Database,
   slug: string,
@@ -657,7 +726,10 @@ export async function getRelatedServers(
           select count(distinct membership.category_id)::integer
           from ${serverCategories} membership
           where membership.server_id = ${servers.id}
-            and membership.category_id in (${sql.join(categoryIds.map((categoryId) => sql`${categoryId}`), sql`, `)})
+            and membership.category_id in (${sql.join(
+              categoryIds.map((categoryId) => sql`${categoryId}`),
+              sql`, `,
+            )})
         )`;
   const samePublisherSql = subject.publisherId
     ? sql<boolean>`coalesce(${servers.publisherId} = ${subject.publisherId}, false)`

@@ -4,10 +4,6 @@ import { getDb } from "@/lib/db";
 import { SearchForm } from "@/components/search-form";
 import { ServerDirectoryList } from "@/components/server-directory-list";
 
-interface Props {
-  searchParams: Promise<{ q?: string | string[] }>;
-}
-
 const MAX_SEARCH_QUERY_LENGTH = 200;
 
 function normalizeSearchQuery(value: string | string[] | undefined): string {
@@ -15,7 +11,7 @@ function normalizeSearchQuery(value: string | string[] | undefined): string {
   return firstValue?.trim().slice(0, MAX_SEARCH_QUERY_LENGTH) ?? "";
 }
 
-export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+export async function generateMetadata({ searchParams }: PageProps<"/search">): Promise<Metadata> {
   const { q } = await searchParams;
   const query = normalizeSearchQuery(q);
   return {
@@ -24,7 +20,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   };
 }
 
-export default async function SearchPage({ searchParams }: Props) {
+export default async function SearchPage({ searchParams }: PageProps<"/search">) {
   const { q } = await searchParams;
   const query = normalizeSearchQuery(q);
   const db = getDb();

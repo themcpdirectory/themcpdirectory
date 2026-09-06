@@ -47,7 +47,7 @@ test.describe("Homepage", () => {
 
   test("has search form with labeled input", async ({ page }) => {
     await page.goto("/");
-    const searchInput = page.getByRole("searchbox");
+    const searchInput = page.getByRole("combobox", { name: "Search MCP servers" });
     await expect(searchInput).toBeVisible();
   });
 
@@ -60,7 +60,7 @@ test.describe("Homepage", () => {
 
   test("focuses search with slash without hijacking normal typing", async ({ page }) => {
     await page.goto("/");
-    const searchInput = page.getByRole("searchbox", { name: "Search MCP servers" });
+    const searchInput = page.getByRole("combobox", { name: "Search MCP servers" });
 
     await page.keyboard.press("/");
     await expect(searchInput).toBeFocused();
@@ -172,12 +172,12 @@ test.describe("Homepage", () => {
     expect(durationSeconds).toBeLessThan(0.001);
   });
 
-  test("search form submits via GET to /search", async ({ page }) => {
+  test("search form submits via GET to /browse", async ({ page }) => {
     await page.goto("/");
-    const input = page.getByRole("searchbox");
+    const input = page.getByRole("combobox", { name: "Search MCP servers" });
     await input.fill("github");
     await input.press("Enter");
-    await expect(page).toHaveURL(/\/search\?q=github/);
+    await expect(page).toHaveURL(/\/browse\?q=github/);
   });
 
   test("does not render the old quick-entry rail or full-registry section", async ({ page }) => {

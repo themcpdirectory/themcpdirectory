@@ -42,6 +42,7 @@ export {
   getEcosystemFacts,
   getPublicPublisher,
   getRelatedServers,
+  getSearchSuggestions,
   getVisibleCollections,
 } from "./discovery/queries.js";
 export type {
@@ -56,6 +57,9 @@ export type {
   EcosystemFacts,
   PageInput,
   PublicPublisherDetail,
+  SearchSuggestionServer,
+  SearchSuggestionsInput,
+  SearchSuggestionsResult,
 } from "./discovery/types.js";
 
 const SEARCH_SIMILARITY_THRESHOLD = 0.12;
