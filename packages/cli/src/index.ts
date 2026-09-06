@@ -30,6 +30,9 @@ export {
   type JsonEnvelopeV1,
 } from "./commands/result.js";
 export { runSearchCommand } from "./commands/search.js";
+export { INIT_USAGE, parseInitArgs, runInitCommand, type InitResult } from "./commands/init.js";
+export { PUBLISH_USAGE, runPublishCommand } from "./commands/publish.js";
+export { VALIDATE_USAGE, runValidateCommand } from "./commands/validate.js";
 export {
   runUpdateCliCommand,
   runUpdateCommand,
@@ -66,6 +69,7 @@ export {
   type DefaultCliDependenciesOptions,
   type OutputWriter,
   type PromptIO,
+  type MaintainerFileSystem,
 } from "./dependencies.js";
 export { serializeJsonEnvelope } from "./output/json.js";
 export { CLI_JSON_SCHEMAS, parseCliJsonEnvelope, type CliJsonSchemaName } from "./output/schema.js";

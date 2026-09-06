@@ -103,7 +103,7 @@ The open directory for the MCP ecosystem.
 Initial execution:
 
 ```bash
-npx @themcpdirectory/cli add github
+npx mcpdir add github
 ```
 
 Installed globally:
@@ -310,7 +310,7 @@ More
 Primary command:
 
 ```bash
-npx @themcpdirectory/cli add github --to codex
+npx mcpdir add github --to codex
 ```
 
 If mcpdir is already installed:
@@ -569,13 +569,16 @@ mcpdir
 Initial commands:
 
 ```bash
-mcpdir add <server>
-mcpdir remove <server>
 mcpdir search <query>
 mcpdir info <server>
+mcpdir add <server>
 mcpdir list
+mcpdir remove <server>
 mcpdir update [server]
 mcpdir doctor
+mcpdir init
+mcpdir validate
+mcpdir publish
 ```
 
 ## 16. CLI add command
@@ -626,6 +629,26 @@ Skip normal confirmation:
 ```bash
 mcpdir add github --to codex --yes
 ```
+
+Dynamic install badges use:
+
+```text
+https://api.themcpdirectory.org/b/<slug>.svg
+```
+
+The public count contains anonymous, CLI-reported successful add totals and supported-client totals only; it does not represent verified unique users or installations.
+
+## 16.1 Maintainer publication workflow
+
+Maintainers create a versioned `mcpdir.json` that validates to the Official MCP Registry ServerJSON schema:
+
+```bash
+npx mcpdir init --package @example/mcp-server --name io.github.example/mcp-server --description "An MCP server" --version 1.2.3
+npx mcpdir validate
+MCP_REGISTRY_TOKEN=... npx mcpdir publish
+```
+
+Remote manifests use `mcpdir init --remote https://mcp.example.com/v1`. `publish` validates before network access, requires `MCP_REGISTRY_TOKEN`, and sends the validated ServerJSON object to `POST /v0/publish`. `MCP_REGISTRY_BASE_URL` may override the Registry origin only with a public HTTPS URL without embedded credentials.
 
 ## 17. Client adapter system
 
@@ -710,6 +733,10 @@ Example:
 ```
 
 The CLI resolves this normalized format into the configuration required by each supported client.
+
+The API response includes a canonical SHA-256 `manifestHash` over the validated install data, excluding response metadata. It also advertises a hash-addressed snapshot at `/api/v1/servers/:slug/install/:manifestHash`. That snapshot is immutable and uses the manifest hash as its strong ETag. The CLI verifies the supplied hash before creating an install plan and records it in the receipt.
+
+Install resolution accepts a canonical slug or alias, an Official MCP Registry or package identifier, a validated GitHub `owner/repository` identifier, or a validated GitHub HTTPS repository URL. GitHub forms are matched only against normalized, validated repository metadata. README text and README commands are never parsed or executed.
 
 ## 20. Installation safety
 
@@ -1026,14 +1053,20 @@ Do not place Publisher Pro in the critical MVP path.
 
 The website may collect privacy respecting aggregate analytics.
 
-The CLI should have no behavioral telemetry enabled by default in the MVP.
+Privacy-minimal CLI telemetry is enabled by default and is best-effort. Delivery failure or timeout never changes command output or exit status. `DO_NOT_TRACK=1` and `MCPDIR_DISABLE_TELEMETRY=1` disable telemetry before an event is constructed.
 
-If CLI telemetry is introduced later:
+The CLI sends only:
 
-* it must be clearly documented
-* it must be disableable
-* secrets and configuration contents must never be transmitted
-* installation attribution must use privacy preserving identifiers
+* event
+* canonical slug when known
+* exact CLI version
+* supported target client when applicable
+* success
+* package or remote variant when applicable
+
+Storage retains CLI major/minor instead of the exact version and adds the server receipt time. It does not retain the search query, raw identifier, arguments, paths, configuration or project content, error text, secrets, IP address, user agent, cookie, request ID, or a persistent device, installation, or person identifier. Network infrastructure may process source addresses and HTTP metadata transiently for delivery and abuse prevention; telemetry requests are excluded from application request logs.
+
+Raw events are retained for seven days and daily aggregates for thirteen months. Public display exposes anonymous, CLI-reported successful add totals and supported-client totals only; success, CLI-version, and install-variant cells remain internal, and the totals are not verified unique installations.
 
 The website must launch with:
 

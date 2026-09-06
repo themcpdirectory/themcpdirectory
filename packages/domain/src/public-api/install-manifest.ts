@@ -1,10 +1,13 @@
 import {
+  hashInstallManifest,
   httpUrlSchema,
+  installManifestV1Schema,
   isExactPackageVersionForRegistry,
   type InstallManifestV1,
   type SupportedClientId,
 } from "@themcpdirectory/api-contract";
-import type { Database } from "@themcpdirectory/db";
+import { installManifestSnapshots, type Database } from "@themcpdirectory/db";
+import { and, eq } from "drizzle-orm";
 import {
   loadServerDetailRow,
   projectEnvironmentVariable,
@@ -164,4 +167,48 @@ export async function buildInstallManifest(
     variants: [...filteredVariants],
     compatibility: detail.compatibility,
   };
+}
+
+function snapshotClientId(clientId?: SupportedClientId): string {
+  return clientId ?? "";
+}
+
+export async function saveInstallManifestSnapshot(
+  db: Database,
+  input: { readonly manifest: InstallManifestV1; readonly clientId?: SupportedClientId },
+): Promise<string> {
+  const manifest = installManifestV1Schema.parse(input.manifest);
+  const manifestHash = hashInstallManifest(manifest);
+  await db
+    .insert(installManifestSnapshots)
+    .values({
+      manifestHash,
+      serverId: manifest.server.id,
+      clientId: snapshotClientId(input.clientId),
+      manifest,
+    })
+    .onConflictDoNothing();
+  return manifestHash;
+}
+
+export async function loadInstallManifestSnapshot(
+  db: Database,
+  input: {
+    readonly serverId: string;
+    readonly manifestHash: string;
+    readonly clientId?: SupportedClientId;
+  },
+): Promise<InstallManifestV1 | null> {
+  const [row] = await db
+    .select({ manifest: installManifestSnapshots.manifest })
+    .from(installManifestSnapshots)
+    .where(
+      and(
+        eq(installManifestSnapshots.serverId, input.serverId),
+        eq(installManifestSnapshots.clientId, snapshotClientId(input.clientId)),
+        eq(installManifestSnapshots.manifestHash, input.manifestHash),
+      ),
+    )
+    .limit(1);
+  return row ? installManifestV1Schema.parse(row.manifest) : null;
 }

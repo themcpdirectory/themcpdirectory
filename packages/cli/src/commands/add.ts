@@ -6,6 +6,7 @@ import { sanitizeTerminalText } from "../output/render.js";
 import { executeAddCommand, type AddExecutionResult } from "./add-execute.js";
 import { planAddCommand, type AddCommandOptions, type TargetInstallPreview } from "./add-plan.js";
 import type { CommandResult } from "./result.js";
+import { withTelemetry } from "./result.js";
 
 export const ADD_USAGE = getCliCommandMetadata("add")!.usage;
 
@@ -15,18 +16,23 @@ export async function runAddCliCommand(
 ): Promise<CommandResult<AddExecutionResult>> {
   const parsed = parseAddArgs(argv);
   if (!parsed.ok) {
-    return failure("USAGE_ERROR", parsed.message, 2, undefined, [ADD_USAGE]);
+    return withTelemetry(failure("USAGE_ERROR", parsed.message, 2, undefined, [ADD_USAGE]), () => [
+      { event: "add", success: false },
+    ]);
   }
 
   const planning = await planAddCommand(parsed.options, deps);
   if (planning.exitCode !== 0 || !planning.stdout?.data) {
-    return failure(
-      planning.stdout?.error?.code ?? "COMMAND_FAILED",
-      planning.stdout?.error?.message ?? "Installation planning failed.",
-      planning.exitCode || 1,
-      undefined,
-      planning.stderrLines,
-      planning.warnings,
+    return withTelemetry(
+      failure(
+        planning.stdout?.error?.code ?? "COMMAND_FAILED",
+        planning.stdout?.error?.message ?? "Installation planning failed.",
+        planning.exitCode || 1,
+        undefined,
+        planning.stderrLines,
+        planning.warnings,
+      ),
+      () => [{ event: "add", success: false }],
     );
   }
 
@@ -35,10 +41,11 @@ export async function runAddCliCommand(
     ...new Set([...planning.warnings, ...previews.flatMap((preview) => preview.warnings)]),
   ];
   if (parsed.options.dryRun) {
-    return success(
+    const result = success(
       previews.map((preview) => skippedTarget(preview, preview.plan.previewLines.join(" "))),
       warnings,
     );
+    return withTelemetry(result, () => addTelemetry(previews, result));
   }
 
   if (!parsed.options.yes) {
@@ -46,7 +53,7 @@ export async function runAddCliCommand(
       const targets = previews.map((preview) =>
         skippedTarget(preview, "Installation requires confirmation."),
       );
-      return failure(
+      const result = failure(
         "REQUIRED_INPUT",
         "Installation requires --yes in noninteractive mode.",
         1,
@@ -54,13 +61,14 @@ export async function runAddCliCommand(
         undefined,
         warnings,
       );
+      return withTelemetry(result, () => addTelemetry(previews, result));
     }
 
     if (!(await deps.promptIO.confirm(sanitizeTerminalText(confirmationMessage)))) {
       const targets = previews.map((preview) =>
         skippedTarget(preview, "Installation was cancelled."),
       );
-      return failure(
+      const result = failure(
         "USER_CANCELLED",
         "Installation was cancelled.",
         1,
@@ -68,10 +76,26 @@ export async function runAddCliCommand(
         undefined,
         warnings,
       );
+      return withTelemetry(result, () => addTelemetry(previews, result));
     }
   }
 
-  return withWarnings(await executeAddCommand(previews, deps), warnings);
+  const result = withWarnings(await executeAddCommand(previews, deps), warnings);
+  return withTelemetry(result, () => addTelemetry(previews, result));
+}
+
+function addTelemetry(
+  previews: readonly TargetInstallPreview[],
+  result: CommandResult<AddExecutionResult>,
+) {
+  const targets = result.stdout?.data?.targets ?? [];
+  return previews.map((preview, index) => ({
+    event: "add" as const,
+    slug: preview.intent.server.slug,
+    client: preview.client,
+    success: targets[index]?.status === "installed",
+    installVariant: preview.intent.variant.kind,
+  }));
 }
 
 export function parseAddArgs(

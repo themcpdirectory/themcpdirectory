@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
+import { repositorySnapshots, servers } from "@themcpdirectory/db";
 import type { PublicApiTestContext } from "./public-api-test-context.js";
 import { createPublicApiTestContext } from "./public-api-test-context.js";
 import { resolveServerIdentifier } from "../../index.js";
@@ -31,6 +33,109 @@ describe("resolveServerIdentifier", () => {
       matchedValue: "github",
       needsRedirect: false,
       installAvailability: "available",
+    });
+  });
+
+  it.each([
+    "https://github.com/GitHub/github-mcp-server",
+    "https://github.com/GitHub/github-mcp-server/",
+    "github/github-mcp-server",
+    "GITHUB/GITHUB-MCP-SERVER",
+  ])("resolves the validated GitHub repository source %s", async (identifier) => {
+    await expect(resolveServerIdentifier(context.db, identifier)).resolves.toMatchObject({
+      slug: "github",
+      matchedBy: "github_repository",
+      matchedValue: "GitHub/github-mcp-server",
+      needsRedirect: true,
+    });
+  });
+
+  it("gives existing registry identifiers precedence over GitHub-shaped sources", async () => {
+    await context.db
+      .update(servers)
+      .set({ canonicalRegistryName: "github/github-mcp-server" })
+      .where(eq(servers.slug, "category-second"));
+
+    await expect(
+      resolveServerIdentifier(context.db, "github/github-mcp-server"),
+    ).resolves.toMatchObject({
+      slug: "category-second",
+      matchedBy: "canonical_registry_name",
+    });
+
+    await context.db
+      .update(servers)
+      .set({ canonicalRegistryName: null })
+      .where(eq(servers.slug, "category-second"));
+  });
+
+  it("rejects unvalidated, malformed, and ambiguous GitHub repository sources", async () => {
+    const [unvalidated] = await context.db
+      .insert(servers)
+      .values({
+        slug: "unvalidated-github",
+        title: "Unvalidated GitHub",
+        shortDescription: "Unvalidated source",
+        listingStatus: "active",
+        moderationStatus: "normal",
+        repositoryUrl: "https://github.com/acme/unvalidated",
+        firstSeenAt: new Date("2026-09-01T00:00:00.000Z"),
+        lastSeenAt: new Date("2026-09-01T00:00:00.000Z"),
+      })
+      .returning({ id: servers.id });
+    if (!unvalidated) throw new Error("Expected unvalidated GitHub server");
+
+    for (const [slug, externalRepositoryId] of [
+      ["ambiguous-github-one", "77001"],
+      ["ambiguous-github-two", "77002"],
+    ] as const) {
+      const [server] = await context.db
+        .insert(servers)
+        .values({
+          slug,
+          title: slug,
+          shortDescription: slug,
+          listingStatus: "active",
+          moderationStatus: "normal",
+          repositoryUrl: "https://github.com/acme/shared",
+          repositorySource: "github",
+          repositoryExternalId: externalRepositoryId,
+          firstSeenAt: new Date("2026-09-01T00:00:00.000Z"),
+          lastSeenAt: new Date("2026-09-01T00:00:00.000Z"),
+        })
+        .returning({ id: servers.id });
+      if (!server) throw new Error("Expected ambiguous GitHub server");
+      await context.db.insert(repositorySnapshots).values({
+        serverId: server.id,
+        provider: "github",
+        externalRepositoryId,
+        owner: "Acme",
+        name: "Shared",
+        url: "https://github.com/acme/shared",
+        payload: {},
+        checkedAt: new Date(`2026-09-01T12:00:0${externalRepositoryId.at(-1)}.000Z`),
+      });
+    }
+
+    await expect(
+      resolveServerIdentifier(context.db, "https://github.com/acme/unvalidated"),
+    ).resolves.toBeNull();
+    await expect(
+      resolveServerIdentifier(context.db, "http://github.com/github/github-mcp-server"),
+    ).resolves.toBeNull();
+    await expect(
+      resolveServerIdentifier(context.db, "https://github.com/github/repo/issues"),
+    ).resolves.toBeNull();
+    await expect(
+      resolveServerIdentifier(context.db, "https://github.com//github/github-mcp-server"),
+    ).resolves.toBeNull();
+    await expect(resolveServerIdentifier(context.db, "acme/shared")).rejects.toMatchObject({
+      name: "AmbiguousServerIdentifierError",
+      matchedBy: "github_repository",
+      matches: [
+        expect.objectContaining({ slug: "ambiguous-github-one" }),
+        expect.objectContaining({ slug: "ambiguous-github-two" }),
+      ],
     });
   });
 

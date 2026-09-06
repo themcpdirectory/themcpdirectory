@@ -6,6 +6,7 @@ import { createErrorHandler } from "./http/errors.js";
 import { attachStructuredLogging } from "./http/logging.js";
 import { attachRateLimit } from "./http/rate-limit.js";
 import { attachRequestId } from "./http/request-id.js";
+import { registerBadgeRoutes } from "./routes/badges.js";
 import { registerCategoryRoutes } from "./routes/categories.js";
 import { registerClientRoutes } from "./routes/clients.js";
 import { registerInstallRoutes } from "./routes/install.js";
@@ -13,8 +14,9 @@ import { registerPublisherRoutes } from "./routes/publishers.js";
 import { registerResolveRoutes } from "./routes/resolve.js";
 import { registerSearchRoutes } from "./routes/search.js";
 import { registerServerRoutes } from "./routes/servers.js";
+import { registerTelemetryRoutes } from "./routes/telemetry.js";
 
-export type RateLimitBucket = "resource" | "search" | "install";
+export type RateLimitBucket = "resource" | "search" | "install" | "telemetry";
 
 export interface ApiVariables {
   requestId: string;
@@ -62,6 +64,7 @@ export function createApiApp(deps: ApiDependencies): Hono<ApiEnv> {
   app.use("*", attachRequestId(deps.requestIdFactory));
   app.use("*", attachStructuredLogging(deps.logger));
   app.get("/", (c) => c.json({ status: "ok" }));
+  registerBadgeRoutes(app, deps);
 
   apiV1.use("*", attachCors(deps.allowedOrigins));
   apiV1.use("/servers", withRateLimit("resource"));
@@ -75,6 +78,7 @@ export function createApiApp(deps: ApiDependencies): Hono<ApiEnv> {
   apiV1.use("/publishers/:slug", withRateLimit("resource"));
   apiV1.use("/clients", withRateLimit("resource"));
   apiV1.use("/clients/:id", withRateLimit("resource"));
+  apiV1.use("/telemetry/events", withRateLimit("telemetry"));
 
   registerServerRoutes(apiV1, deps);
   registerSearchRoutes(apiV1, deps);
@@ -83,6 +87,7 @@ export function createApiApp(deps: ApiDependencies): Hono<ApiEnv> {
   registerCategoryRoutes(apiV1, deps);
   registerPublisherRoutes(apiV1, deps);
   registerClientRoutes(apiV1, deps);
+  registerTelemetryRoutes(apiV1, deps);
 
   app.route("/api/v1", apiV1);
 

@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-const cli = "node packages/cli/dist/index.js";
+const cli = "npx @themcpdirectory/cli@0.2.1";
 
 test("CLI docs project commands, clients, safety, and current distribution state", async ({
   page,
@@ -33,12 +33,14 @@ test("CLI docs project commands, clients, safety, and current distribution state
   await expect(
     page.getByText(/unsupported clients and ambiguous servers fail clearly/i),
   ).toBeVisible();
-  await expect(page.getByText(/not published to a package registry/i)).toBeVisible();
+  await expect(
+    page.getByText(/primary one-shot command is: npx @themcpdirectory\/cli@0\.2\.1 add github/i),
+  ).toBeVisible();
   await expect(page.getByRole("region", { name: "Exit codes" })).toContainText(
     "2 means invalid command usage",
   );
   await expect(page.getByRole("region", { name: "Removal and uninstall" })).toContainText(
     `${cli} remove github-server --to codex --scope user --dry-run`,
   );
-  await expect(page.getByRole("region", { name: "Quick start" })).not.toContainText("mcpdir ");
+  await expect(page.getByRole("region", { name: "Quick start" })).toContainText("npx mcpdir ");
 });

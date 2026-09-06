@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../commands/add-plan.js", () => ({ planAddCommand: mocks.planAddCommand }));
 vi.mock("../commands/add-execute.js", () => ({ executeAddCommand: mocks.executeAddCommand }));
 
-import { runUpdateCommand } from "../commands/update.js";
+import { runUpdateCliCommand, runUpdateCommand } from "../commands/update.js";
 
 const VARIANT_ID = "11111111-1111-4111-8111-111111111111";
 type PackageVariant = Extract<InstallManifestV1["variants"][number], { kind: "package" }>;
@@ -276,6 +276,22 @@ describe("runUpdateCommand", () => {
         },
       },
     });
+    expect(updated.telemetry?.()).toEqual([
+      {
+        event: "update",
+        slug: "github",
+        client: "codex",
+        success: true,
+        installVariant: "package",
+      },
+      {
+        event: "update",
+        slug: "playwright",
+        client: "cursor",
+        success: false,
+        installVariant: "package",
+      },
+    ]);
     expect(mocks.planAddCommand).toHaveBeenCalledTimes(3);
     expect(mocks.executeAddCommand).toHaveBeenCalledTimes(2);
     expect(updateDeps.confirmationMessages).toHaveLength(1);
@@ -323,5 +339,8 @@ describe("runUpdateCommand", () => {
       ok: true,
       data: { skipped: ["No Directory-managed installations matched."] },
     });
+
+    const usageFailure = await runUpdateCliCommand(["--unsupported"], dependencies([]));
+    expect(usageFailure.telemetry?.()).toEqual([{ event: "update", success: false }]);
   });
 });

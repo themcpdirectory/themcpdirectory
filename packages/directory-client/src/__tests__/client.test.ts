@@ -187,6 +187,7 @@ describe("DirectoryClient", () => {
         },
       },
       resolveInstallBody: {
+        manifestHash: "a".repeat(64),
         data: {
           schemaVersion: 1,
           server: {

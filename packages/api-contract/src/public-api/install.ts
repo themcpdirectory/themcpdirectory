@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { valid as validPep440 } from "@renovatebot/pep440";
 import { valid as validSemver } from "semver";
 import { z } from "zod";
@@ -132,6 +133,19 @@ export const installManifestQuerySchema = strictObject({
   client: supportedClientIdSchema.optional(),
 });
 
+export const installManifestHashSchema = z.string().regex(/^[a-f0-9]{64}$/);
+export const installManifestSnapshotPathParamsSchema = strictObject({
+  slug: slugSchema,
+  manifestHash: installManifestHashSchema,
+});
+export const resolvedInstallManifestSnapshotPathParamsSchema = strictObject({
+  identifier: z
+    .string()
+    .max(512)
+    .refine((value) => value.trim().length > 0),
+  manifestHash: installManifestHashSchema,
+});
+
 const packageVariantShape = {
   id: uuidSchema,
   kind: z.literal("package"),
@@ -168,7 +182,7 @@ const remoteVariantSchema = strictObject({
   variables: z.array(remoteVariableSchema),
 });
 
-const installManifestServerSchema = strictObject({
+export const installManifestV1Schema = strictObject({
   schemaVersion: z.literal(1),
   server: strictObject({
     id: uuidSchema,
@@ -196,8 +210,33 @@ const installManifestServerSchema = strictObject({
 });
 
 export const installManifestResponseSchema = createResourceResponseSchema(
-  installManifestServerSchema,
-);
+  installManifestV1Schema,
+).extend({
+  manifestHash: installManifestHashSchema,
+});
+
+function canonicalizeManifestValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalizeManifestValue);
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+        .map(([key, child]) => [key, canonicalizeManifestValue(child)]),
+    );
+  }
+  return value;
+}
+
+export function serializeInstallManifest(manifest: InstallManifestV1): string {
+  const validated = installManifestV1Schema.parse(manifest);
+  return JSON.stringify(canonicalizeManifestValue(validated));
+}
+
+export function hashInstallManifest(manifest: InstallManifestV1): string {
+  return createHash("sha256").update(serializeInstallManifest(manifest)).digest("hex");
+}
 
 export type InstallManifestV1 = z.infer<typeof installManifestResponseSchema>["data"];
 export type InstallManifestResponse = z.infer<typeof installManifestResponseSchema>;

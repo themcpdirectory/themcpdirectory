@@ -55,6 +55,7 @@ export const PUBLIC_API_SUCCESS_EXAMPLES = {
     meta: { requestId: "req_example_resource" },
   }),
   install: installManifestResponseSchema.parse({
+    manifestHash: "62133d32c5e9a62eb17ed33f45e209c1ef4ab7e5647a6efaac833d6acba9b602",
     data: {
       schemaVersion: 1,
       server: {

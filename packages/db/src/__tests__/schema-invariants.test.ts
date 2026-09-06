@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { legalHolds } from "../index.js";
 import {
+  cliTelemetryDailyCounts,
+  cliTelemetryEvents,
+  installManifestSnapshots,
   registrySources,
   registrySyncRuns,
   registrySnapshots,
@@ -50,6 +53,60 @@ function indexColumns(table: Parameters<typeof getTableConfig>[0], name: string)
 }
 
 describe("schema invariants", () => {
+  it("defines privacy-minimal CLI telemetry storage and aggregation indexes", () => {
+    expect(getConfig(cliTelemetryEvents).columns.map((column) => column.name)).toEqual([
+      "id",
+      "event",
+      "server_id",
+      "cli_major_minor",
+      "client",
+      "success",
+      "install_variant",
+      "received_at",
+      "aggregated_at",
+    ]);
+    expect(indexColumns(cliTelemetryEvents, "cli_telemetry_events_received_at_idx")).toEqual([
+      "received_at",
+    ]);
+    expect(
+      indexColumns(cliTelemetryEvents, "cli_telemetry_events_event_server_received_at_idx"),
+    ).toEqual(["event", "server_id", "received_at"]);
+    expect(indexColumns(cliTelemetryEvents, "cli_telemetry_events_aggregation_idx")).toEqual([
+      "aggregated_at",
+      "received_at",
+    ]);
+    expect(
+      indexColumns(cliTelemetryDailyCounts, "cli_telemetry_daily_counts_server_day_idx"),
+    ).toEqual(["server_id", "day"]);
+    expect(indexColumns(cliTelemetryDailyCounts, "cli_telemetry_daily_counts_day_idx")).toEqual([
+      "day",
+    ]);
+    expect(
+      getConfig(cliTelemetryDailyCounts).indexes.some(
+        (index) =>
+          index.config.name === "cli_telemetry_daily_counts_dimensions_uidx" && index.config.unique,
+      ),
+    ).toBe(true);
+  });
+
+  it("defines canonical install manifest snapshots with route identity indexes", () => {
+    expect(getConfig(installManifestSnapshots).columns.map((column) => column.name)).toEqual([
+      "manifest_hash",
+      "server_id",
+      "client_id",
+      "manifest",
+      "created_at",
+    ]);
+    expect(findColumn(installManifestSnapshots, "client_id").notNull).toBe(true);
+    expect(
+      getConfig(installManifestSnapshots).primaryKeys[0]?.columns.map((column) => column.name),
+    ).toEqual(["server_id", "client_id", "manifest_hash"]);
+    expect(
+      indexColumns(installManifestSnapshots, "install_manifest_snapshots_server_hash_idx"),
+    ).toEqual(["server_id", "manifest_hash"]);
+    expect(getConfig(installManifestSnapshots).foreignKeys).toHaveLength(1);
+  });
+
   it("defines Phase F observation metadata, idempotency, retention, and legal holds", () => {
     expect(getConfig(serverHealthChecks).columns.map((column) => column.name)).toEqual(
       expect.arrayContaining(["final_origin", "redirect_count", "method_used"]),

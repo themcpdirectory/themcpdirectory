@@ -11,7 +11,6 @@ import {
   registrySources,
   repositorySnapshots,
   serverHealthChecks,
-  serverAliases,
   serverCategories,
   serverPackages,
   serverRemotes,
@@ -22,6 +21,7 @@ import {
 import { InvalidCursorError } from "./cursor.js";
 import { createServerSearchFiltersHash } from "./query-fingerprint.js";
 import { mapServerSummaryRow } from "./server-projections.js";
+import { searchPredicateSql, searchScoreSql } from "../ranking.js";
 import type {
   SearchServersPageInput,
   SearchServersPageOptions,
@@ -33,7 +33,6 @@ import type {
 export type { PublicServerSummary };
 export type { SearchServersPageInput, SearchServersPageOptions, SearchServersPageResult };
 
-const SEARCH_SIMILARITY_THRESHOLD = 0.12;
 const CLIENT_SUPPORTED_STATUSES = ["supported", "supported_with_configuration"] as const;
 
 function normalized(value: string): string {
@@ -87,48 +86,6 @@ function sortUpdatedAtSql() {
     ${latestRepositoryLastPushAtSql()}::timestamptz,
     ${servers.lastSeenAt}
   )::text`;
-}
-
-function searchScoreSql(normalizedQuery: string) {
-  const exactSlug = sql<number>`case when lower(${servers.slug}::text) = ${normalizedQuery} then 120 else 0 end`;
-  const exactTitle = sql<number>`case when lower(${servers.title}) = ${normalizedQuery} then 100 else 0 end`;
-  const aliasExact = sql<number>`case when exists (
-    select 1
-    from ${serverAliases} sa
-    where sa.server_id = ${servers.id}
-      and lower(sa.alias) = ${normalizedQuery}
-  ) then 90 else 0 end`;
-  const fts = sql<number>`coalesce(
-    ts_rank_cd(${servers.searchDocument}, websearch_to_tsquery('simple', ${normalizedQuery})),
-    0
-  ) * 40`;
-  const trigram = sql<number>`greatest(
-    similarity(lower(${servers.slug}::text), ${normalizedQuery}),
-    similarity(lower(${servers.title}), ${normalizedQuery}),
-    similarity(lower(coalesce(${servers.searchText}, '')), ${normalizedQuery}),
-    coalesce((
-      select max(similarity(lower(sa.alias), ${normalizedQuery}))
-      from ${serverAliases} sa
-      where sa.server_id = ${servers.id}
-    ), 0)
-  ) * 25`;
-
-  return sql<number>`(${fts} + ${exactSlug} + ${exactTitle} + ${aliasExact} + ${trigram})`;
-}
-
-function searchPredicate(normalizedQuery: string): SQL {
-  return sql`(
-    ${servers.searchDocument} @@ websearch_to_tsquery('simple', ${normalizedQuery})
-    or similarity(lower(coalesce(${servers.searchText}, '')), ${normalizedQuery}) > ${SEARCH_SIMILARITY_THRESHOLD}
-    or lower(${servers.slug}::text) % ${normalizedQuery}
-    or lower(${servers.title}) % ${normalizedQuery}
-    or exists (
-      select 1
-      from ${serverAliases} sa
-      where sa.server_id = ${servers.id}
-        and lower(sa.alias) % ${normalizedQuery}
-    )
-  )`;
 }
 
 function buildOrderBy(sort: PublicServerSort, score: SQL<number>) {
@@ -238,7 +195,7 @@ export async function runSearchServersPageQuery(
   } else {
     where.push(sql`${servers.listingStatus} <> 'deleted_upstream'`);
   }
-  if (normalizedQuery) where.push(searchPredicate(normalizedQuery));
+  if (normalizedQuery) where.push(searchPredicateSql(normalizedQuery));
   if (input.category) {
     const categorySlug = normalized(input.category);
     where.push(sql`exists (

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import type { Socket } from "node:net";
 
@@ -25,6 +26,61 @@ const serverSummary = {
     openSource: true,
   },
 } as const;
+
+const installManifest = {
+  schemaVersion: 1,
+  server: {
+    id: serverId,
+    slug: "github-server",
+    title: "GitHub Server",
+    version: "1.2.3",
+  },
+  provenance: {
+    registry: "https://registry.modelcontextprotocol.io",
+    registryName: "Model Context Protocol Registry",
+    observedAt: "2026-09-01T12:00:00Z",
+  },
+  variants: [
+    {
+      id: variantId,
+      kind: "package",
+      registryType: "npm",
+      identifier: "@modelcontextprotocol/server-github",
+      version: "1.2.3",
+      runtimeHint: "npx",
+      transport: "stdio",
+      runtimeArguments: [],
+      packageArguments: [],
+      environmentVariables: [],
+      integrity: {
+        algorithm: "sha256",
+        digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      },
+    },
+  ],
+  compatibility: {
+    codex: "supported",
+    "claude-code": "supported",
+    cursor: "supported",
+    vscode: "supported",
+  },
+} as const;
+
+function hashFixtureManifest(value: unknown): string {
+  const canonicalize = (input: unknown): unknown =>
+    Array.isArray(input)
+      ? input.map(canonicalize)
+      : input !== null && typeof input === "object"
+        ? Object.fromEntries(
+            Object.entries(input)
+              .sort(([left], [right]) => left.localeCompare(right))
+              .map(([key, child]) => [key, canonicalize(child)]),
+          )
+        : input;
+  return createHash("sha256")
+    .update(JSON.stringify(canonicalize(value)))
+    .digest("hex");
+}
 
 const routeBodies = {
   search: {
@@ -59,6 +115,10 @@ const routeBodies = {
         openSource: true,
         signals: [],
       },
+      installs: {
+        total: 0,
+        clients: { "claude-code": 0, codex: 0, cursor: 0, vscode: 0 },
+      },
       timestamps: {
         firstSeenAt: "2026-09-01T12:00:00Z",
         lastSeenAt: "2026-09-01T12:00:00Z",
@@ -69,44 +129,8 @@ const routeBodies = {
     meta: { requestId: "req_tarball_detail" },
   },
   install: {
-    data: {
-      schemaVersion: 1,
-      server: {
-        id: serverId,
-        slug: "github-server",
-        title: "GitHub Server",
-        version: "1.2.3",
-      },
-      provenance: {
-        registry: "https://registry.modelcontextprotocol.io",
-        registryName: "Model Context Protocol Registry",
-        observedAt: "2026-09-01T12:00:00Z",
-      },
-      variants: [
-        {
-          id: variantId,
-          kind: "package",
-          registryType: "npm",
-          identifier: "@modelcontextprotocol/server-github",
-          version: "1.2.3",
-          runtimeHint: "npx",
-          transport: "stdio",
-          runtimeArguments: [],
-          packageArguments: [],
-          environmentVariables: [],
-          integrity: {
-            algorithm: "sha256",
-            digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-          },
-        },
-      ],
-      compatibility: {
-        codex: "supported",
-        "claude-code": "supported",
-        cursor: "supported",
-        vscode: "supported",
-      },
-    },
+    data: installManifest,
+    manifestHash: hashFixtureManifest(installManifest),
     meta: { requestId: "req_tarball_install" },
   },
   clients: {

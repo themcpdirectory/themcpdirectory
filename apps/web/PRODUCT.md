@@ -28,7 +28,11 @@ Users browse the web directory, search by server or capability, inspect server d
 - Supported CLI clients are Codex, Claude Code, Cursor, and Visual Studio Code.
 - Trust signals are factual observations, not ratings, certifications, endorsements, or security guarantees.
 - Command and JSON interfaces are automation contracts and must remain backward compatible while interactive CLI navigation is added.
-- Only strictly necessary authentication and OAuth security cookies are currently used. No behavioural analytics, advertising, fingerprinting, session replay, marketing pixels, or cross-site tracking is implemented.
+- The current primary end-user command is `npx @themcpdirectory/cli@0.2.1 add github`; `npx mcpdir add github` remains gated on npm approving the unscoped package name.
+- CLI source resolution accepts canonical slugs and aliases, Registry or package identifiers, and validated GitHub repository identifiers or HTTPS URLs. README text is never scraped or executed.
+- Install manifests have a canonical SHA-256 hash and a hash-addressed immutable snapshot.
+- Privacy-minimal CLI telemetry is default-on and best-effort, with `DO_NOT_TRACK=1` and `MCPDIR_DISABLE_TELEMETRY=1` hard opt-outs. Public display is limited to anonymous, CLI-reported successful add totals and client totals, not verified unique installations.
+- Only strictly necessary authentication and OAuth security cookies are currently used. The website has no behavioural analytics, advertising, fingerprinting, session replay, marketing pixels, or cross-site tracking.
 - Legal documents remain drafts until qualified legal review. Estopia Engineering Ltd is the currently recorded operator; registration details, electronic contact, processors, transfers, final lawful bases, governing law, and effective dates remain open production decisions.
 
 ## Brand Commitments

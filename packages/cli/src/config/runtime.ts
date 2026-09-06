@@ -7,6 +7,7 @@ export interface CliRuntimeConfig {
   readonly apiBaseUrl: string;
   readonly requestTimeoutMs: number;
   readonly stateDirOverride?: string;
+  readonly workingDirectory?: string;
 }
 
 export class CliRuntimeConfigError extends Error {
@@ -45,6 +46,7 @@ export function resolveCliRuntimeConfig(options?: {
   return {
     apiBaseUrl,
     requestTimeoutMs,
+    workingDirectory: cwd,
     ...(stateDirOverride ? { stateDirOverride } : {}),
   };
 }

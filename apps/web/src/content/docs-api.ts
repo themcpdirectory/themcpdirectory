@@ -65,10 +65,17 @@ function getAllowedValues(schema: OpenApiParameterSchema): readonly (string | nu
   return schema.anyOf?.flatMap((option) => option.enum ?? []) ?? [];
 }
 
-function getSuccessSchema(response: OpenApiResponse | undefined, route: string): string {
-  const reference = response?.content?.["application/json"]?.schema?.$ref;
-  if (!reference) throw new Error(`Missing success response schema for ${route}`);
-  return reference.replace("#/components/schemas/", "");
+function getSuccessSchema(
+  responses: Readonly<Record<string, OpenApiResponse>>,
+  route: string,
+): string {
+  const successStatus = Object.keys(responses)
+    .filter((status) => /^2\d\d$/.test(status))
+    .sort()[0];
+  if (!successStatus) throw new Error(`Missing success response for ${route}`);
+
+  const reference = responses[successStatus]?.content?.["application/json"]?.schema?.$ref;
+  return reference ? reference.replace("#/components/schemas/", "") : "No response body";
 }
 
 export const PUBLIC_API_DOC_OPERATIONS: readonly PublicApiOperationDocumentation[] = Object.entries(
@@ -119,7 +126,10 @@ export const PUBLIC_API_DOC_OPERATIONS: readonly PublicApiOperationDocumentation
         path: formatRoutePath(path),
         parameters,
         responseStatuses: Object.keys(responses),
-        successSchema: getSuccessSchema(responses["200"] as OpenApiResponse | undefined, route),
+        successSchema: getSuccessSchema(
+          responses as Readonly<Record<string, OpenApiResponse>>,
+          route,
+        ),
       },
     ];
   }),

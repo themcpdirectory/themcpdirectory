@@ -174,6 +174,20 @@ The default API root is `http://127.0.0.1:3001/api/v1`. Override it per command 
 MCPDIR_API_BASE_URL=https://api.example.test/api/v1 pnpm --filter @themcpdirectory/cli exec mcpdir search github
 ```
 
+The public one-shot command is `npx @themcpdirectory/cli@0.2.1 add github`. The shorter `npx mcpdir add github` remains gated on npm approving the unscoped package name. The repository-linked commands above are for local development.
+
+Exercise the maintainer workflow with a disposable manifest and a mock or approved Registry endpoint:
+
+```sh
+pnpm --filter @themcpdirectory/cli exec mcpdir init --package @example/mcp-server --name io.github.example/mcp-server --description "An MCP server" --version 1.2.3
+pnpm --filter @themcpdirectory/cli exec mcpdir validate
+MCP_REGISTRY_TOKEN=... MCP_REGISTRY_BASE_URL=https://registry.example.test pnpm --filter @themcpdirectory/cli exec mcpdir publish
+```
+
+`mcpdir.json` validates to the Official MCP Registry ServerJSON schema. `publish` always validates first, requires `MCP_REGISTRY_TOKEN`, and sends `POST /v0/publish`; the optional `MCP_REGISTRY_BASE_URL` override must be a public HTTPS URL without embedded credentials.
+
+CLI telemetry is default-on and best-effort. Use `DO_NOT_TRACK=1` or `MCPDIR_DISABLE_TELEMETRY=1` while testing when no event should be constructed or sent.
+
 CLI changes must preserve these safety properties:
 
 - Installation and removal execute only adapter-generated plans accepted by the install-engine validator.
@@ -191,7 +205,7 @@ pnpm --filter @themcpdirectory/cli exec mcpdir --help
 pnpm prettier --check README.md docs/development.md docs/superpowers/plans/2026-09-01-phase-e-cli-installation.md
 ```
 
-The built file at `packages/cli/dist/index.js` is a bundled local-development executable. Run `pnpm release:cli-tarball` from the repository root to check the publish allowlist, record the tarball SHA-256, install the exact archive into a temporary prefix, and exercise its packed binary and adapters. This validates an artefact but does not publish it. The public package is installed with `npm install --global @themcpdirectory/cli`.
+The built file at `packages/cli/dist/index.js` is a bundled local-development executable. Run `pnpm release:cli-tarballs` from the repository root to check both publish allowlists, record both tarball SHA-256 values, install the exact local archives into temporary prefixes, and exercise the packed binaries and adapters. The existing singular command remains as a compatibility alias. This validates the synchronized `@themcpdirectory/cli` implementation package and `mcpdir` wrapper but does not publish either package or establish a published version.
 
 ## Validation
 

@@ -113,6 +113,30 @@ describe("synchronizeRegistryPage integration", () => {
     }
   });
 
+  it("assigns the curated github alias to GitHub's canonical Registry server", async () => {
+    const source = await createSource(db);
+    const page = makeSingleServerPage(0, (entry) => {
+      entry.server.name = "io.github.github/github-mcp-server";
+      entry.server.title = "GitHub";
+      entry.server.repository = {
+        url: "https://github.com/github/github-mcp-server",
+        source: "github",
+      };
+    });
+
+    await synchronizeRegistryPage(db, source, page, {
+      observedAt: new Date("2026-09-01T10:00:00.000Z"),
+    });
+
+    const [alias] = await db
+      .select({ alias: serverAliases.alias, serverSlug: servers.slug })
+      .from(serverAliases)
+      .innerJoin(servers, eq(servers.id, serverAliases.serverId))
+      .where(eq(serverAliases.alias, "github"));
+
+    expect(alias).toEqual({ alias: "github", serverSlug: "github-mcp-server" });
+  });
+
   it("is idempotent for duplicate imports and keeps counts stable", async () => {
     const source = await createSource(db);
     const page = makePage();

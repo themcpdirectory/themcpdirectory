@@ -52,13 +52,15 @@ export function createErrorHandler(logger: ApiLogger): ErrorHandler<ApiEnv> {
     const httpError = toHttpApiError(error);
     const requestId = c.get("requestId") ?? randomUUID();
 
-    logger.error({
-      event: "api_error",
-      requestId,
-      route: c.req.routePath,
-      status: httpError.status,
-      code: httpError.code,
-    });
+    if (c.req.path !== "/api/v1/telemetry/events") {
+      logger.error({
+        event: "api_error",
+        requestId,
+        route: c.req.routePath,
+        status: httpError.status,
+        code: httpError.code,
+      });
+    }
 
     const body = errorResponseSchema.parse({
       error: {

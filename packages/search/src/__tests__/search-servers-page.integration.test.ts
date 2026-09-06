@@ -17,6 +17,7 @@ import {
 import {
   createServerSearchCursorCodec,
   refreshServerSearchDocument,
+  searchServers,
   searchServersPage,
 } from "../index.js";
 import { createTempDatabase } from "./postgres-test-db.js";
@@ -227,6 +228,34 @@ describe("searchServersPage", () => {
 
   afterEach(async () => {
     if (destroy) await destroy();
+  });
+
+  it("uses the same recommendation-aware relevance order as direct search", async () => {
+    await seedSearchPageServer(db, sourceIds, {
+      slug: "plain-community",
+      title: "Shared Tools",
+      shortDescription: "Shared developer tools",
+      publisher: { slug: "plain", displayName: "Plain", verified: false },
+      officialSource: false,
+    });
+    await seedSearchPageServer(db, sourceIds, {
+      slug: "verified-official",
+      title: "Shared Tools",
+      shortDescription: "Shared developer tools",
+      publisher: { slug: "verified", displayName: "Verified", verified: true },
+      officialSource: true,
+    });
+    await refreshServerSearchDocument(db);
+
+    const direct = await searchServers(db, { query: "shared tools" });
+    const page = await searchServersPage(
+      db,
+      { q: "shared tools", sort: "relevance", limit: 10 },
+      { cursorCodec },
+    );
+
+    expect(direct.map((item) => item.slug)).toEqual(["verified-official", "plain-community"]);
+    expect(page.items.map((item) => item.slug)).toEqual(direct.map((item) => item.slug));
   });
 
   it("returns deterministic keyset pages without duplicates for recent sort", async () => {

@@ -24,6 +24,8 @@ import {
   InstallAvailabilitySchema,
   installManifestQuerySchema,
   installManifestResponseSchema,
+  installManifestSnapshotPathParamsSchema,
+  resolvedInstallManifestSnapshotPathParamsSchema,
 } from "./install.js";
 import {
   resolveServerIdentifierResponseSchema,
@@ -33,6 +35,7 @@ import {
   serverDetailResponseSchema,
 } from "./servers.js";
 import { httpUrlSchema, identifierPathParamsSchema, slugPathParamsSchema } from "./shared.js";
+import { cliTelemetryEventV1Schema } from "./telemetry.js";
 import { TrustProfileV1Schema, TrustSignalKeySchema, TrustSignalStateSchema } from "./trust.js";
 
 extendZodWithOpenApi(z);
@@ -241,6 +244,26 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
 
   registry.registerPath({
     method: "get",
+    path: "/api/v1/resolve/{identifier}/install/{manifestHash}",
+    request: {
+      params: resolvedInstallManifestSnapshotPathParamsSchema,
+      query: installManifestQuerySchema,
+    },
+    responses: {
+      200: {
+        description: "Immutable install manifest snapshot via resolution",
+        content: { "application/json": { schema: installManifestResponse } },
+      },
+      400: validationError,
+      404: notFoundError,
+      409: ambiguousServerError,
+      410: installGoneError,
+      ...commonErrors,
+    },
+  });
+
+  registry.registerPath({
+    method: "get",
     path: "/api/v1/search",
     request: { query: searchCollectionQuerySchema },
     responses: {
@@ -294,6 +317,41 @@ export function createPublicApiOpenApiDocument(baseUrl: string): OpenAPIObject {
       400: validationError,
       404: notFoundError,
       410: installGoneError,
+      ...commonErrors,
+    },
+  });
+
+  registry.registerPath({
+    method: "get",
+    path: "/api/v1/servers/{slug}/install/{manifestHash}",
+    request: {
+      params: installManifestSnapshotPathParamsSchema,
+      query: installManifestQuerySchema,
+    },
+    responses: {
+      200: {
+        description: "Immutable install manifest snapshot",
+        content: { "application/json": { schema: installManifestResponse } },
+      },
+      400: validationError,
+      404: notFoundError,
+      410: installGoneError,
+      ...commonErrors,
+    },
+  });
+
+  registry.registerPath({
+    method: "post",
+    path: "/api/v1/telemetry/events",
+    request: {
+      body: {
+        required: true,
+        content: { "application/json": { schema: cliTelemetryEventV1Schema } },
+      },
+    },
+    responses: {
+      202: { description: "Telemetry event accepted" },
+      400: validationError,
       ...commonErrors,
     },
   });

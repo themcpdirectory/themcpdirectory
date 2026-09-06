@@ -7,12 +7,20 @@ import {
   createVsCodeAdapter,
   type AdapterRegistry,
 } from "@themcpdirectory/client-adapters";
+import { readFile, writeFile } from "node:fs/promises";
+import { lookup } from "node:dns/promises";
 import { DirectoryClient } from "@themcpdirectory/directory-client";
 import type { ReceiptStore } from "./config/receipt-store.js";
 import { createReceiptStore } from "./config/receipt-store.js";
 import { type CliRuntimeConfig, resolveCliRuntimeConfig } from "./config/runtime.js";
 import { resolveCliStatePaths } from "./config/state-paths.js";
 import { createInquirerPromptIO, resolvePromptMode } from "./prompts/inquirer.js";
+import {
+  createPinnedRegistryPublishTransport,
+  type RegistryPublishTransport,
+} from "./registry-publish-transport.js";
+import type { TelemetryReporter } from "./telemetry.js";
+import { createTelemetryReporter } from "./telemetry.js";
 
 export interface PromptIO {
   readonly isInteractive: boolean;
@@ -27,6 +35,15 @@ export interface OutputWriter {
   writeStderr(line: string): void;
 }
 
+export interface MaintainerFileSystem {
+  readFile(path: string): Promise<string>;
+  writeFile(
+    path: string,
+    contents: string,
+    options?: { readonly flag?: "w" | "wx" },
+  ): Promise<void>;
+}
+
 export interface CliDependencies {
   readonly directoryClient: DirectoryClient;
   readonly adapterRegistry: AdapterRegistry;
@@ -36,7 +53,14 @@ export interface CliDependencies {
   readonly runtime: CliRuntimeConfig;
   readonly environment: Readonly<NodeJS.ProcessEnv>;
   readonly clock: () => Date;
+  readonly telemetryReporter?: TelemetryReporter;
+  readonly maintainerFileSystem?: MaintainerFileSystem;
+  readonly fetchImpl?: typeof fetch;
+  readonly dnsLookup?: (hostname: string) => Promise<readonly string[]>;
+  readonly registryPublishTransport?: RegistryPublishTransport;
 }
+
+export type { RegistryPublishTransport } from "./registry-publish-transport.js";
 
 export interface DefaultCliDependenciesOptions {
   readonly env?: NodeJS.ProcessEnv;
@@ -47,6 +71,7 @@ export interface DefaultCliDependenciesOptions {
   readonly stdout?: NodeJS.WriteStream;
   readonly stderr?: NodeJS.WriteStream;
   readonly clock?: () => Date;
+  readonly fetchImpl?: typeof fetch;
 }
 
 export function createDefaultCliDependencies(
@@ -83,6 +108,22 @@ export function createDefaultCliDependencies(
     runtime,
     environment: env,
     clock,
+    ...(env.DO_NOT_TRACK === "1" || env.MCPDIR_DISABLE_TELEMETRY === "1"
+      ? {}
+      : {
+          telemetryReporter: createTelemetryReporter({
+            apiBaseUrl: runtime.apiBaseUrl,
+            ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+          }),
+        }),
+    maintainerFileSystem: {
+      readFile: (path) => readFile(path, "utf8"),
+      writeFile: (path, contents, writeOptions) => writeFile(path, contents, writeOptions),
+    },
+    fetchImpl: options.fetchImpl ?? fetch,
+    dnsLookup: async (hostname) =>
+      (await lookup(hostname, { all: true, verbatim: true })).map(({ address }) => address),
+    registryPublishTransport: createPinnedRegistryPublishTransport(),
   };
 }
 

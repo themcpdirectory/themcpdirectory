@@ -107,6 +107,10 @@ const INFO_RESPONSE = {
       redirectCount: 1,
     },
     installAvailability: "available",
+    installs: {
+      total: 0,
+      clients: { "claude-code": 0, codex: 0, cursor: 0, vscode: 0 },
+    },
     timestamps: {
       firstSeenAt: "2026-08-01T00:00:00.000Z",
       lastSeenAt: "2026-09-03T10:00:00.000Z",
@@ -285,7 +289,9 @@ describe("Task 10 search and info command runner", () => {
       },
       stderrLines: [],
       warnings: [],
+      telemetry: expect.any(Function),
     });
+    expect(result.telemetry?.()).toEqual([{ event: "search", success: true }]);
     expect(context.stdout).toEqual([]);
     expect(context.stderr).toEqual([]);
   });

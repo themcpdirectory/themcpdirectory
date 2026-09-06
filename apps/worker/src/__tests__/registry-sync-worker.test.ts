@@ -17,6 +17,7 @@ import {
 import {
   REGISTRY_SYNC_QUEUE,
   RegistrySyncTerminalError,
+  TELEMETRY_RETENTION_QUEUE,
   initializeWorkerQueues,
   processRegistrySyncJob,
   runRegistrySync,
@@ -77,6 +78,16 @@ describe("registry sync worker", () => {
       expect(first.initialRegistrySyncJobId).toEqual(expect.any(String));
       expect(duplicate.initialRegistrySyncJobId).toBeNull();
       expect(job?.data).toEqual({ sourceKey: "official" });
+      await expect(boss.getQueue(TELEMETRY_RETENTION_QUEUE)).resolves.toEqual(
+        expect.objectContaining({ name: TELEMETRY_RETENTION_QUEUE }),
+      );
+      await expect(boss.getSchedules()).resolves.toContainEqual(
+        expect.objectContaining({
+          name: TELEMETRY_RETENTION_QUEUE,
+          cron: "7 1 * * *",
+          timezone: "UTC",
+        }),
+      );
     } finally {
       await boss.stop({ graceful: true });
     }

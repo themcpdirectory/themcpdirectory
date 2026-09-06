@@ -53,6 +53,7 @@ import {
   nextRemoteHealthRetryDelayMs,
 } from "./trust-health-config.js";
 import { cleanupHealthHistory, cleanupTrustHistory } from "./retention.js";
+import { processTelemetryRetention } from "./telemetry-retention.js";
 import { PUBLISHER_OUTBOX_QUEUE, processPublisherOutboxJob } from "./publisher-outbox-worker.js";
 import {
   PUBLISHER_ERASURE_QUEUE,
@@ -72,6 +73,7 @@ export const REMOTE_HEALTH_RETRY_LIMIT = 5;
 export const REMOTE_HEALTH_WORKER_COUNT = 8;
 export const TRUST_HEALTH_SWEEP_BATCH_SIZE = 500;
 export const RETENTION_BATCH_SIZE = 500;
+export const TELEMETRY_RETENTION_QUEUE = "telemetry.retention";
 export const REGISTRY_SYNC_QUEUE_OPTIONS = {
   policy: "short",
   retryLimit: 5,
@@ -674,6 +676,10 @@ export async function initializeWorkerQueues(
     name: TRUST_RETENTION_QUEUE,
     ...RETENTION_QUEUE_OPTIONS,
   });
+  await boss.createQueue(TELEMETRY_RETENTION_QUEUE, {
+    name: TELEMETRY_RETENTION_QUEUE,
+    ...RETENTION_QUEUE_OPTIONS,
+  });
   await boss.createQueue(PUBLISHER_OUTBOX_QUEUE, {
     name: PUBLISHER_OUTBOX_QUEUE,
     ...PUBLISHER_OUTBOX_QUEUE_OPTIONS,
@@ -695,6 +701,7 @@ export async function initializeWorkerQueues(
   });
   await boss.schedule(HEALTH_RETENTION_QUEUE, "37 3 * * *", {}, { tz: "UTC" });
   await boss.schedule(TRUST_RETENTION_QUEUE, "47 4 1 * *", {}, { tz: "UTC" });
+  await boss.schedule(TELEMETRY_RETENTION_QUEUE, "7 1 * * *", {}, { tz: "UTC" });
   await boss.schedule(PUBLISHER_OUTBOX_QUEUE, "*/10 * * * *", {}, { tz: "UTC" });
   await boss.schedule(PUBLISHER_ERASURE_QUEUE, "*/15 * * * *", {}, { tz: "UTC" });
   await boss.schedule(PUBLISHER_RETENTION_QUEUE, "19 5 * * *", {}, { tz: "UTC" });
@@ -982,6 +989,19 @@ export async function startWorker(): Promise<void> {
     console.info({ event: "trust_retention", queue: TRUST_RETENTION_QUEUE, ...result });
   });
 
+  await boss.work(TELEMETRY_RETENTION_QUEUE, async () => {
+    const result = await processTelemetryRetention(db, {
+      now: new Date(),
+      batchSize: RETENTION_BATCH_SIZE,
+    });
+    if (!result.done) await boss.send(TELEMETRY_RETENTION_QUEUE, {});
+    console.info({
+      event: "telemetry_retention",
+      queue: TELEMETRY_RETENTION_QUEUE,
+      ...result,
+    });
+  });
+
   await boss.work(PUBLISHER_OUTBOX_QUEUE, async ([job]) => {
     const result = await processPublisherOutboxJob(db, new Date());
     if (result.retried > 0) await boss.send(PUBLISHER_OUTBOX_QUEUE, {});
@@ -1039,6 +1059,7 @@ export async function startWorker(): Promise<void> {
       TRUST_REFRESH_QUEUE,
       HEALTH_RETENTION_QUEUE,
       TRUST_RETENTION_QUEUE,
+      TELEMETRY_RETENTION_QUEUE,
       PUBLISHER_OUTBOX_QUEUE,
       PUBLISHER_ERASURE_QUEUE,
       PUBLISHER_RETENTION_QUEUE,

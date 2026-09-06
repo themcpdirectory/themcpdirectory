@@ -76,6 +76,9 @@ type PostgresError = Error & {
 };
 
 const PG_UNIQUE_VIOLATION = "23505";
+const CURATED_REGISTRY_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  "io.github.github/github-mcp-server": ["github"],
+};
 
 function parseOptionalTimestamp(value: string | undefined): Date | null {
   if (value === undefined) return null;
@@ -118,6 +121,25 @@ async function allocateServerSlug(
   }
 
   throw new Error("Unable to allocate a unique server slug.");
+}
+
+async function upsertCuratedRegistryAliases(
+  db: SyncTransactionDatabase,
+  serverId: string,
+  canonicalRegistryName: string,
+): Promise<void> {
+  const aliases = CURATED_REGISTRY_ALIASES[canonicalRegistryName.toLowerCase()] ?? [];
+  for (const alias of aliases) {
+    const [existing] = await db
+      .select({ serverId: serverAliases.serverId })
+      .from(serverAliases)
+      .where(eq(sql`lower(${serverAliases.alias})`, alias.toLowerCase()));
+    if (existing?.serverId === serverId) continue;
+    if (existing) {
+      throw new AmbiguousIdentityError(`Curated alias '${alias}' belongs to another server.`);
+    }
+    await db.insert(serverAliases).values({ serverId, alias, kind: "manual" });
+  }
 }
 
 function snapshotIdentityKey(sourceId: string, normalized: NormalizedRegistryServer): string {
@@ -704,6 +726,7 @@ async function synchronizeServerRecord(
 
   const resolvedServerId = await resolveCanonicalServerId(db, normalized);
   const serverWrite = await upsertServer(db, resolvedServerId, normalized, observedAt);
+  await upsertCuratedRegistryAliases(db, serverWrite.serverId, normalized.canonicalRegistryName);
   const versionWrite = await upsertServerVersion(
     db,
     serverWrite.serverId,

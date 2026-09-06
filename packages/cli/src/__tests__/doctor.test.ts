@@ -5,7 +5,8 @@ import type {
   InstalledMcpServer,
   McpClientAdapter,
 } from "@themcpdirectory/client-adapters";
-import type { ClientId } from "@themcpdirectory/install-engine";
+import type { InstallManifestV1 } from "@themcpdirectory/api-contract";
+import { hashInstallManifest, type ClientId } from "@themcpdirectory/install-engine";
 import { describe, expect, it, vi } from "vitest";
 import type { InstallationReceipt } from "../config/receipt-store.js";
 import type { CliDependencies } from "../dependencies.js";
@@ -180,40 +181,47 @@ describe("runDoctorCommand", () => {
             Object.assign(error, { code: "DIRECTORY_INSTALL_UNAVAILABLE" });
             throw error;
           }
-          return {
-            data: {
-              schemaVersion: 1,
-              server: { slug, title: "GitHub", version: "1.1.0-rc.1+build.7" },
-              provenance: {
-                registry: "registry.modelcontextprotocol.io",
-                registryName: "MCP Registry",
-                observedAt: "2026-09-03T00:00:00Z",
-              },
-              variants: [
-                {
-                  id: VARIANT_ID,
-                  kind: "package",
-                  registryType: "npm",
-                  identifier: "@example/github",
-                  version: "1.1.0-rc.1+build.7",
-                  runtimeHint: "npx",
-                  transport: "stdio",
-                  runtimeArguments: [],
-                  packageArguments: [],
-                  environmentVariables: [
-                    {
-                      name: "GITHUB_TOKEN",
-                      description: "GitHub token",
-                      required: true,
-                      defaultValue: null,
-                      valueSource: "environment",
-                    },
-                  ],
-                  integrity: null,
-                },
-              ],
-              compatibility: { cursor: "supported" },
+          const data: InstallManifestV1 = {
+            schemaVersion: 1,
+            server: {
+              id: "4d5d0cfe-7c48-4df8-9c18-3f5af777d2bb",
+              slug,
+              title: "GitHub",
+              version: "1.1.0-rc.1+build.7",
             },
+            provenance: {
+              registry: "registry.modelcontextprotocol.io",
+              registryName: "MCP Registry",
+              observedAt: "2026-09-03T00:00:00Z",
+            },
+            variants: [
+              {
+                id: VARIANT_ID,
+                kind: "package",
+                registryType: "npm",
+                identifier: "@example/github",
+                version: "1.1.0-rc.1+build.7",
+                runtimeHint: "npx",
+                transport: "stdio",
+                runtimeArguments: [],
+                packageArguments: [],
+                environmentVariables: [
+                  {
+                    name: "GITHUB_TOKEN",
+                    description: "GitHub token",
+                    required: true,
+                    defaultValue: null,
+                    valueSource: "environment",
+                  },
+                ],
+                integrity: null,
+              },
+            ],
+            compatibility: { cursor: "supported" },
+          };
+          return {
+            data,
+            manifestHash: hashInstallManifest(data),
             meta: { requestId: "req_install" },
           };
         },

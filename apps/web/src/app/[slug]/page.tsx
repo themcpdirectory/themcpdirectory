@@ -171,7 +171,11 @@ export default async function ServerDetailPage({ params }: Props) {
           <span>{detail.title}</span>
         </nav>
 
-        <ServerDetailHeader detail={detail} publisherWebsiteUrl={publisherWebsiteUrl} />
+        <ServerDetailHeader
+          detail={detail}
+          installs={publicDetail.installs}
+          publisherWebsiteUrl={publisherWebsiteUrl}
+        />
 
         <DeletedUpstreamBanner listingStatus={publicDetail.listingStatus} />
 

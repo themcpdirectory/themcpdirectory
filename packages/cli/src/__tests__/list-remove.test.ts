@@ -108,6 +108,9 @@ describe("list and remove commands", () => {
         },
       },
     });
+    expect(removed.telemetry?.()).toEqual([
+      { event: "remove", slug: "github", client: "codex", success: true },
+    ]);
     expect(calls).toEqual([
       "plan:codex:user:github",
       "confirm:Remove github from codex user scope.",
@@ -138,6 +141,10 @@ describe("list and remove commands", () => {
         },
       },
     });
+    expect(ambiguous.telemetry?.()).toEqual([
+      { event: "remove", slug: "github", client: "codex", success: false },
+      { event: "remove", slug: "github", client: "cursor", success: false },
+    ]);
     expect(calls).toEqual([]);
 
     const explicit = await runRemoveCommand(
@@ -158,6 +165,9 @@ describe("list and remove commands", () => {
       executionMessage: "Dry run plan: Remove github from cursor project scope.",
       receiptRemoved: false,
     });
+    expect(explicit.telemetry?.()).toEqual([
+      { event: "remove", slug: "github", client: "cursor", success: false },
+    ]);
     expect(calls).toEqual(["plan:cursor:project:github"]);
 
     calls.length = 0;

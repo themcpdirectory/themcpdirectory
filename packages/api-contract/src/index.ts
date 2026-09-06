@@ -81,9 +81,15 @@ export {
 export {
   InstallAvailabilitySchema,
   PUBLIC_API_INSTALL_SAFETY,
+  hashInstallManifest,
   isExactPackageVersionForRegistry,
+  installManifestHashSchema,
   installManifestQuerySchema,
   installManifestResponseSchema,
+  installManifestSnapshotPathParamsSchema,
+  installManifestV1Schema,
+  resolvedInstallManifestSnapshotPathParamsSchema,
+  serializeInstallManifest,
   type InstallManifestResponse,
   type InstallManifestV1,
 } from "./public-api/install.js";
@@ -117,3 +123,4 @@ export {
   type PublisherDetailResponse,
 } from "./public-api/discovery.js";
 export { createPublicApiOpenApiDocument } from "./public-api/openapi.js";
+export { cliTelemetryEventV1Schema, type CliTelemetryEventV1 } from "./public-api/telemetry.js";

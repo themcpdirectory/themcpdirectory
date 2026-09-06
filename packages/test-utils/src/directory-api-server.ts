@@ -130,6 +130,7 @@ const defaultClientsBody: ClientsCollectionResponse = parseClientsCollectionResp
 });
 
 const defaultResolveInstallBody: InstallManifestResponse = parseInstallManifestResponse({
+  manifestHash: "a".repeat(64),
   data: {
     schemaVersion: 1,
     server: {

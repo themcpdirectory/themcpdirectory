@@ -1,3 +1,7 @@
+import type { CliTelemetryEventV1 } from "@themcpdirectory/api-contract";
+
+export type CliTelemetryContext = Omit<CliTelemetryEventV1, "schemaVersion" | "cliVersion">;
+
 export interface JsonEnvelopeV1<T = unknown> {
   readonly schemaVersion: 1;
   readonly command: string;
@@ -15,6 +19,14 @@ export interface CommandResult<T = unknown> {
   readonly stdout?: JsonEnvelopeV1<T>;
   readonly stderrLines: readonly string[];
   readonly warnings: readonly string[];
+  readonly telemetry?: () => readonly CliTelemetryContext[];
+}
+
+export function withTelemetry<T>(
+  result: CommandResult<T>,
+  telemetry: () => readonly CliTelemetryContext[],
+): CommandResult<T> {
+  return { ...result, telemetry };
 }
 
 export function createSuccessResult<T>(

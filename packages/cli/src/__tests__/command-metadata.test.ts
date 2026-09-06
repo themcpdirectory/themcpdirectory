@@ -10,8 +10,13 @@ import { parseAddArgs } from "../commands/add.js";
 import { parseRemoveArgs } from "../commands/remove.js";
 import { parseSearchArgs } from "../commands/search.js";
 import { parseUpdateArgs } from "../commands/update.js";
+import packageMetadata from "../../package.json" with { type: "json" };
 
 describe("CLI command metadata", () => {
+  it("supports only the maintained Node.js 24 line", () => {
+    expect(packageMetadata.engines.node).toBe(">=24.10 <25");
+  });
+
   it("is the complete exported source for command help and supported clients", () => {
     expect(
       CLI_COMMANDS.map(({ name, aliases, options }) => ({
@@ -58,6 +63,22 @@ describe("CLI command metadata", () => {
         aliases: [],
         options: ["--to <client>", "--yes", "--dry-run", "--json"],
       },
+      {
+        name: "init",
+        aliases: [],
+        options: [
+          "--package <identifier>",
+          "--remote <https-url>",
+          "--remote-type <type>",
+          "--name <registry-name>",
+          "--description <text>",
+          "--version <exact-version>",
+          "--force",
+          "--json",
+        ],
+      },
+      { name: "validate", aliases: [], options: ["--json"] },
+      { name: "publish", aliases: [], options: ["--json"] },
     ]);
     expect(CLI_COMMANDS.map((command) => command.usage)).toEqual([
       "Usage: mcpdir help",
@@ -68,6 +89,9 @@ describe("CLI command metadata", () => {
       "Usage: mcpdir list [--json]",
       "Usage: mcpdir remove <slug> [--to <client>] [--scope <user|project|global>] [--yes] [--dry-run] [--json]",
       "Usage: mcpdir update [server] [--to <client>] [--yes] [--dry-run] [--json]",
+      "Usage: mcpdir init [--package <identifier> | --remote <https-url> --remote-type <type>] [--name <registry-name>] [--description <text>] [--version <exact-version>] [--force] [--json]",
+      "Usage: mcpdir validate [path] [--json]",
+      "Usage: mcpdir publish [path] [--json]",
     ]);
     expect(CLI_HELP_TEXT).toMatch(/help\s+Show this help/u);
     expect(CLI_HELP_TEXT).toMatch(/add <slug-or-alias> \[options\]\s+Install an MCP server/u);
@@ -104,8 +128,8 @@ describe("CLI command metadata", () => {
       },
       secrets: expect.arrayContaining([expect.stringMatching(/never written to receipts/i)]),
       distribution: expect.arrayContaining([
-        expect.stringMatching(/private.*not published to a package registry/i),
-        expect.stringMatching(/repository-local/i),
+        expect.stringMatching(/@themcpdirectory\/cli.*public/i),
+        expect.stringMatching(/npx @themcpdirectory\/cli@0\.2\.1.*current/i),
       ]),
     });
     const parsers = [

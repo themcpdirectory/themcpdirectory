@@ -10,7 +10,12 @@ import type { InstallationReceipt } from "../config/receipt-store.js";
 import { getCliCommandMetadata } from "../command-metadata.js";
 import type { CliDependencies } from "../dependencies.js";
 import { inspectAdapters } from "./list.js";
-import { createFailureResult, createSuccessResult, type CommandResult } from "./result.js";
+import {
+  createFailureResult,
+  createSuccessResult,
+  type CommandResult,
+  withTelemetry,
+} from "./result.js";
 
 export interface RemoveCommandOptions {
   readonly slug: string;
@@ -73,24 +78,35 @@ export async function runRemoveCliCommand(
 ): Promise<CommandResult<RemoveCommandData>> {
   const parsed = parseRemoveArgs(argv);
   if (!parsed.ok) {
-    return {
-      exitCode: 2,
-      stdout: {
-        schemaVersion: 1,
-        command: "remove",
-        ok: false,
-        error: { code: "USAGE_ERROR", message: parsed.message },
+    return withTelemetry(
+      {
+        exitCode: 2,
+        stdout: {
+          schemaVersion: 1,
+          command: "remove",
+          ok: false,
+          error: { code: "USAGE_ERROR", message: parsed.message },
+          warnings: [],
+        },
+        stderrLines: [REMOVE_USAGE],
         warnings: [],
       },
-      stderrLines: [REMOVE_USAGE],
-      warnings: [],
-    };
+      () => [{ event: "remove", success: false }],
+    );
   }
 
   return runRemoveCommand(parsed.options, deps);
 }
 
 export async function runRemoveCommand(
+  options: RemoveCommandOptions,
+  deps: CliDependencies,
+): Promise<CommandResult<RemoveCommandData>> {
+  const result = await runRemoveCommandCore(options, deps);
+  return withTelemetry(result, () => removeTelemetry(result.stdout?.data));
+}
+
+async function runRemoveCommandCore(
   options: RemoveCommandOptions,
   deps: CliDependencies,
 ): Promise<CommandResult<RemoveCommandData>> {
@@ -228,6 +244,28 @@ export async function runRemoveCommand(
       message,
     );
   }
+}
+
+function removeTelemetry(data: RemoveCommandData | undefined) {
+  if (!data || data.status === "not_installed") {
+    return [{ event: "remove" as const, success: data?.status === "not_installed" }];
+  }
+  if (data.status === "ambiguous") {
+    return data.availableTargets.map((target) => ({
+      event: "remove" as const,
+      slug: data.slug,
+      client: target.client,
+      success: false,
+    }));
+  }
+  return [
+    {
+      event: "remove" as const,
+      slug: data.slug,
+      client: data.client,
+      success: data.status === "removed",
+    },
+  ];
 }
 
 function discoverTargets(

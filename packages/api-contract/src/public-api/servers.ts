@@ -198,6 +198,16 @@ const serverTimestampsSchema = strictObject({
   publishedAt: rfc3339UtcSchema.nullable(),
   updatedAt: rfc3339UtcSchema.nullable(),
 });
+
+const serverInstallCountsSchema = strictObject({
+  total: z.number().int().nonnegative(),
+  clients: strictObject({
+    "claude-code": z.number().int().nonnegative(),
+    codex: z.number().int().nonnegative(),
+    cursor: z.number().int().nonnegative(),
+    vscode: z.number().int().nonnegative(),
+  }),
+});
 export type PublicServerTimestamps = {
   readonly firstSeenAt: string;
   readonly lastSeenAt: string;
@@ -228,6 +238,7 @@ const serverDetailServerSchema = strictObject({
   trustProfile: legacyTrustProfileServerSchema,
   latestHealth: RemoteHealthObservationV1Schema.optional(),
   installAvailability: InstallAvailabilitySchema.optional(),
+  installs: serverInstallCountsSchema,
   timestamps: serverTimestampsSchema,
 });
 
@@ -241,7 +252,13 @@ const resolvedServerSchema = strictObject({
   title: z.string().min(1),
   version: z.string().min(1).nullable(),
   canonicalUrl: httpUrlSchema,
-  matchedBy: z.enum(["slug", "alias", "canonical_registry_name", "package_identifier"]),
+  matchedBy: z.enum([
+    "slug",
+    "alias",
+    "canonical_registry_name",
+    "package_identifier",
+    "github_repository",
+  ]),
   matchedValue: z.string().min(1),
   needsRedirect: z.boolean(),
   installAvailability: InstallAvailabilitySchema.optional(),

@@ -3,6 +3,7 @@ import type { InstallAvailability, ResolvedServerIdentifier } from "@themcpdirec
 import {
   serverAliases,
   serverPackages,
+  repositorySnapshots,
   serverVersions,
   servers,
   type Database,
@@ -17,7 +18,7 @@ const IDENTIFIER_PRECEDENCE = [
 ] as const;
 
 type IdentifierMatchType = (typeof IDENTIFIER_PRECEDENCE)[number];
-type AmbiguousIdentifierMatchType = Exclude<IdentifierMatchType, "slug">;
+type AmbiguousIdentifierMatchType = Exclude<IdentifierMatchType, "slug"> | "github_repository";
 
 export interface IdentifierMatchRow {
   readonly id: string;
@@ -62,6 +63,94 @@ export class AmbiguousServerIdentifierError extends Error {
 
 function publicServerPredicate() {
   return sql`${servers.moderationStatus} not in ('hidden', 'blocked')`;
+}
+
+interface GitHubRepositoryIdentifier {
+  readonly owner: string;
+  readonly repository: string;
+  readonly canonicalUrl: string;
+}
+
+function parseGitHubRepositoryIdentifier(identifier: string): GitHubRepositoryIdentifier | null {
+  const trimmed = identifier.trim();
+  let owner: string;
+  let repository: string;
+
+  if (/^https:\/\//i.test(trimmed)) {
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      return null;
+    }
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.hostname.toLowerCase() !== "github.com" ||
+      parsed.port !== "" ||
+      parsed.username !== "" ||
+      parsed.password !== "" ||
+      parsed.search !== "" ||
+      parsed.hash !== ""
+    ) {
+      return null;
+    }
+    const pathMatch = /^\/([^/]+)\/([^/]+)\/?$/.exec(parsed.pathname);
+    if (!pathMatch) return null;
+    owner = pathMatch[1]!;
+    repository = pathMatch[2]!;
+  } else {
+    if (trimmed.includes(":")) return null;
+    const segments = trimmed.split("/");
+    if (segments.length !== 2) return null;
+    [owner, repository] = segments as [string, string];
+  }
+
+  const validSegment = /^[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?$/;
+  if (!validSegment.test(owner) || !validSegment.test(repository)) return null;
+
+  const normalizedOwner = owner.toLowerCase();
+  const normalizedRepository = repository.toLowerCase();
+  return {
+    owner: normalizedOwner,
+    repository: normalizedRepository,
+    canonicalUrl: `https://github.com/${normalizedOwner}/${normalizedRepository}`,
+  };
+}
+
+async function lookupGitHubRepositoryMatches(
+  db: Database,
+  identifier: GitHubRepositoryIdentifier,
+): Promise<readonly IdentifierMatchRow[]> {
+  return db
+    .select({
+      id: servers.id,
+      slug: sql<string>`${servers.slug}::text`,
+      title: servers.title,
+      version: serverVersions.version,
+      matchedValue: sql<string>`min(${repositorySnapshots.owner} || '/' || ${repositorySnapshots.name})`,
+      listingStatus: servers.listingStatus,
+    })
+    .from(repositorySnapshots)
+    .innerJoin(servers, eq(servers.id, repositorySnapshots.serverId))
+    .leftJoin(
+      serverVersions,
+      and(eq(serverVersions.id, servers.currentVersionId), eq(serverVersions.serverId, servers.id)),
+    )
+    .where(
+      and(
+        eq(repositorySnapshots.provider, "github"),
+        eq(servers.repositorySource, "github"),
+        eq(servers.repositoryExternalId, repositorySnapshots.externalRepositoryId),
+        sql`lower(${repositorySnapshots.owner}) = ${identifier.owner}`,
+        sql`lower(${repositorySnapshots.name}) = ${identifier.repository}`,
+        sql`lower(${repositorySnapshots.url}) = ${identifier.canonicalUrl}`,
+        sql`lower(${servers.repositoryUrl}) = ${identifier.canonicalUrl}`,
+        publicServerPredicate(),
+      ),
+    )
+    .groupBy(servers.id, servers.slug, servers.title, servers.listingStatus, serverVersions.version)
+    .orderBy(asc(servers.slug))
+    .limit(3);
 }
 
 export async function lookupIdentifierMatches(
@@ -194,5 +283,23 @@ export async function resolveServerIdentifier(
     };
   }
 
-  return null;
+  const githubIdentifier = parseGitHubRepositoryIdentifier(identifier);
+  if (!githubIdentifier) return null;
+  const githubMatches = await lookupGitHubRepositoryMatches(db, githubIdentifier);
+  if (githubMatches.length > 1) {
+    throw new AmbiguousServerIdentifierError(normalized, "github_repository", githubMatches);
+  }
+  const githubMatch = githubMatches[0];
+  if (!githubMatch) return null;
+  return {
+    id: githubMatch.id,
+    slug: githubMatch.slug,
+    title: githubMatch.title,
+    version: githubMatch.version,
+    canonicalUrl: `https://themcpdirectory.org/${githubMatch.slug}`,
+    matchedBy: "github_repository",
+    matchedValue: githubMatch.matchedValue,
+    needsRedirect: true,
+    installAvailability: deriveInstallAvailability(githubMatch.listingStatus, githubMatch.version),
+  };
 }

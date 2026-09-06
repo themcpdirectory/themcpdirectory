@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { InstallManifestV1 } from "@themcpdirectory/api-contract";
+import { hashInstallManifest } from "@themcpdirectory/api-contract";
 import type { InstallPlan, JsonValue, RemovalPlan, ResolvedInstallIntent } from "./types.js";
 
 function compareOrdinal(left: string, right: string): number {
@@ -145,9 +145,7 @@ function hashCanonicalJson(value: unknown): string {
   return createHash("sha256").update(serializeCanonicalJson(value)).digest("hex");
 }
 
-export function hashInstallManifest(manifest: InstallManifestV1): string {
-  return hashCanonicalJson(manifest);
-}
+export { hashInstallManifest };
 
 export function hashResolvedInstallIntent(intent: ResolvedInstallIntent): string {
   return hashCanonicalJson(intent);

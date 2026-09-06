@@ -2,7 +2,12 @@ import { DirectoryClientError } from "@themcpdirectory/directory-client";
 import type { SearchServersParams } from "@themcpdirectory/directory-client";
 import { isSupportedClientId } from "@themcpdirectory/client-adapters";
 import { getCliCommandMetadata } from "../command-metadata.js";
-import { createFailureResult, createSuccessResult, type CommandResult } from "./result.js";
+import {
+  createFailureResult,
+  createSuccessResult,
+  type CommandResult,
+  withTelemetry,
+} from "./result.js";
 import type { CliDependencies } from "../dependencies.js";
 
 const SEARCH_USAGE = getCliCommandMetadata("search")!.usage;
@@ -17,19 +22,26 @@ export async function runSearchCommand(
 ): Promise<CommandResult> {
   const parsed = parseSearchArgs(argv);
   if (!parsed.ok) {
-    return createFailureResult("search", {
-      exitCode: 2,
-      code: "USAGE_ERROR",
-      message: parsed.message,
-      stderrLines: [SEARCH_USAGE],
-    });
+    return withTelemetry(
+      createFailureResult("search", {
+        exitCode: 2,
+        code: "USAGE_ERROR",
+        message: parsed.message,
+        stderrLines: [SEARCH_USAGE],
+      }),
+      () => [{ event: "search", success: false }],
+    );
   }
 
   try {
     const response = await deps.directoryClient.searchServers(parsed.params);
-    return createSuccessResult("search", response);
+    return withTelemetry(createSuccessResult("search", response), () => [
+      { event: "search", success: true },
+    ]);
   } catch (error) {
-    return toDirectoryFailure("search", error);
+    return withTelemetry(toDirectoryFailure("search", error), () => [
+      { event: "search", success: false },
+    ]);
   }
 }
 

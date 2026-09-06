@@ -16,10 +16,13 @@ test("API docs project the complete verified public contract", async ({ page }) 
     "GET /api/v1/publishers/:slug",
     "GET /api/v1/resolve/:identifier",
     "GET /api/v1/resolve/:identifier/install",
+    "GET /api/v1/resolve/:identifier/install/:manifestHash",
     "GET /api/v1/search",
     "GET /api/v1/servers",
     "GET /api/v1/servers/:slug",
     "GET /api/v1/servers/:slug/install",
+    "GET /api/v1/servers/:slug/install/:manifestHash",
+    "POST /api/v1/telemetry/events",
   ]);
   await expect(page.getByRole("region", { name: "Errors" }).locator("p")).toHaveText([
     "400 VALIDATION_ERROR: Validation failed",
@@ -129,6 +132,16 @@ test("API docs project the complete verified public contract", async ({ page }) 
       ],
     ],
     [
+      "GET /api/v1/resolve/:identifier/install/:manifestHash",
+      [
+        "Parameter: identifier; in path; required; maximum length 512.",
+        "Parameter: manifestHash; in path; required; pattern ^[a-f0-9]{64}$.",
+        "Parameter: client; in query; optional; allowed claude-code, codex, cursor, vscode.",
+        "Responses: 200, 400, 404, 409, 410, 429, 500.",
+        "Success schema: InstallManifestResponse.",
+      ],
+    ],
+    [
       "GET /api/v1/search",
       [
         "Parameter: q; in query; optional; minimum length 1; maximum length 200.",
@@ -182,6 +195,20 @@ test("API docs project the complete verified public contract", async ({ page }) 
         "Responses: 200, 400, 404, 410, 429, 500.",
         "Success schema: InstallManifestResponse.",
       ],
+    ],
+    [
+      "GET /api/v1/servers/:slug/install/:manifestHash",
+      [
+        "Parameter: slug; in path; required; maximum length 128; pattern ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$.",
+        "Parameter: manifestHash; in path; required; pattern ^[a-f0-9]{64}$.",
+        "Parameter: client; in query; optional; allowed claude-code, codex, cursor, vscode.",
+        "Responses: 200, 400, 404, 410, 429, 500.",
+        "Success schema: InstallManifestResponse.",
+      ],
+    ],
+    [
+      "POST /api/v1/telemetry/events",
+      ["Parameters: none.", "Responses: 202, 400, 429, 500.", "Success schema: No response body."],
     ],
   ] as const;
 

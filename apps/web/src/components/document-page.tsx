@@ -8,9 +8,10 @@ export function DocumentPage({ document }: { document: ReleaseDocument }) {
     <main
       id="main-content"
       tabIndex={-1}
+      className="document-page"
       style={{ minHeight: "100vh", padding: "2.5rem 1rem 4rem" }}
     >
-      <div style={{ maxWidth: "72rem", margin: "0 auto" }}>
+      <div className="document-page__inner" style={{ maxWidth: "72rem", margin: "0 auto" }}>
         {document.draftLabel ? <LegalDraftBanner label={document.draftLabel} /> : null}
         <header style={{ maxWidth: "48rem", padding: "1rem 0 2rem" }}>
           <h1
@@ -27,6 +28,7 @@ export function DocumentPage({ document }: { document: ReleaseDocument }) {
           </p>
         </header>
         <div
+          className="document-page__layout"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 18rem), 1fr))",
@@ -34,7 +36,11 @@ export function DocumentPage({ document }: { document: ReleaseDocument }) {
             alignItems: "start",
           }}
         >
-          <nav aria-label={`On this page: ${document.title}`}>
+          <nav
+            className="document-page__navigation"
+            aria-label={`On this page: ${document.title}`}
+            style={{ minWidth: 0, overflowWrap: "anywhere" }}
+          >
             <p
               style={{
                 margin: "0 0 0.75rem",
@@ -49,7 +55,10 @@ export function DocumentPage({ document }: { document: ReleaseDocument }) {
             </p>
             <ol style={{ margin: 0, paddingLeft: "1.25rem", color: "var(--fg-muted)" }}>
               {document.sections.map((section) => (
-                <li key={section.id} style={{ marginBottom: "0.6rem", paddingLeft: "0.25rem" }}>
+                <li
+                  key={section.id}
+                  style={{ minWidth: 0, marginBottom: "0.6rem", paddingLeft: "0.25rem" }}
+                >
                   <a
                     href={`#${section.id}`}
                     style={{ color: "inherit", textDecorationThickness: 1 }}
@@ -60,7 +69,7 @@ export function DocumentPage({ document }: { document: ReleaseDocument }) {
               ))}
             </ol>
           </nav>
-          <article style={{ minWidth: 0 }}>
+          <article className="document-page__article" style={{ minWidth: 0 }}>
             {document.sections.map((section) => (
               <section
                 key={section.id}

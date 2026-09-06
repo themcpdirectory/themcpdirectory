@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { serverDetailResponseSchema } from "@themcpdirectory/api-contract";
+import { cliTelemetryDailyCounts, cliTelemetryEvents, servers } from "@themcpdirectory/db";
+import { eq } from "drizzle-orm";
 import type { PublicApiTestContext } from "./public-api-test-context.js";
 import { createPublicApiTestContext } from "./public-api-test-context.js";
 import { getServerDetailBySlug } from "../../index.js";
@@ -15,6 +17,107 @@ afterAll(async () => {
 });
 
 describe("getServerDetailBySlug", () => {
+  it("exposes lifetime successful-add totals by supported client only", async () => {
+    const [server] = await context.db
+      .select({ id: servers.id })
+      .from(servers)
+      .where(eq(servers.slug, "github"));
+    await context.db.insert(cliTelemetryDailyCounts).values([
+      {
+        day: "2026-09-04",
+        event: "add",
+        serverId: server!.id,
+        cliMajorMinor: "1.2",
+        client: "vscode",
+        success: true,
+        installVariant: "package",
+        count: 3,
+      },
+      {
+        day: "2026-09-05",
+        event: "add",
+        serverId: server!.id,
+        cliMajorMinor: "1.3",
+        client: "cursor",
+        success: true,
+        installVariant: "remote",
+        count: 2,
+      },
+      {
+        day: "2026-09-05",
+        event: "add",
+        serverId: server!.id,
+        cliMajorMinor: "1.3",
+        client: "cursor",
+        success: false,
+        installVariant: "remote",
+        count: 50,
+      },
+      {
+        day: "2026-09-05",
+        event: "search",
+        serverId: server!.id,
+        cliMajorMinor: "1.3",
+        success: true,
+        count: 100,
+      },
+    ]);
+    await context.db.insert(cliTelemetryEvents).values([
+      {
+        event: "add",
+        serverId: server!.id,
+        cliMajorMinor: "1.4",
+        client: "cursor",
+        success: true,
+        installVariant: "package",
+        receivedAt: new Date("2026-09-06T10:00:00.000Z"),
+      },
+      {
+        event: "add",
+        serverId: server!.id,
+        cliMajorMinor: "1.3",
+        client: "cursor",
+        success: true,
+        installVariant: "remote",
+        receivedAt: new Date("2026-09-05T10:00:00.000Z"),
+        aggregatedAt: new Date("2026-09-06T00:00:00.000Z"),
+      },
+      {
+        event: "add",
+        serverId: server!.id,
+        cliMajorMinor: "1.4",
+        client: "vscode",
+        success: false,
+        installVariant: "package",
+        receivedAt: new Date("2026-09-06T10:00:00.000Z"),
+      },
+      {
+        event: "search",
+        serverId: server!.id,
+        cliMajorMinor: "1.4",
+        client: "vscode",
+        success: true,
+        receivedAt: new Date("2026-09-06T10:00:00.000Z"),
+      },
+    ]);
+
+    const detail = await getServerDetailBySlug(context.db, "github");
+
+    expect(detail?.installs).toEqual({
+      total: 6,
+      clients: { "claude-code": 0, codex: 0, cursor: 3, vscode: 3 },
+    });
+    expect(
+      serverDetailResponseSchema.safeParse({
+        data: detail,
+        meta: { requestId: crypto.randomUUID() },
+      }).success,
+    ).toBe(true);
+    expect(JSON.stringify(detail?.installs)).not.toContain("cliMajorMinor");
+    expect(JSON.stringify(detail?.installs)).not.toContain("success");
+    expect(JSON.stringify(detail?.installs)).not.toContain("installVariant");
+  });
+
   it("returns deleted_upstream listings directly by slug", async () => {
     const detail = await getServerDetailBySlug(context.db, "upstream-deleted-server");
 

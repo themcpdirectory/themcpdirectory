@@ -1407,7 +1407,11 @@ canonical slug
 alias
 Registry name
 known package identifier
+validated GitHub owner/repository
+validated GitHub HTTPS repository URL
 ```
+
+GitHub identifiers are matched only against normalized, validated repository metadata. README text and README commands are never parsed or executed. Ambiguous non-slug identifiers return candidate matches instead of being guessed.
 
 Response:
 
@@ -1490,11 +1494,14 @@ Response:
       "cursor": "supported"
     }
   },
+  "manifestHash": "canonical-sha256",
   "meta": {
     "requestId": "..."
   }
 }
 ```
+
+The manifest hash covers the validated install data and excludes response metadata. The mutable current-manifest response advertises a content location under `/api/v1/servers/:slug/install/:manifestHash`; that hash-addressed snapshot has a strong hash ETag and `Cache-Control: public, max-age=31536000, immutable`. The CLI recomputes and verifies the hash before it creates an install plan.
 
 # 37. Manifest rules
 
@@ -1680,6 +1687,9 @@ mcpdir info
 mcpdir list
 mcpdir update
 mcpdir doctor
+mcpdir init
+mcpdir validate
+mcpdir publish
 ```
 
 Future:
@@ -1689,6 +1699,16 @@ mcpdir auth
 mcpdir config
 mcpdir registry
 ```
+
+Maintainer flow:
+
+```bash
+npx mcpdir init --package @example/mcp-server --name io.github.example/mcp-server --description "An MCP server" --version 1.2.3
+npx mcpdir validate
+MCP_REGISTRY_TOKEN=... npx mcpdir publish
+```
+
+`mcpdir.json` is a versioned wrapper around a document that validates to the Official MCP Registry ServerJSON schema. Remote manifests use `mcpdir init --remote https://mcp.example.com/v1`. `publish` validates locally before network access, requires `MCP_REGISTRY_TOKEN`, and posts the validated `server` object to the current `/v0/publish` endpoint. `MCP_REGISTRY_BASE_URL` may override the Registry origin only when it is a public HTTPS URL without embedded credentials.
 
 # 47. CLI package structure
 
@@ -1702,7 +1722,10 @@ packages/cli/
 │   │   ├── info.ts
 │   │   ├── list.ts
 │   │   ├── update.ts
-│   │   └── doctor.ts
+│   │   ├── doctor.ts
+│   │   ├── init.ts
+│   │   ├── validate.ts
+│   │   └── publish.ts
 │   │
 │   ├── api/
 │   ├── output/
@@ -1718,7 +1741,7 @@ packages/cli/
 Command:
 
 ```bash
-mcpdir add github
+npx mcpdir add github
 ```
 
 Flow:
@@ -2341,7 +2364,11 @@ Search zero result rate
 CLI manifest resolution failures
 ```
 
-CLI usage telemetry remains disabled by default.
+CLI usage telemetry is enabled by default and best-effort. It must not change a command result when delivery fails or exceeds its short timeout. `DO_NOT_TRACK=1` and `MCPDIR_DISABLE_TELEMETRY=1` are hard opt-outs checked before event construction.
+
+The accepted dimensions are event, canonical slug when known, exact CLI version, supported target client when applicable, success, and package or remote variant when applicable. Persistence reduces the CLI version to major/minor and adds server receipt time. It must not store the search query, raw identifier, arguments, paths, configuration or project content, error text, secrets, IP address, user agent, cookie, request ID, or persistent device, installation, or person identifiers. Network infrastructure may process source addresses and HTTP metadata transiently for delivery and abuse prevention; telemetry requests are excluded from application request logs.
+
+Raw events are retained for seven days and daily aggregates for thirteen months. Public projections expose anonymous, CLI-reported successful add totals and supported-client totals only; they are not verified unique-user or installation metrics.
 
 # 74. Local development
 
@@ -2717,6 +2744,8 @@ API:
 /api/v1/servers/:slug
 /api/v1/resolve/:identifier
 /api/v1/servers/:slug/install
+/api/v1/servers/:slug/install/:manifestHash
+/b/:slug.svg
 ```
 
 ## Phase E
@@ -2724,10 +2753,21 @@ API:
 CLI:
 
 ```text
+npx mcpdir add github
+mcpdir search
+mcpdir info
 mcpdir add
+mcpdir list
+mcpdir remove
+mcpdir update
+mcpdir doctor
+mcpdir init
+mcpdir validate
+mcpdir publish
 Codex adapter
 Claude Code adapter
 Cursor adapter
+VS Code adapter
 dry run
 installation receipts
 ```
@@ -2777,6 +2817,8 @@ This feature is not done until the following works:
 ```text
 mcpdir add <slug>
 mcpdir add <alias>
+mcpdir add <Registry-or-package-identifier>
+mcpdir add <GitHub-owner/repository-or-HTTPS-URL>
 mcpdir add <slug> --to codex
 mcpdir add <slug> --to claude-code
 mcpdir add <slug> --to cursor

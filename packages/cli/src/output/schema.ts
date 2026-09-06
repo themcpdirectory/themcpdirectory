@@ -4,6 +4,7 @@ import {
   serverDetailResponseSchema,
   supportedClientIdSchema,
 } from "@themcpdirectory/api-contract";
+import { mcpdirManifestSchema } from "@themcpdirectory/registry-normalizer";
 
 const errorSchema = z.strictObject({
   code: z.string().min(1),
@@ -53,6 +54,25 @@ const addDataSchema = z.strictObject({
   ),
 });
 
+const initDataSchema = z.strictObject({
+  path: z.string().min(1),
+  kind: z.enum(["package", "remote"]),
+  overwritten: z.boolean(),
+});
+
+const validateDataSchema = z.strictObject({
+  path: z.string().min(1),
+  valid: z.literal(true),
+  artifact: mcpdirManifestSchema.shape.server,
+});
+
+const publishDataSchema = z.strictObject({
+  path: z.string().min(1),
+  registryUrl: z.string().url(),
+  name: z.string().min(1),
+  version: z.string().min(1),
+});
+
 function commandEnvelope<TData extends z.ZodType>(command: string, dataSchema: TData) {
   return z.union([
     z.strictObject({
@@ -79,6 +99,9 @@ export const CLI_JSON_SCHEMAS = Object.freeze({
   info: commandEnvelope("info", serverDetailResponseSchema),
   list: commandEnvelope("list", listDataSchema),
   search: commandEnvelope("search", serverCollectionResponseSchema),
+  init: commandEnvelope("init", initDataSchema),
+  validate: commandEnvelope("validate", validateDataSchema),
+  publish: commandEnvelope("publish", publishDataSchema),
 });
 
 export type CliJsonSchemaName = keyof typeof CLI_JSON_SCHEMAS;

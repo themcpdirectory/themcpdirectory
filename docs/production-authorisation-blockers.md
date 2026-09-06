@@ -48,11 +48,11 @@ The following actions each require explicit, action-specific operator approval a
 - configure or rotate production secrets
 - create or push a Git tag
 - create a GitHub release
-- remove `private: true` from the CLI package
 - publish `@themcpdirectory/cli` to npm
+- claim and publish the unscoped `mcpdir` package to npm after the matching canonical CLI version
 - change repository or package licensing
 
-npm publication additionally requires confirmed scope ownership, package-name availability, a reviewed publish identity/provenance method, the approved package version, the exact tarball SHA-256 from release evidence, and public installation documentation updated only after publication succeeds.
+The canonical package is published as `@themcpdirectory/cli@0.2.1`. npm rejected initial registration of `mcpdir` because the name was considered too similar to an existing package. Publishing the unscoped wrapper remains blocked on npm Support approval; until then, public copy must use the scoped command and must not claim `npx mcpdir` is available.
 
 ## Authorisation Record
 

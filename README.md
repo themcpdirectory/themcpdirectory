@@ -32,15 +32,15 @@
 Run `mcpdir` with Node.js 24. The primary installation path is one command:
 
 ```sh
-npx mcpdir add github
+npx @themcpdirectory/cli@0.2.1 add github
 ```
 
 Search, inspect, and target a supported client from the same command surface:
 
 ```sh
-npx mcpdir search github
-npx mcpdir info github
-npx mcpdir add github --to cursor
+npx @themcpdirectory/cli@0.2.1 search github
+npx @themcpdirectory/cli@0.2.1 info github
+npx @themcpdirectory/cli@0.2.1 add github --to cursor
 ```
 
 For repeated use, install the canonical scoped package globally:
@@ -58,10 +58,10 @@ Search  →  Inspect  →  Review  →  Install
 Use `mcpdir` to manage the rest of the lifecycle:
 
 ```sh
-npx mcpdir list
-npx mcpdir update
-npx mcpdir doctor
-npx mcpdir remove github
+npx @themcpdirectory/cli@0.2.1 list
+npx @themcpdirectory/cli@0.2.1 update
+npx @themcpdirectory/cli@0.2.1 doctor
+npx @themcpdirectory/cli@0.2.1 remove github
 ```
 
 Run `mcpdir` without arguments for an interactive experience, or use explicit commands and `--json` for scripts and automation.
@@ -149,9 +149,9 @@ Raw events are retained for seven days and daily aggregates for thirteen months.
 Maintainers can create an `mcpdir.json` file that validates to the Official MCP Registry ServerJSON schema, validate it locally, and publish its validated `server` object:
 
 ```sh
-npx mcpdir init --package @example/mcp-server --name io.github.example/mcp-server --description "An MCP server" --version 1.2.3
-npx mcpdir validate
-MCP_REGISTRY_TOKEN=... npx mcpdir publish
+npx @themcpdirectory/cli@0.2.1 init --package @example/mcp-server --name io.github.example/mcp-server --description "An MCP server" --version 1.2.3
+npx @themcpdirectory/cli@0.2.1 validate
+MCP_REGISTRY_TOKEN=... npx @themcpdirectory/cli@0.2.1 publish
 ```
 
 Use `mcpdir init --remote https://mcp.example.com/v1` for a remote server. `publish` requires `MCP_REGISTRY_TOKEN` and sends `POST /v0/publish` to the Official MCP Registry. `MCP_REGISTRY_BASE_URL` may override the Registry origin only with a public HTTPS URL without embedded credentials.

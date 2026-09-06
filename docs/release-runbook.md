@@ -10,8 +10,8 @@ Stop when any required value or approver is missing. The unresolved non-code gat
 
 ## Version And Changelog
 
-1. Choose the release version before building the candidate. The repository and CLI currently use `0.1.0`; do not change versions merely to run verification.
-2. For a CLI release, update `packages/cli/package.json` and the lockfile together. The packed binary reads that package version for `mcpdir --version`.
+1. Choose the release version before building the candidate. Do not change versions merely to run verification.
+2. For a CLI release, update `packages/cli/package.json`, `packages/mcpdir/package.json`, the wrapper's exact `workspace:<version>` dependency, and the lockfile together. Both packages must use the same version, and the packed binary reads the canonical CLI package version for `mcpdir --version`.
 3. Prepare reviewed release notes from the commits since the last approved release. The repository does not currently maintain a `CHANGELOG.md`, so the release record must include the proposed notes before any external GitHub release is created.
 4. Include user-visible changes, migrations, security or privacy effects, fixed defects, breaking changes, known limitations, and operator actions. Do not claim that an unpublished package or undeployed surface is available.
 5. Re-run the full release gate after any version, lockfile, code, migration, or documentation change. Evidence from an earlier tree is invalid.
@@ -29,7 +29,7 @@ pnpm --filter @themcpdirectory/web exec playwright install chromium
 pnpm verify:release
 ```
 
-`pnpm verify:release` runs 17 checks sequentially and stops on the first failure. It does not publish to npm or deploy the stack. Retain the CI logs and the files under `test-results/release/`, including the Lighthouse and CLI tarball reports. Confirm the CLI report contains the candidate package version, exact allowlist, SHA-256, and completed smoke steps.
+`pnpm verify:release` runs 17 checks sequentially and stops on the first failure. It does not publish to npm or deploy the stack. Retain the CI logs and the files under `test-results/release/`, including the Lighthouse, canonical CLI tarball, and `mcpdir` wrapper tarball reports. Confirm both package reports contain the candidate version, exact allowlist, SHA-256, and completed smoke steps. Confirm the wrapper report records the same canonical CLI version.
 
 Do not waive a failing gate in place. Fix the owning code or documentation, review the change, and restart verification from the new commit.
 
@@ -38,6 +38,8 @@ Do not waive a failing gate in place. Fix the owning code or documentation, revi
 Before touching production, verify all blockers are recorded as satisfied and obtain a direct go/no-go decision from the authorised operator. In particular, require qualified legal sign-off, a tested private disclosure channel, production credentials and secrets, verified backup/restore evidence, and explicit approval for each requested external action.
 
 An npm release and a container deployment are independent decisions. A green gate authorises neither.
+
+The canonical package is currently published as `@themcpdirectory/cli@0.2.1`. npm rejected initial registration of the unscoped `mcpdir` package because its name was considered too similar to an existing package, so public documentation must use `npx @themcpdirectory/cli@0.2.1` until npm approves the name. After approval, publish the already verified wrapper at the same version and smoke-test `npx mcpdir@<version> --version` before activating the shorter command.
 
 ## Backup And Image Pinning
 
@@ -85,7 +87,17 @@ Run pre-public checks through the access-restricted preview hostname or operator
 
 - `GET /` returns `{ "status": "ok" }` on the API service.
 - `GET /api/v1/openapi.json`, `/api/v1/search?q=github`, `/api/v1/servers/github`, and `/api/v1/clients` return schema-valid success responses.
+- `GET /api/v1/servers/github/install` returns a canonical manifest hash and a hash-addressed content location; fetching that snapshot returns the same manifest with immutable cache headers and a strong hash ETag.
+- `GET /b/github.svg` returns a deterministic SVG badge with the expected CLI-reported successful-add total.
+- `POST /api/v1/telemetry/events` accepts only the documented privacy-minimal dimensions and returns `202` without a response body. Use synthetic data and verify that request logging does not capture the telemetry request.
 - The public proxy preserves request IDs, cache headers, CORS policy, rate limits, and `/api/v1` paths.
+
+### CLI Product Loop
+
+- `npx @themcpdirectory/cli@0.2.1 search github`, `info github`, `add github --dry-run`, `list`, `update github --dry-run`, `doctor`, and `remove github --dry-run` complete with expected exit codes. After npm approves and the wrapper is published, repeat the smoke with `npx mcpdir@<version>`.
+- Alias, Registry or package identifier, GitHub `owner/repository`, and GitHub HTTPS URL inputs resolve to the same canonical listing and manifest when backed by validated metadata.
+- With `DO_NOT_TRACK=1` and separately with `MCPDIR_DISABLE_TELEMETRY=1`, the CLI sends no telemetry request.
+- `mcpdir init`, `validate`, and `publish` pass against a disposable manifest and an approved non-production Registry endpoint before production publication is attempted.
 
 ### Publisher Authentication
 
@@ -118,6 +130,7 @@ Escalate immediately for suspected credential exposure, authorization bypass, pe
 - The GHCR publish workflow and CI run independently on `main`; image existence does not prove release verification passed.
 - Portainer rollback changes the application image only and never reverses database migrations.
 - Lighthouse reports are controlled lab evidence, not field Core Web Vitals.
+- The canonical CLI is live at `0.2.1`; the unscoped wrapper remains version-synchronized in the repository but unpublished until npm approves the package name.
 
 ## Final Approval And Closeout
 

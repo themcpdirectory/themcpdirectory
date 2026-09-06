@@ -7,7 +7,12 @@ import type { CliDependencies } from "../dependencies.js";
 import { sanitizeTerminalText } from "../output/render.js";
 import { executeAddCommand, type TargetInstallResultV1 } from "./add-execute.js";
 import { planAddCommand, type TargetInstallPreview } from "./add-plan.js";
-import { createSuccessResult, type CommandResult } from "./result.js";
+import {
+  createSuccessResult,
+  type CliTelemetryContext,
+  type CommandResult,
+  withTelemetry,
+} from "./result.js";
 
 const COMMAND_NAME = "update";
 
@@ -33,6 +38,13 @@ export interface UpdateResult {
   readonly skipped: readonly string[];
 }
 
+interface UpdateTelemetryFact {
+  readonly slug: string;
+  readonly client: ClientId;
+  readonly success: boolean;
+  readonly installVariant?: "package" | "remote";
+}
+
 export const UPDATE_USAGE = getCliCommandMetadata("update")!.usage;
 
 export async function runUpdateCliCommand(
@@ -41,18 +53,21 @@ export async function runUpdateCliCommand(
 ): Promise<CommandResult<UpdateResult>> {
   const parsed = parseUpdateArgs(argv);
   if (!parsed.ok) {
-    return {
-      exitCode: 2,
-      stdout: {
-        schemaVersion: 1,
-        command: COMMAND_NAME,
-        ok: false,
-        error: { code: "USAGE_ERROR", message: parsed.message },
+    return withTelemetry(
+      {
+        exitCode: 2,
+        stdout: {
+          schemaVersion: 1,
+          command: COMMAND_NAME,
+          ok: false,
+          error: { code: "USAGE_ERROR", message: parsed.message },
+          warnings: [],
+        },
+        stderrLines: [UPDATE_USAGE],
         warnings: [],
       },
-      stderrLines: [UPDATE_USAGE],
-      warnings: [],
-    };
+      () => [{ event: "update", success: false }],
+    );
   }
 
   return runUpdateCommand(parsed.options, deps);
@@ -72,20 +87,39 @@ export async function runUpdateCommand(
       )
       .sort(compareReceiptKey);
   } catch {
-    return failure([], [], "RECEIPT_STATE_IO", "Update receipts could not be read.");
+    return withTelemetry(
+      failure([], [], "RECEIPT_STATE_IO", "Update receipts could not be read."),
+      () => [{ event: "update", success: false }],
+    );
   }
 
   if (receipts.length === 0) {
-    return createSuccessResult(COMMAND_NAME, {
-      exitCode: 0,
-      updated: [],
-      skipped: ["No Directory-managed installations matched."],
-    });
+    return withTelemetry(
+      createSuccessResult(COMMAND_NAME, {
+        exitCode: 0,
+        updated: [],
+        skipped: ["No Directory-managed installations matched."],
+      }),
+      () => [{ event: "update", success: true }],
+    );
   }
+
+  const telemetryFacts = new Map<string, UpdateTelemetryFact>(
+    receipts.map((receipt) => [
+      receiptKey(receipt),
+      {
+        slug: receipt.slug,
+        client: receipt.client,
+        success: false,
+      } satisfies UpdateTelemetryFact,
+    ]),
+  );
 
   const listingPreflight = await preflightUpdateListings(receipts, deps);
   if (!listingPreflight.ok) {
-    return failure([], [], listingPreflight.code, listingPreflight.message);
+    return withTelemetry(failure([], [], listingPreflight.code, listingPreflight.message), () => [
+      ...updateTelemetry(telemetryFacts),
+    ]);
   }
 
   const candidates: UpdateCandidate[] = [];
@@ -123,6 +157,10 @@ export async function runUpdateCommand(
       planningFailures.push(`${targetLabel(receipt)}: ${reason}`);
       continue;
     }
+    telemetryFacts.set(receiptKey(receipt), {
+      ...telemetryFacts.get(receiptKey(receipt))!,
+      installVariant: preview.intent.variant.kind,
+    });
 
     const selectedPackageVersion = packageVersion(preview);
     if (selectedPackageVersion && parseSemVer(selectedPackageVersion) === null) {
@@ -142,6 +180,10 @@ export async function runUpdateCommand(
     );
     if (!hasChanged(receipt, preview)) {
       skipped.push(`${targetLabel(receipt)}: already current. ${diffLines.join(" ")}`);
+      telemetryFacts.set(receiptKey(receipt), {
+        ...telemetryFacts.get(receiptKey(receipt))!,
+        success: true,
+      });
       continue;
     }
 
@@ -155,39 +197,51 @@ export async function runUpdateCommand(
   }
 
   if (planningFailures.length > 0) {
-    return failure(
-      [],
-      [...skipped, ...planningFailures],
-      "UPDATE_PLANNING_FAILED",
-      "One or more updates could not be planned; no changes were made.",
-      warnings,
+    return withTelemetry(
+      failure(
+        [],
+        [...skipped, ...planningFailures],
+        "UPDATE_PLANNING_FAILED",
+        "One or more updates could not be planned; no changes were made.",
+        warnings,
+      ),
+      () => updateTelemetry(telemetryFacts),
     );
   }
 
   if (candidates.length === 0) {
-    return createSuccessResult(COMMAND_NAME, { exitCode: 0, updated: [], skipped }, warnings);
+    return withTelemetry(
+      createSuccessResult(COMMAND_NAME, { exitCode: 0, updated: [], skipped }, warnings),
+      () => updateTelemetry(telemetryFacts),
+    );
   }
 
   if (options.dryRun) {
-    return createSuccessResult(
-      COMMAND_NAME,
-      {
-        exitCode: 0,
-        updated: [],
-        skipped: [...skipped, ...candidates.map((candidate) => dryRunSummary(candidate))],
-      },
-      warnings,
+    return withTelemetry(
+      createSuccessResult(
+        COMMAND_NAME,
+        {
+          exitCode: 0,
+          updated: [],
+          skipped: [...skipped, ...candidates.map((candidate) => dryRunSummary(candidate))],
+        },
+        warnings,
+      ),
+      () => updateTelemetry(telemetryFacts),
     );
   }
 
   if (!options.yes) {
     if (!deps.promptIO.isInteractive) {
-      return failure(
-        [],
-        [...skipped, ...candidates.map((candidate) => pendingSummary(candidate))],
-        "REQUIRED_INPUT",
-        "Update requires --yes in noninteractive mode.",
-        warnings,
+      return withTelemetry(
+        failure(
+          [],
+          [...skipped, ...candidates.map((candidate) => pendingSummary(candidate))],
+          "REQUIRED_INPUT",
+          "Update requires --yes in noninteractive mode.",
+          warnings,
+        ),
+        () => updateTelemetry(telemetryFacts),
       );
     }
 
@@ -195,12 +249,15 @@ export async function runUpdateCommand(
       sanitizeTerminalText(buildConfirmationMessage(candidates)),
     );
     if (!confirmed) {
-      return failure(
-        [],
-        [...skipped, ...candidates.map((candidate) => cancelledSummary(candidate))],
-        "USER_CANCELLED",
-        "Update was cancelled.",
-        warnings,
+      return withTelemetry(
+        failure(
+          [],
+          [...skipped, ...candidates.map((candidate) => cancelledSummary(candidate))],
+          "USER_CANCELLED",
+          "Update was cancelled.",
+          warnings,
+        ),
+        () => updateTelemetry(telemetryFacts),
       );
     }
   }
@@ -219,22 +276,40 @@ export async function runUpdateCommand(
     }
 
     updated.push(withUpdateDetails(candidate, target));
+    telemetryFacts.set(receiptKey(candidate.receipt), {
+      ...telemetryFacts.get(receiptKey(candidate.receipt))!,
+      success: target.status === "installed",
+    });
     if (executed.exitCode !== 0) {
       failureCode ??= executed.stdout?.error?.code ?? "EXECUTION_FAILED";
     }
   }
 
   if (failureCode) {
-    return failure(
-      updated,
-      skipped,
-      failureCode,
-      "One or more updates failed. Successful targets kept their refreshed receipts.",
-      warnings,
+    return withTelemetry(
+      failure(
+        updated,
+        skipped,
+        failureCode,
+        "One or more updates failed. Successful targets kept their refreshed receipts.",
+        warnings,
+      ),
+      () => updateTelemetry(telemetryFacts),
     );
   }
 
-  return createSuccessResult(COMMAND_NAME, { exitCode: 0, updated, skipped }, warnings);
+  return withTelemetry(
+    createSuccessResult(COMMAND_NAME, { exitCode: 0, updated, skipped }, warnings),
+    () => updateTelemetry(telemetryFacts),
+  );
+}
+
+function updateTelemetry(facts: ReadonlyMap<string, UpdateTelemetryFact>): CliTelemetryContext[] {
+  return [...facts.values()].map((fact) => ({ event: "update", ...fact }));
+}
+
+function receiptKey(receipt: InstallationReceipt): string {
+  return `${receipt.slug}\u0000${receipt.client}\u0000${receipt.scope}`;
 }
 
 async function preflightUpdateListings(

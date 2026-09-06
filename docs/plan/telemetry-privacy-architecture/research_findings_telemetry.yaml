@@ -1,0 +1,537 @@
+plan_id: telemetry-privacy-architecture
+objective: Inspect existing usage telemetry and map the smallest privacy-preserving architecture for CLI search/add/remove/update events.
+focus_area: telemetry
+created_at: 2026-09-01T00:00:00Z
+created_by: gem-researcher
+status: completed
+
+tldr: |
+  - No first-party behavioral telemetry pipeline exists in the API, database, worker, domain, CLI, or web discovery surfaces.
+  - Existing API logs are operational and minimized; Better Auth includes a transitive telemetry package but its installed implementation defaults to disabled and the application does not enable it.
+  - The smallest isolated pipeline is CLI best-effort reporting -> strict POST contract -> dedicated raw table -> daily aggregates -> bounded worker retention.
+  - Repository policy currently requires CLI telemetry disabled by default; changing that posture requires product/privacy approval and legal-copy updates before launch.
+
+research_metadata:
+  methodology: Hybrid semantic and exact search, targeted file reads, dependency/caller tracing, schema and migration inspection, test-pattern inspection, and installed dependency verification.
+  scope: API middleware/routes/logging, DB schemas/migrations, worker scheduling/retention, domain boundaries, CLI runtime/commands/receipts, web search/detail/install-copy, privacy/product/legal documents, and installed telemetry dependencies.
+  confidence: high
+  coverage: 94
+  decision_blockers: 2
+  research_blockers: 0
+
+files_analyzed:
+  - {
+      file: app.ts,
+      path: apps/api/src/app.ts,
+      purpose: API composition and route registration,
+      key_elements:
+        [
+          {
+            element: createApiApp,
+            type: function,
+            location: "apps/api/src/app.ts:54",
+            description: Central middleware and route composition; no telemetry route exists.,
+          },
+        ],
+      language: TypeScript,
+      lines: 160,
+    }
+  - {
+      file: logging.ts,
+      path: apps/api/src/http/logging.ts,
+      purpose: Privacy-minimized operational request logging,
+      key_elements:
+        [
+          {
+            element: attachStructuredLogging,
+            type: function,
+            location: "apps/api/src/http/logging.ts:22",
+            description: Records request ID,
+            route template,
+            method,
+            status,
+            duration,
+            and limiter outcome without request content.,
+          },
+        ],
+      language: TypeScript,
+      lines: 82,
+    }
+  - {
+      file: rate-limit.ts,
+      path: apps/api/src/http/rate-limit.ts,
+      purpose: In-memory caller abuse control,
+      key_elements:
+        [
+          {
+            element: createInMemoryRateLimiter,
+            type: function,
+            location: "apps/api/src/http/rate-limit.ts:35",
+            description: Bounded-cardinality IP/socket-peer limiter with fail-closed saturation behavior.,
+          },
+        ],
+      language: TypeScript,
+      lines: 154,
+    }
+  - {
+      file: command-dispatch.ts,
+      path: packages/cli/src/command-dispatch.ts,
+      purpose: Central CLI completion boundary,
+      key_elements:
+        [
+          {
+            element: dispatchCommand,
+            type: function,
+            location: "packages/cli/src/command-dispatch.ts:89",
+            description: Receives normalized final command results after every supported command.,
+          },
+        ],
+      language: TypeScript,
+      lines: 138,
+    }
+  - {
+      file: runtime.ts,
+      path: packages/cli/src/config/runtime.ts,
+      purpose: Environment-derived CLI runtime configuration,
+      key_elements:
+        [
+          {
+            element: resolveCliRuntimeConfig,
+            type: function,
+            location: "packages/cli/src/config/runtime.ts:18",
+            description: Reads API URL,
+            timeout,
+            and state directory; no telemetry setting exists.,
+          },
+        ],
+      language: TypeScript,
+      lines: 52,
+    }
+  - {
+      file: receipt-store.ts,
+      path: packages/cli/src/config/receipt-store.ts,
+      purpose: Local install receipt persistence,
+      key_elements:
+        [
+          {
+            element: InstallReceipt,
+            type: interface,
+            location: "packages/cli/src/config/receipt-store.ts:21",
+            description: Contains slug/client/variant plus path-adjacent and fingerprint fields that must remain local.,
+          },
+        ],
+      language: TypeScript,
+      lines: 191,
+    }
+  - {
+      file: openapi.ts,
+      path: packages/api-contract/src/public-api/openapi.ts,
+      purpose: Central public API OpenAPI registration,
+      key_elements:
+        [
+          {
+            element: createPublicApiOpenApiDocument,
+            type: function,
+            location: "packages/api-contract/src/public-api/openapi.ts:57",
+            description: Registers GET-only public operations; no ingestion contract exists.,
+          },
+        ],
+      language: TypeScript,
+      lines: 304,
+    }
+  - {
+      file: audit-events.ts,
+      path: packages/db/src/schema/audit-events.ts,
+      purpose: Identity-linked publisher security audit records,
+      key_elements:
+        [
+          {
+            element: auditEvents,
+            type: variable,
+            location: "packages/db/src/schema/audit-events.ts:12",
+            description: Purpose and identity model are incompatible with anonymous product telemetry.,
+          },
+        ],
+      language: TypeScript,
+      lines: 72,
+    }
+  - {
+      file: retention.ts,
+      path: apps/worker/src/retention.ts,
+      purpose: Scheduled bounded retention execution,
+      key_elements:
+        [
+          {
+            element: runPublisherRetention,
+            type: function,
+            location: "apps/worker/src/retention.ts:14",
+            description: Existing batch-delete and job-reporting convention.,
+          },
+        ],
+      language: TypeScript,
+      lines: 74,
+    }
+  - {
+      file: legal.ts,
+      path: apps/web/src/content/legal.ts,
+      purpose: Privacy and cookie disclosures,
+      key_elements:
+        [
+          {
+            element: getPrivacyDraftDocument,
+            type: function,
+            location: "apps/web/src/content/legal.ts:61",
+            description: States no behavioral analytics at launch and defines minimized request logs.,
+          },
+        ],
+      language: TypeScript,
+      lines: 280,
+    }
+  - {
+      file: engineering-spec.md,
+      path: docs/ai-docs/engineering-spec.md,
+      purpose: Product engineering authority,
+      key_elements:
+        [
+          {
+            element: Metrics,
+            type: pattern,
+            location: "docs/ai-docs/engineering-spec.md:2311",
+            description: Requires CLI usage telemetry to remain disabled by default.,
+          },
+        ],
+      language: Markdown,
+      lines: 2650,
+    }
+
+patterns_found:
+  - category: architecture
+    pattern: Separate operational logs, security audit events, and domain outbox records by purpose.
+    description: Existing stores have distinct schemas and retention semantics; none is an anonymous product-event store.
+    examples:
+      [
+        {
+          file: apps/api/src/http/logging.ts,
+          location: "apps/api/src/http/logging.ts:22",
+          snippet: "event: api_request",
+        },
+        {
+          file: packages/db/src/schema/audit-events.ts,
+          location: "packages/db/src/schema/audit-events.ts:12",
+          snippet: "auditEvents",
+        },
+      ]
+    prevalence: common
+  - category: privacy
+    pattern: Strict minimization and explicit negative collection statements.
+    description: Logs exclude search text, arbitrary identifiers, IPs, user agents, cookies, and bodies; legal/product text states no behavioral analytics at launch.
+    examples:
+      [
+        {
+          file: apps/web/src/content/legal.ts,
+          location: "apps/web/src/content/legal.ts:73",
+          snippet: "They do not record search text",
+        },
+        {
+          file: apps/web/PRODUCT.md,
+          location: "apps/web/PRODUCT.md:25",
+          snippet: "No behavioural analytics",
+        },
+      ]
+    prevalence: common
+  - category: testing
+    pattern: Dependency injection and temp-Postgres integration tests.
+    description: CLI fetch/time/env/clock and API limiter/database dependencies are replaceable in tests.
+    examples:
+      [
+        {
+          file: packages/cli/src/dependencies.ts,
+          location: "packages/cli/src/dependencies.ts:29",
+          snippet: "createCliDependencies",
+        },
+        {
+          file: apps/api/src/__tests__/public-api-core.integration.test.ts,
+          location: "apps/api/src/__tests__/public-api-core.integration.test.ts:68",
+          snippet: "createTempDatabase",
+        },
+      ]
+    prevalence: common
+  - category: dependency
+    pattern: Better Auth telemetry is transitive and disabled by default.
+    description: The app does not set telemetry.enabled; installed Better Auth 1.7.2 only publishes when explicitly enabled and an endpoint/custom tracker exists.
+    examples:
+      [
+        {
+          file: packages/auth/src/better-auth.ts,
+          location: "packages/auth/src/better-auth.ts:62",
+          snippet: "betterAuth({",
+        },
+        {
+          file: pnpm-lock.yaml,
+          location: "pnpm-lock.yaml:5069",
+          snippet: "@better-auth/telemetry",
+        },
+      ]
+    prevalence: rare
+
+related_architecture:
+  components_relevant_to_domain:
+    - {
+        component: CLI command dispatcher,
+        responsibility: Normalize completion and exit behavior,
+        location: packages/cli/src/command-dispatch.ts,
+        relationship_to_domain: telemetry emission boundary,
+      }
+    - {
+        component: CLI command implementations,
+        responsibility: Hold event-specific slug/client/variant context,
+        location: packages/cli/src/commands,
+        relationship_to_domain: telemetry context producers,
+      }
+    - {
+        component: Public API,
+        responsibility: Validate and accept anonymous event envelopes,
+        location: apps/api/src,
+        relationship_to_domain: telemetry ingestion boundary,
+      }
+    - {
+        component: Worker retention jobs,
+        responsibility: Bounded scheduled aggregation/deletion,
+        location: apps/worker/src,
+        relationship_to_domain: telemetry lifecycle operator,
+      }
+  interfaces_used_by_domain:
+    - {
+        interface: CommandResult,
+        location: packages/cli/src/commands/result.ts,
+        usage_pattern: Provides command and success/failure without parsing rendered output.,
+      }
+    - {
+        interface: RateLimiter,
+        location: apps/api/src/http/rate-limit.ts,
+        usage_pattern: Supports a dedicated telemetry bucket keyed ephemerally by trusted peer address.,
+      }
+  data_flow_involving_domain: CLI forms a strict event from normalized command outcome and explicit command context, checks opt-out before any request, sends best-effort POST, API validates and rate-limits, DB stores server-receipt time, worker rolls up daily counts and deletes raw rows.
+  key_relationships_to_domain:
+    - {
+        from: packages/cli/src/command-dispatch.ts,
+        to: packages/cli/src/commands,
+        relationship: calls,
+      }
+    - { from: apps/api/src/app.ts, to: apps/api/src/routes, relationship: composes }
+    - { from: apps/worker/src/index.ts, to: apps/worker/src/retention.ts, relationship: schedules }
+
+related_technology_stack:
+  languages_used_in_domain: [TypeScript, SQL, Markdown]
+  frameworks_used_in_domain:
+    [
+      { name: Hono, usage_in_domain: API routing and middleware },
+      { name: Drizzle ORM, usage_in_domain: PostgreSQL schema and queries },
+      { name: PgBoss, usage_in_domain: Scheduled worker execution },
+      { name: Next.js, usage_in_domain: Server-rendered web discovery surfaces },
+    ]
+  libraries_used_in_domain:
+    [
+      { name: Zod, purpose_in_domain: Strict request/response validation },
+      { name: Vitest, purpose_in_domain: Unit and integration tests },
+      { name: Playwright, purpose_in_domain: Web behavior and legal-copy tests },
+    ]
+  external_apis_used_in_domain:
+    [{ name: Directory API, integration_point: packages/directory-client/src/client.ts }]
+
+related_conventions:
+  naming_patterns_in_domain: snake_case PostgreSQL tables; camelCase TypeScript fields; schemaVersion on versioned wire contracts.
+  structure_of_domain: Contracts in api-contract, persistence in db, business operations in domain, HTTP in apps/api, schedules in apps/worker, presentation/runtime in CLI and web.
+  error_handling_in_domain: Strict validation, generic client-facing unexpected errors, normalized CLI result codes, telemetry must not change command outcome.
+  testing_in_domain: Vitest unit tests plus temp-Postgres API/DB integration and Playwright release assertions.
+  documentation_in_domain: Product and legal sources explicitly describe current collection posture and production approval blockers.
+
+related_dependencies:
+  internal:
+    [
+      {
+        component: api-contract,
+        relationship_to_domain: Owns strict event wire schema,
+        direction: outbound,
+      },
+      { component: db, relationship_to_domain: Owns raw and aggregate tables, direction: outbound },
+      {
+        component: worker,
+        relationship_to_domain: Aggregates and prunes telemetry,
+        direction: outbound,
+      },
+    ]
+  external:
+    [
+      { name: PostgreSQL, purpose_for_domain: Raw event and aggregate persistence },
+      {
+        name: Better Auth telemetry,
+        purpose_for_domain: Transitive package currently disabled and separate from proposed CLI telemetry,
+      },
+    ]
+
+domain_security_considerations:
+  sensitive_areas:
+    - {
+        area: CLI command context,
+        location: packages/cli/src/commands,
+        concern: Queries,
+        paths,
+        arguments,
+        config,
+        receipt hashes/fingerprints,
+        error text,
+        tokens,
+        keys,
+        and project data must never enter the event object.,
+      }
+    - {
+        area: Ingestion abuse,
+        location: apps/api/src/http/rate-limit.ts,
+        concern: Anonymous writes require a separate low-capacity limiter,
+        strict content type/body size,
+        one-event requests,
+        and bounded dimensions.,
+      }
+    - {
+        area: Aggregate disclosure,
+        location: packages/db/src/schema,
+        concern: Low-count multidimensional cells can reveal rare client/server combinations and require suppression before exposure.,
+      }
+  authentication_patterns_in_domain: Proposed ingestion is anonymous; no user, session, installation, device, or generated persistent identifier is present.
+  authorization_patterns_in_domain: Write-only ingestion is public and rate-limited; aggregate reads remain internal unless separately authorized and thresholded.
+  data_validation_in_domain: Strict discriminated event schema; event in [search, add, remove, update]; bounded enum dimensions; slug only where known; server assigns receivedAt and ignores/rejects client timestamps.
+
+minimal_architecture_mapping:
+  collection_default: disabled, preserving current engineering and product authority; enabling requires an explicit approved policy change.
+  opt_out_precedence: If DO_NOT_TRACK=1 or MCPDIR_DISABLE_TELEMETRY=1, construct no request and invoke no reporter regardless of future enablement state.
+  event_contract:
+    {
+      schemaVersion: 1,
+      event: "search|add|remove|update",
+      slug: "optional canonical slug",
+      cliVersion: "bounded semver",
+      client: "optional supported-client enum",
+      success: boolean,
+      installVariant: "optional package|remote",
+      receivedAt: "server-generated UTC timestamp",
+    }
+  cardinality_rules: Search omits slug/client/variant; add/remove/update emit one event per attempted client target; slug is canonical; variant is included only when selected or receipt-backed.
+  transport: Dedicated POST /api/v1/telemetry/events with application/json, strict small body limit, no retries beyond the command lifetime, short timeout, no output, and fail-open behavior.
+  storage: telemetry_events raw append-only table plus telemetry_daily_counts keyed by UTC day/event/slug/CLI major-minor/client/success/variant; neither table stores IP, request ID, user agent, or identifiers.
+  aggregation: Idempotent daily upsert from raw rows followed by deletion only after aggregate commit; suppress cells below an approved threshold before any external reporting.
+  retention: Raw events 7 days; internal daily aggregates 13 months; worker deletes in bounded batches; operational proxy logs follow their separately approved retention.
+  timestamp_policy: receivedAt defaults to database/server time; no client timestamp is accepted, preventing clock-derived fingerprinting and falsified historical writes.
+
+testing_patterns:
+  framework: Vitest and Playwright
+  coverage_areas:
+    [
+      strict schema acceptance/rejection,
+      opt-out short-circuit,
+      no forbidden fields,
+      per-target event cardinality,
+      fail-open network behavior,
+      telemetry limiter isolation,
+      server timestamp,
+      aggregate idempotency,
+      bounded retention,
+      legal disclosure,
+    ]
+  test_organization: Unit tests beside packages; API temp-Postgres integration under apps/api/src/__tests__; browser/legal assertions under apps/web/e2e.
+  mock_patterns:
+    [
+      Injected fetch/env/clock in CLI,
+      injected rate limiter/request ID in API,
+      disposable PostgreSQL databases,
+    ]
+
+change_surface:
+  production_files:
+    [
+      packages/api-contract/src/public-api/telemetry.ts,
+      packages/api-contract/src/public-api/openapi.ts,
+      packages/api-contract/src/index.ts,
+      packages/db/src/schema/telemetry.ts,
+      packages/db/src/schema/index.ts,
+      packages/db/drizzle/0007_cli_telemetry.sql,
+      packages/db/drizzle/meta/_journal.json,
+      packages/domain/src/telemetry.ts,
+      packages/domain/src/index.ts,
+      apps/api/src/routes/telemetry.ts,
+      apps/api/src/app.ts,
+      apps/api/src/http/rate-limit.ts,
+      apps/worker/src/telemetry-retention.ts,
+      apps/worker/src/index.ts,
+      packages/cli/src/telemetry.ts,
+      packages/cli/src/config/runtime.ts,
+      packages/cli/src/dependencies.ts,
+      packages/cli/src/command-dispatch.ts,
+      packages/cli/src/commands/search.ts,
+      packages/cli/src/commands/add-execute.ts,
+      packages/cli/src/commands/remove.ts,
+      packages/cli/src/commands/update.ts,
+      packages/cli/README.md,
+      apps/web/src/content/legal.ts,
+      apps/web/PRODUCT.md,
+      docs/ai-docs/engineering-spec.md,
+      docs/ai-docs/product-and-technical-spec.md,
+    ]
+  test_files:
+    [
+      packages/api-contract/src/public-api/__tests__/telemetry.test.ts,
+      packages/db/src/__tests__/schema.test.ts,
+      packages/domain/src/__tests__/telemetry.test.ts,
+      apps/api/src/__tests__/telemetry.integration.test.ts,
+      apps/api/src/__tests__/middleware.test.ts,
+      apps/worker/src/__tests__/telemetry-retention.test.ts,
+      packages/cli/src/__tests__/telemetry.test.ts,
+      packages/cli/src/__tests__/runtime.test.ts,
+      packages/cli/src/__tests__/command-dispatch.test.ts,
+      packages/cli/src/__tests__/search.test.ts,
+      packages/cli/src/__tests__/add.test.ts,
+      packages/cli/src/__tests__/list-remove.test.ts,
+      packages/cli/src/__tests__/update.test.ts,
+      apps/web/e2e/legal-and-governance.spec.ts,
+    ]
+
+open_questions:
+  - {
+      question: Will collection remain default-off or receive an approved default-on policy change?,
+      context: Governing specs and current legal copy require default-off/no launch analytics,
+      while opt-out variables alone imply a possible default-on interpretation.,
+      type: decision_blocker,
+      affects: [CLI runtime, legal disclosure, release approval],
+    }
+  - {
+      question: What minimum aggregate cell threshold and access audience are approved?,
+      context: Server/client/variant/result dimensions can create rare cells even without identifiers.,
+      type: decision_blocker,
+      affects: [aggregation, reporting],
+    }
+  - {
+      question: Should CLI version retain patch precision in raw rows or be reduced to major.minor at ingestion?,
+      context: Patch versions improve regression analysis but increase cardinality; aggregates are mapped to major.minor in the minimal design.,
+      type: nice_to_know,
+      affects: [event contract, aggregation],
+    }
+
+gaps:
+  - {
+      area: Legal approval,
+      description: Privacy/terms/cookie documents are explicitly drafts and do not authorize new analytics processing.,
+      impact: decision_blocker,
+      affects: [production enablement],
+    }
+  - {
+      area: Production limiter topology,
+      description: Current limiter is process-local; deployment replica count and proxy trust configuration determine effective anonymous-write limits.,
+      impact: research_blocker,
+      affects: [abuse prevention],
+    }
+  - {
+      area: Product metrics access,
+      description: No authenticated internal analytics read surface or reporting audience is defined.,
+      impact: nice_to_know,
+      affects: [aggregate consumption],
+    }

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { installManifestResponseSchema } from "@themcpdirectory/api-contract";
+import { hashInstallManifest, installManifestResponseSchema } from "@themcpdirectory/api-contract";
 import type { PublicApiTestContext } from "./public-api-test-context.js";
 import { createPublicApiTestContext } from "./public-api-test-context.js";
 import { buildInstallManifest } from "../../index.js";
@@ -21,6 +21,7 @@ describe("buildInstallManifest", () => {
     expect(
       installManifestResponseSchema.safeParse({
         data: manifest,
+        manifestHash: hashInstallManifest(manifest),
         meta: { requestId: crypto.randomUUID() },
       }).success,
     ).toBe(true);
@@ -77,6 +78,25 @@ describe("buildInstallManifest", () => {
     expect(serialized).not.toContain("literal-secret");
     expect(serialized).not.toContain("unsafe-range");
     expect(serialized).not.toContain("javascript:");
+  });
+
+  it("builds identical plans from every canonical identifier without consulting README text", async () => {
+    const identifiers = [
+      "github",
+      "github-server",
+      "io.github/github/mcp-server",
+      "@github/mcp-server",
+      "github/github-mcp-server",
+      "https://github.com/github/github-mcp-server/",
+    ];
+    const manifests = await Promise.all(
+      identifiers.map(async (identifier) => await buildInstallManifest(context.db, { identifier })),
+    );
+
+    expect(manifests).toEqual(identifiers.map(() => manifests[0]));
+    const serialized = JSON.stringify(manifests);
+    expect(serialized).not.toContain("bad.example");
+    expect(serialized).not.toContain("curl");
   });
 
   it("filters all variants when a requested client is unsupported", async () => {

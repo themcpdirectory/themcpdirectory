@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@themcpdirectory/registry-client": "workspace:*",
-    "@themcpdirectory/security": "workspace:*"
+    "@themcpdirectory/security": "workspace:*",
+    "zod": "4.5.4"
   }
 }

@@ -1,4 +1,5 @@
 import type {
+  CliTelemetryEventV1,
   InstallManifestV1,
   ServerCollectionResponse,
   ServerDetailResponse,
@@ -9,6 +10,7 @@ import type {
   InstallPlan,
   RemovalPlan,
 } from "@themcpdirectory/install-engine";
+import { hashInstallManifest } from "@themcpdirectory/install-engine";
 import { createInProcessCliHarness } from "@themcpdirectory/test-utils";
 import { describe, expect, it } from "vitest";
 import { runCli } from "../cli.js";
@@ -21,6 +23,7 @@ describe("integrated CLI", () => {
     let currentVersion = "1.2.3";
     let configuredPlan: InstallPlan | null = null;
     const calls: string[] = [];
+    const telemetryEvents: CliTelemetryEventV1[] = [];
     const adapter = createStatefulAdapter(
       calls,
       () => configuredPlan,
@@ -36,7 +39,12 @@ describe("integrated CLI", () => {
         return infoResponse(currentVersion);
       },
       async resolveInstall() {
-        return { data: installManifest(currentVersion), meta: { requestId: "req_install" } };
+        const data = installManifest(currentVersion);
+        return {
+          data,
+          manifestHash: hashInstallManifest(data),
+          meta: { requestId: "req_install" },
+        };
       },
       async listClients() {
         return { data: [], meta: { requestId: "req_clients" } };
@@ -45,6 +53,11 @@ describe("integrated CLI", () => {
     const harness = createInProcessCliHarness<CliDependencies>({
       directoryClient,
       adapterRegistry: createAdapterRegistry([adapter]),
+      telemetryReporter: {
+        async report(event) {
+          telemetryEvents.push(event);
+        },
+      },
     });
 
     const search = await runCaptured(["search", "github", "--json"], harness);
@@ -96,6 +109,35 @@ describe("integrated CLI", () => {
     const emptyList = await runCaptured(["list"], harness);
     expect(emptyList).toMatchObject({ exitCode: 0, stdout: "No installed MCP servers found.\n" });
     expect(calls).toEqual(["install:1.2.3", "install:1.2.4", "remove:github"]);
+    expect(telemetryEvents).toEqual([
+      { schemaVersion: 1, event: "search", cliVersion: "0.2.1", success: true },
+      {
+        schemaVersion: 1,
+        event: "add",
+        slug: "github",
+        cliVersion: "0.2.1",
+        client: "codex",
+        success: true,
+        installVariant: "package",
+      },
+      {
+        schemaVersion: 1,
+        event: "update",
+        slug: "github",
+        cliVersion: "0.2.1",
+        client: "codex",
+        success: true,
+        installVariant: "package",
+      },
+      {
+        schemaVersion: 1,
+        event: "remove",
+        slug: "github",
+        cliVersion: "0.2.1",
+        client: "codex",
+        success: true,
+      },
+    ]);
   });
 });
 
@@ -330,6 +372,10 @@ function infoResponse(version: string): ServerDetailResponse {
         sourceAvailable: true,
         openSource: true,
         signals: [],
+      },
+      installs: {
+        total: 0,
+        clients: { "claude-code": 0, codex: 0, cursor: 0, vscode: 0 },
       },
       timestamps: {
         firstSeenAt: "2026-08-01T00:00:00Z",

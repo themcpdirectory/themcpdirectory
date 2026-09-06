@@ -335,6 +335,9 @@ importers:
       '@themcpdirectory/install-engine':
         specifier: workspace:*
         version: link:../install-engine
+      '@themcpdirectory/registry-normalizer':
+        specifier: workspace:*
+        version: link:../registry-normalizer
       '@themcpdirectory/test-utils':
         specifier: workspace:*
         version: link:../test-utils
@@ -579,6 +582,12 @@ importers:
         specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@20.19.43)(vite@8.2.2(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
+  packages/mcpdir:
+    dependencies:
+      '@themcpdirectory/cli':
+        specifier: workspace:0.2.1
+        version: link:../cli
+
   packages/registry-client:
     dependencies:
       '@themcpdirectory/security':
@@ -615,6 +624,9 @@ importers:
       '@themcpdirectory/security':
         specifier: workspace:*
         version: link:../security
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
     devDependencies:
       '@themcpdirectory/eslint-config':
         specifier: workspace:*

@@ -5,6 +5,7 @@ import {
   categoryDetailResponseSchema,
   clientDetailResponseSchema,
   clientsCollectionResponseSchema,
+  hashInstallManifest,
   installManifestQuerySchema,
   installManifestResponseSchema,
   parseCategoriesCollectionResponse,
@@ -14,6 +15,7 @@ import {
   parseInstallManifestResponse,
   parsePublisherDetailResponse,
   publisherDetailResponseSchema,
+  type InstallManifestV1,
 } from "../index.js";
 
 const serverSummaryExample = {
@@ -37,106 +39,109 @@ const serverSummaryExample = {
   },
 };
 
-const installManifestResponseExample = {
-  data: {
+const installManifestDataExample = {
+  schemaVersion: 1,
+  server: {
+    id: "4d5d0cfe-7c48-4df8-9c18-3f5af777d2bb",
+    slug: "github",
+    title: "GitHub",
+    version: "1.2.3",
+  },
+  provenance: {
+    registry: "https://github.com/modelcontextprotocol/servers",
+    registryName: "Model Context Protocol Registry",
+    observedAt: "2026-09-01T12:00:00Z",
+  },
+  trustProfile: {
+    officialRegistry: true,
+    publisherVerified: true,
+    sourceAvailable: true,
+    openSource: true,
+    signals: [
+      {
+        key: "official_registry",
+        status: "positive",
+        summary: "Listed in the Official MCP Registry",
+        checkedAt: "2026-09-01T12:00:00Z",
+      },
+    ],
+  },
+  latestHealth: {
     schemaVersion: 1,
-    server: {
-      id: "4d5d0cfe-7c48-4df8-9c18-3f5af777d2bb",
-      slug: "github",
-      title: "GitHub",
+    outcome: "healthy",
+    checkedAt: "2026-09-01T12:00:00Z",
+    durationMs: 120,
+    httpStatus: 200,
+    finalOrigin: "https://api.example.com",
+    redirectCount: 0,
+  },
+  installAvailability: "available",
+  variants: [
+    {
+      id: "8f6c5ae7-c883-4c12-b4c1-f528d6a3c4e5",
+      kind: "package",
+      registryType: "npm",
+      identifier: "@modelcontextprotocol/server-github",
       version: "1.2.3",
-    },
-    provenance: {
-      registry: "https://github.com/modelcontextprotocol/servers",
-      registryName: "Model Context Protocol Registry",
-      observedAt: "2026-09-01T12:00:00Z",
-    },
-    trustProfile: {
-      officialRegistry: true,
-      publisherVerified: true,
-      sourceAvailable: true,
-      openSource: true,
-      signals: [
+      runtimeHint: "npx",
+      transport: "stdio",
+      runtimeArguments: [
         {
-          key: "official_registry",
-          status: "positive",
-          summary: "Listed in the Official MCP Registry",
-          checkedAt: "2026-09-01T12:00:00Z",
+          type: "named",
+          name: "config",
+          valueHint: "path",
+          description: "Config file path.",
+          required: true,
+        },
+      ],
+      packageArguments: [
+        {
+          type: "positional",
+          valueHint: "repository",
+          description: "Repository slug.",
+          required: false,
+        },
+      ],
+      environmentVariables: [
+        {
+          name: "GITHUB_TOKEN",
+          description: "GitHub access token.",
+          required: true,
+          defaultValue: null,
+          valueSource: "environment",
+        },
+      ],
+      integrity: {
+        algorithm: "sha256",
+        digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      },
+    },
+    {
+      id: "37c5eb45-5cb9-4f4a-85da-a51bd25d8cf1",
+      kind: "remote",
+      transport: "streamable-http",
+      urlTemplate: "https://api.example.com/mcp/{workspaceId}",
+      headers: [{ name: "Authorization", value: "Bearer {token}" }],
+      variables: [
+        {
+          name: "workspaceId",
+          description: "Workspace identifier.",
+          required: true,
+          defaultValue: null,
         },
       ],
     },
-    latestHealth: {
-      schemaVersion: 1,
-      outcome: "healthy",
-      checkedAt: "2026-09-01T12:00:00Z",
-      durationMs: 120,
-      httpStatus: 200,
-      finalOrigin: "https://api.example.com",
-      redirectCount: 0,
-    },
-    installAvailability: "available",
-    variants: [
-      {
-        id: "8f6c5ae7-c883-4c12-b4c1-f528d6a3c4e5",
-        kind: "package",
-        registryType: "npm",
-        identifier: "@modelcontextprotocol/server-github",
-        version: "1.2.3",
-        runtimeHint: "npx",
-        transport: "stdio",
-        runtimeArguments: [
-          {
-            type: "named",
-            name: "config",
-            valueHint: "path",
-            description: "Config file path.",
-            required: true,
-          },
-        ],
-        packageArguments: [
-          {
-            type: "positional",
-            valueHint: "repository",
-            description: "Repository slug.",
-            required: false,
-          },
-        ],
-        environmentVariables: [
-          {
-            name: "GITHUB_TOKEN",
-            description: "GitHub access token.",
-            required: true,
-            defaultValue: null,
-            valueSource: "environment",
-          },
-        ],
-        integrity: {
-          algorithm: "sha256",
-          digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-        },
-      },
-      {
-        id: "37c5eb45-5cb9-4f4a-85da-a51bd25d8cf1",
-        kind: "remote",
-        transport: "streamable-http",
-        urlTemplate: "https://api.example.com/mcp/{workspaceId}",
-        headers: [{ name: "Authorization", value: "Bearer {token}" }],
-        variables: [
-          {
-            name: "workspaceId",
-            description: "Workspace identifier.",
-            required: true,
-            defaultValue: null,
-          },
-        ],
-      },
-    ],
-    compatibility: {
-      "claude-code": "supported",
-      codex: "supported_with_configuration",
-      cursor: "unknown",
-    },
+  ],
+  compatibility: {
+    "claude-code": "supported",
+    codex: "supported_with_configuration",
+    cursor: "unknown",
   },
+} satisfies InstallManifestV1;
+
+const installManifestResponseExample = {
+  manifestHash: hashInstallManifest(installManifestDataExample),
+  data: installManifestDataExample,
   meta: { requestId: "req_phase_d_021" },
 };
 
@@ -153,6 +158,15 @@ describe("installManifestQuerySchema", () => {
 });
 
 describe("installManifestResponseSchema", () => {
+  it("requires a canonical lowercase SHA-256 manifest identity", () => {
+    expect(() =>
+      installManifestResponseSchema.parse({
+        ...installManifestResponseExample,
+        manifestHash: "A".repeat(64),
+      }),
+    ).toThrow();
+  });
+
   it("keeps install manifests declarative and strict on server surfaces", () => {
     const parsed = installManifestResponseSchema.parse(installManifestResponseExample);
 

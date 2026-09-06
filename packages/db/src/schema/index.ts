@@ -35,3 +35,5 @@ export { installOverrides } from "./install-overrides.js";
 export { reports } from "./reports.js";
 export { moderationEvents } from "./moderation-events.js";
 export { transactionalOutbox } from "./transactional-outbox.js";
+export { cliTelemetryDailyCounts, cliTelemetryEvents } from "./telemetry.js";
+export { installManifestSnapshots } from "./install-manifest-snapshots.js";

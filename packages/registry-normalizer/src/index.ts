@@ -2,6 +2,18 @@ import { createHash } from "node:crypto";
 import type { RegistryServerResponse } from "@themcpdirectory/registry-client";
 import { normalizeHttpUrl } from "@themcpdirectory/security";
 
+export {
+  MCPDIR_MANIFEST_SCHEMA_URL,
+  mcpdirManifestSchema,
+  isSafePublicHttpsUrl,
+  parseMcpdirManifest,
+  toRegistryPublishArtifact,
+  type McpdirManifest,
+  type McpdirManifestIssue,
+  type McpdirManifestParseResult,
+  type RegistryPublishArtifact,
+} from "./maintainer-manifest.js";
+
 type JsonPrimitive = string | number | boolean | null;
 type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 

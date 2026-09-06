@@ -8,6 +8,7 @@ import type {
   RemovalResult,
 } from "../commands/remove.js";
 import type { UpdateResult } from "../commands/update.js";
+import type { InitResult } from "../commands/init.js";
 import type { JsonEnvelopeV1 } from "../commands/result.js";
 
 export function renderHumanEnvelope(envelope: JsonEnvelopeV1): readonly string[] {
@@ -37,6 +38,19 @@ export function renderHumanEnvelope(envelope: JsonEnvelopeV1): readonly string[]
       case "update":
         lines = renderUpdateEnvelope(envelope.data as UpdateResult);
         break;
+      case "init": {
+        const result = envelope.data as InitResult;
+        lines = [`${result.overwritten ? "Replaced" : "Created"} ${result.path} (${result.kind}).`];
+        break;
+      }
+      case "validate":
+        lines = [`Valid mcpdir manifest: ${(envelope.data as { path: string }).path}`];
+        break;
+      case "publish": {
+        const result = envelope.data as { name: string; version: string };
+        lines = [`Published ${result.name}@${result.version} to the Official MCP Registry.`];
+        break;
+      }
     }
   }
 

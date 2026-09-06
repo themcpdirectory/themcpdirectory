@@ -79,8 +79,10 @@ export {
   UpstreamDeletedError,
   buildInstallManifest,
   filterVariantsForClient,
+  loadInstallManifestSnapshot,
   projectPackageVariant,
   projectRemoteVariant,
+  saveInstallManifestSnapshot,
   type InstallManifestPackageVariant,
   type InstallManifestRemoteVariant,
   type InstallManifestVariant,
@@ -188,3 +190,5 @@ export {
   type GitHubRepositoryCoordinates,
   type GitHubUserPermissionFacts,
 } from "./publisher/github-app-client.js";
+
+export { recordCliTelemetryEvent, TelemetryServerNotFoundError } from "./telemetry.js";

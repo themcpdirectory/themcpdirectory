@@ -5,6 +5,7 @@ export function attachStructuredLogging(logger: ApiLogger): MiddlewareHandler<Ap
   return async (c, next) => {
     const startedAt = performance.now();
     await next();
+    if (c.req.path === "/api/v1/telemetry/events") return;
     logger.info({
       event: "http_request",
       requestId: c.get("requestId"),

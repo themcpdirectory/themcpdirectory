@@ -13,6 +13,8 @@ import type {
 import { httpUrlSchema } from "@themcpdirectory/api-contract";
 import {
   categories,
+  cliTelemetryDailyCounts,
+  cliTelemetryEvents,
   clientCompatibility,
   publishers,
   registrySources,
@@ -303,6 +305,52 @@ async function loadCompatibilityMap(
   return compatibility;
 }
 
+async function loadInstallCounts(
+  db: ServerDetailReadDatabase,
+  serverId: string,
+): Promise<PublicServerDetail["installs"]> {
+  const aggregateRows = await db
+    .select({
+      client: cliTelemetryDailyCounts.client,
+      count: sql<number>`sum(${cliTelemetryDailyCounts.count})`.mapWith(Number),
+    })
+    .from(cliTelemetryDailyCounts)
+    .where(
+      and(
+        eq(cliTelemetryDailyCounts.serverId, serverId),
+        eq(cliTelemetryDailyCounts.event, "add"),
+        eq(cliTelemetryDailyCounts.success, true),
+      ),
+    )
+    .groupBy(cliTelemetryDailyCounts.client);
+
+  const rawRows = await db
+    .select({
+      client: cliTelemetryEvents.client,
+      count: sql<number>`count(*)`.mapWith(Number),
+    })
+    .from(cliTelemetryEvents)
+    .where(
+      and(
+        eq(cliTelemetryEvents.serverId, serverId),
+        eq(cliTelemetryEvents.event, "add"),
+        eq(cliTelemetryEvents.success, true),
+        isNull(cliTelemetryEvents.aggregatedAt),
+      ),
+    )
+    .groupBy(cliTelemetryEvents.client);
+
+  const clients = { "claude-code": 0, codex: 0, cursor: 0, vscode: 0 };
+  let total = 0;
+  for (const row of [...aggregateRows, ...rawRows]) {
+    total += row.count;
+    if (row.client && SUPPORTED_CLIENT_IDS.has(row.client as SupportedClientId)) {
+      clients[row.client as SupportedClientId] += row.count;
+    }
+  }
+  return { total, clients };
+}
+
 async function loadTrustProfile(
   db: ServerDetailReadDatabase,
   serverId: string,
@@ -509,6 +557,7 @@ export async function getServerDetailBySlug(
     },
     ...(latestHealth ? { latestHealth } : {}),
     installAvailability: deriveInstallAvailability(server.listingStatus, server.currentVersionId),
+    installs: await loadInstallCounts(db, server.id),
     timestamps: server.timestamps,
   };
 }

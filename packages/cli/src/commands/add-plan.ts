@@ -66,6 +66,13 @@ export async function planAddCommand(
 ): Promise<CommandResult<AddPlanningResult>> {
   try {
     const manifestResponse = await deps.directoryClient.resolveInstall(options.identifier);
+    const manifestHash = hashInstallManifest(manifestResponse.data);
+    if (manifestHash !== manifestResponse.manifestHash) {
+      throw new DirectoryClientError(
+        "DIRECTORY_INVALID_RESPONSE",
+        "Directory install manifest hash did not match the validated manifest data",
+      );
+    }
     const commandWarnings = remoteHealthWarnings(manifestResponse.data);
     const selectedTargets = await selectTargetClients(
       {
@@ -74,7 +81,6 @@ export async function planAddCommand(
       },
       deps,
     );
-    const manifestHash = hashInstallManifest(manifestResponse.data);
     const previews: TargetInstallPreview[] = [];
 
     for (const target of selectedTargets) {

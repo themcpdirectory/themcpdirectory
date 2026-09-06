@@ -115,6 +115,34 @@ export const CLI_COMMANDS = Object.freeze([
     ],
     "update [server] [--to <client>] [--yes] [--dry-run] [--json]",
   ),
+  command(
+    "init",
+    "init [options]",
+    "Create a strict mcpdir.json publication manifest",
+    [
+      { syntax: "--package <identifier>", description: "Create an npm package template." },
+      { syntax: "--remote <https-url>", description: "Create a remote server template." },
+      {
+        syntax: "--remote-type <type>",
+        description: "Set the remote transport to streamable-http or sse.",
+      },
+      { syntax: "--name <registry-name>", description: "Set the Official Registry name." },
+      { syntax: "--description <text>", description: "Set the server description." },
+      { syntax: "--version <exact-version>", description: "Set an exact semantic version." },
+      { syntax: "--force", description: "Replace an existing mcpdir.json file." },
+      JSON_OPTION,
+    ],
+    "init [--package <identifier> | --remote <https-url> --remote-type <type>] [--name <registry-name>] [--description <text>] [--version <exact-version>] [--force] [--json]",
+  ),
+  command("validate", "validate [path] [--json]", "Validate an mcpdir.json publication manifest", [
+    JSON_OPTION,
+  ]),
+  command(
+    "publish",
+    "publish [path] [--json]",
+    "Publish a validated manifest to the Official MCP Registry",
+    [JSON_OPTION],
+  ),
 ] as const);
 
 export const CLI_SUPPORTED_CLIENTS = Object.freeze(
@@ -143,8 +171,8 @@ export const CLI_DOCUMENTATION = Object.freeze({
     "Build the repository-local executable: pnpm --filter @themcpdirectory/cli build",
   ] as const),
   distribution: Object.freeze([
-    "The @themcpdirectory/cli package is private and is not published to a package registry.",
-    `Invoke the repository-local executable with: ${CLI_REPOSITORY_INVOCATION}`,
+    "The canonical @themcpdirectory/cli package is public on npm.",
+    "Use npx @themcpdirectory/cli@0.2.1 as the current zero-install command; the mcpdir wrapper is pending npm name approval.",
   ] as const),
   receipts: Object.freeze({
     fields:

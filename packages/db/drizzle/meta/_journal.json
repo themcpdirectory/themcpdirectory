@@ -50,6 +50,13 @@
       "when": 1788541194254,
       "tag": "0006_publisher_github_org_id",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788700000000,
+      "tag": "0007_cli_telemetry",
+      "breakpoints": true
     }
   ]
 }

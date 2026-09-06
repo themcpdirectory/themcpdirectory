@@ -1,6 +1,6 @@
 {
   "name": "@themcpdirectory/cli",
-  "version": "0.1.2",
+  "version": "0.2.1",
   "private": false,
   "description": "Command-line client for The MCP Directory.",
   "type": "module",
@@ -22,7 +22,7 @@
     "directory": "packages/cli"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24.10 <25"
   },
   "exports": {
     ".": {
@@ -52,6 +52,7 @@
     "@themcpdirectory/directory-client": "workspace:*",
     "@themcpdirectory/eslint-config": "workspace:*",
     "@themcpdirectory/install-engine": "workspace:*",
+    "@themcpdirectory/registry-normalizer": "workspace:*",
     "@themcpdirectory/test-utils": "workspace:*",
     "@themcpdirectory/typescript-config": "workspace:*",
     "esbuild": "0.28.2",

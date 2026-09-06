@@ -87,9 +87,19 @@ export function getPrivacyDraftDocument(): ReleaseDocument {
         id: "cookies-and-analytics",
         heading: "Cookies and analytics",
         body: [
-          "Signed-in publisher features use strictly necessary authentication cookies. No behavioural analytics, advertising, fingerprinting, session replay, marketing pixels, or cross-site tracking is added at launch.",
+          "Signed-in publisher features use strictly necessary authentication cookies. The website does not use behavioural analytics, advertising, fingerprinting, session replay, marketing pixels, or cross-site tracking at launch.",
         ],
         links: [{ href: "/cookies", label: "Read the cookie policy" }],
+      },
+      {
+        id: "cli-telemetry",
+        heading: "Command-line telemetry",
+        body: [
+          "The mcpdir command-line client sends privacy-minimal, best-effort product telemetry by default. Set DO_NOT_TRACK=1 or MCPDIR_DISABLE_TELEMETRY=1 to disable telemetry before an event is constructed.",
+          "The event contains the event name, canonical server slug when known, exact CLI version, supported target client when applicable, success, and package or remote variant when applicable. Storage retains CLI major/minor rather than the exact version and adds the server receipt time.",
+          "The CLI event payload and stored event do not contain the search query, raw identifier, command arguments, paths, configuration or project content, error text, secrets, IP address, user agent, cookie, request ID, or a persistent device, installation, or person identifier. Network infrastructure necessarily processes source addresses and HTTP metadata transiently to deliver requests and limit abuse; the telemetry route is excluded from application request logs.",
+          "Raw CLI events are retained for seven days and daily aggregates for thirteen months. Public server pages and badges expose anonymous, CLI-reported successful add totals and supported-client totals only. These counts are abuse-limited reports, not verified unique users or installations.",
+        ],
       },
       {
         id: "directory-observations",
@@ -113,6 +123,7 @@ export function getPrivacyDraftDocument(): ReleaseDocument {
           `Expired session records are eligible for deletion after a ${PUBLISHER_RETENTION_DEFAULTS.expiredSessionGraceDays}-day grace period. Unverified claims expire after ${PUBLISHER_RETENTION_DEFAULTS.claimExpiryDays} days, and expired or revoked claim evidence is retained for ${PUBLISHER_RETENTION_DEFAULTS.claimEvidenceDays} days.`,
           `Completed background outbox records are retained for ${PUBLISHER_RETENTION_DEFAULTS.outboxDays} days. Accounts with no login for ${PUBLISHER_RETENTION_DEFAULTS.dormantAccountDays} days may be deleted only when they have no active publisher responsibility, claim, legal hold, or unresolved erasure operation.`,
           `Publisher audit events are retained for ${PUBLISHER_RETENTION_DEFAULTS.auditDays} days. Remote health observations are retained for 90 days and trust-history observations for 24 months. Active legal holds can delay deletion.`,
+          "Raw CLI telemetry events are retained for seven days and daily CLI telemetry aggregates for thirteen months.",
         ],
       },
       {

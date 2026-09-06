@@ -132,7 +132,8 @@ function getResponseSchemaRef(document: OpenAPIObject, path: string): string | n
 }
 
 function getErrorResponse(document: OpenAPIObject, path: string, status: string): OpenApiResponse {
-  const response = document.paths?.[path]?.get?.responses?.[status];
+  const pathItem = document.paths?.[path];
+  const response = (pathItem?.get ?? pathItem?.post)?.responses?.[status];
   if (!response || isReferenceObject(response)) {
     throw new Error(`Missing inline ${status} response for ${path}`);
   }
@@ -297,10 +298,13 @@ describe("createPublicApiOpenApiDocument", () => {
       "/api/v1/publishers/{slug}",
       "/api/v1/resolve/{identifier}",
       "/api/v1/resolve/{identifier}/install",
+      "/api/v1/resolve/{identifier}/install/{manifestHash}",
       "/api/v1/search",
       "/api/v1/servers",
       "/api/v1/servers/{slug}",
       "/api/v1/servers/{slug}/install",
+      "/api/v1/servers/{slug}/install/{manifestHash}",
+      "/api/v1/telemetry/events",
     ]);
     expect(
       Object.entries(paths).flatMap(([path, pathItem]) =>
@@ -316,11 +320,28 @@ describe("createPublicApiOpenApiDocument", () => {
       "GET /api/v1/publishers/{slug}",
       "GET /api/v1/resolve/{identifier}",
       "GET /api/v1/resolve/{identifier}/install",
+      "GET /api/v1/resolve/{identifier}/install/{manifestHash}",
       "GET /api/v1/search",
       "GET /api/v1/servers",
       "GET /api/v1/servers/{slug}",
       "GET /api/v1/servers/{slug}/install",
+      "GET /api/v1/servers/{slug}/install/{manifestHash}",
+      "POST /api/v1/telemetry/events",
     ]);
+  });
+
+  it("documents the strict telemetry event request and empty accepted response", () => {
+    const document = createPublicApiOpenApiDocument("https://api.themcpdirectory.test");
+    const operation = document.paths?.["/api/v1/telemetry/events"]?.post;
+
+    expect(operation?.requestBody).toEqual(
+      expect.objectContaining({
+        required: true,
+        content: expect.objectContaining({ "application/json": expect.any(Object) }),
+      }),
+    );
+    expect(Object.keys(operation?.responses ?? {})).toEqual(["202", "400", "429", "500"]);
+    expect(operation?.responses?.["202"]).toEqual({ description: "Telemetry event accepted" });
   });
 
   it("documents the verified error envelope and route error responses", () => {
@@ -339,17 +360,28 @@ describe("createPublicApiOpenApiDocument", () => {
       "/api/v1/publishers/{slug}": ["200", "400", "404", "429", "500"],
       "/api/v1/resolve/{identifier}": ["200", "400", "404", "409", "429", "500"],
       "/api/v1/resolve/{identifier}/install": ["200", "400", "404", "409", "410", "429", "500"],
+      "/api/v1/resolve/{identifier}/install/{manifestHash}": [
+        "200",
+        "400",
+        "404",
+        "409",
+        "410",
+        "429",
+        "500",
+      ],
       "/api/v1/search": ["200", "400", "429", "500"],
       "/api/v1/servers": ["200", "400", "429", "500"],
       "/api/v1/servers/{slug}": ["200", "400", "404", "429", "500"],
       "/api/v1/servers/{slug}/install": ["200", "400", "404", "410", "429", "500"],
+      "/api/v1/servers/{slug}/install/{manifestHash}": ["200", "400", "404", "410", "429", "500"],
+      "/api/v1/telemetry/events": ["202", "400", "429", "500"],
     } as const;
 
     expect(
       Object.fromEntries(
         Object.entries(document.paths ?? {}).map(([path, pathItem]) => [
           path,
-          Object.keys(pathItem?.get?.responses ?? {}),
+          Object.keys((pathItem?.get ?? pathItem?.post)?.responses ?? {}),
         ]),
       ),
     ).toEqual(expectedResponseStatuses);
@@ -443,6 +475,7 @@ describe("createPublicApiOpenApiDocument", () => {
 
   it("keeps approved install and discovery examples valid against the runtime schemas", () => {
     const installExample = installManifestResponseSchema.parse({
+      manifestHash: "a".repeat(64),
       data: {
         schemaVersion: 1,
         server: {
@@ -775,6 +808,15 @@ describe("createPublicApiOpenApiDocument", () => {
           },
           {
             "parameters": [
+              "path:identifier",
+              "path:manifestHash",
+              "query:client",
+            ],
+            "path": "/api/v1/resolve/{identifier}/install/{manifestHash}",
+            "responseSchemaRef": "#/components/schemas/InstallManifestResponse",
+          },
+          {
+            "parameters": [
               "query:q",
               "query:category",
               "query:publisher",
@@ -823,6 +865,20 @@ describe("createPublicApiOpenApiDocument", () => {
             ],
             "path": "/api/v1/servers/{slug}/install",
             "responseSchemaRef": "#/components/schemas/InstallManifestResponse",
+          },
+          {
+            "parameters": [
+              "path:slug",
+              "path:manifestHash",
+              "query:client",
+            ],
+            "path": "/api/v1/servers/{slug}/install/{manifestHash}",
+            "responseSchemaRef": "#/components/schemas/InstallManifestResponse",
+          },
+          {
+            "parameters": [],
+            "path": "/api/v1/telemetry/events",
+            "responseSchemaRef": null,
           },
         ],
         "schemaKeys": [

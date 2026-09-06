@@ -17,6 +17,7 @@ import type {
   ResolvedInstallIntent,
   ValidatedInstallInputMap,
 } from "@themcpdirectory/install-engine";
+import { hashInstallManifest } from "@themcpdirectory/install-engine";
 import { describe, expect, it } from "vitest";
 import type { CliDependencies, PromptIO } from "../dependencies.js";
 import { planAddCommand } from "../commands/add-plan.js";
@@ -103,6 +104,75 @@ describe("planAddCommand", () => {
     expect(adapter.state.planCalls).toHaveLength(1);
     expect(adapter.state.executeCalls.current).toBe(0);
     expect(adapter.state.verifyCalls.current).toBe(0);
+  });
+
+  it("fails closed on a server manifest hash mismatch before detection or adapter planning", async () => {
+    const adapter = createFakeAdapter({
+      id: "codex",
+      detection: createDetection("codex", {
+        installed: true,
+        capabilities: ["native-add-stdio", "env-reference", "native-scope-user"],
+      }),
+    });
+    const deps = createCliDependencies({
+      manifest: makePackageManifest(),
+      responseManifestHash: "0".repeat(64),
+      adapters: [adapter],
+    });
+
+    const result = await planAddCommand(
+      { identifier: "github", dryRun: false, yes: true, json: false },
+      deps,
+    );
+
+    expect(result).toMatchObject({
+      exitCode: 1,
+      stdout: { error: { code: "DIRECTORY_INVALID_RESPONSE" } },
+    });
+    expect(adapter.state.detectCalls.current).toBe(0);
+    expect(adapter.state.planCalls).toHaveLength(0);
+    expect(adapter.state.executeCalls.current).toBe(0);
+  });
+
+  it("creates identical plans for canonical, alias, Registry, package, and GitHub identifiers", async () => {
+    const adapter = createFakeAdapter({
+      id: "codex",
+      detection: createDetection("codex", {
+        installed: true,
+        capabilities: ["native-add-stdio", "env-reference", "native-scope-user"],
+      }),
+    });
+    const deps = createCliDependencies({
+      manifest: makePackageManifest(),
+      adapters: [adapter],
+      environment: { GITHUB_TOKEN: "ghs_equivalent_plan" },
+    });
+    const identifiers = [
+      "github",
+      "github-server",
+      "io.github/github/mcp-server",
+      "@github/mcp-server",
+      "github/github-mcp-server",
+      "https://github.com/github/github-mcp-server/",
+    ];
+
+    const results = [];
+    for (const identifier of identifiers) {
+      results.push(
+        await planAddCommand(
+          { identifier, targetClients: ["codex"], dryRun: true, yes: true, json: false },
+          deps,
+        ),
+      );
+    }
+    const plans = results.map((result) => result.stdout?.data?.previews[0]?.plan);
+
+    expect(
+      results.map((result) => ({ exitCode: result.exitCode, error: result.stdout?.error })),
+    ).toEqual(identifiers.map(() => ({ exitCode: 0, error: undefined })));
+    expect(plans[0]).toBeDefined();
+    expect(plans).toEqual(identifiers.map(() => plans[0]));
+    expect(deps.resolveInstallCalls).toEqual(identifiers);
   });
 
   it("blocks a deleted-upstream install before detection, prompts, or adapter planning", async () => {
@@ -228,6 +298,24 @@ describe("planAddCommand", () => {
       ],
       confirmationMessage: expect.stringContaining("Dry run"),
     });
+
+    const commandResult = await runAddCliCommand(["github", "--to", "all", "--dry-run"], allDeps);
+    expect(commandResult.telemetry?.()).toEqual([
+      {
+        event: "add",
+        slug: "github",
+        client: "codex",
+        success: false,
+        installVariant: "package",
+      },
+      {
+        event: "add",
+        slug: "github",
+        client: "cursor",
+        success: false,
+        installVariant: "package",
+      },
+    ]);
 
     const interactiveDeps = createCliDependencies({
       manifest: makePackageManifest(),
@@ -770,6 +858,7 @@ function createFakeAdapterRegistry(
 
 function createCliDependencies(options: {
   readonly manifest: InstallManifestV1;
+  readonly responseManifestHash?: string;
   readonly adapters: readonly (McpClientAdapter & { readonly state: FakeAdapterState })[];
   readonly prompt?: PromptIoDouble;
   readonly environment?: Readonly<NodeJS.ProcessEnv>;
@@ -782,6 +871,7 @@ function createCliDependencies(options: {
   const prompt = options.prompt ?? createPromptIoDouble({ isInteractive: false });
   const manifestResponse: InstallManifestResponse = {
     data: options.manifest,
+    manifestHash: options.responseManifestHash ?? hashInstallManifest(options.manifest),
     meta: { requestId: "req_add_plan_001" },
   };
 

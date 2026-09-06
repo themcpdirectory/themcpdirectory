@@ -16,6 +16,7 @@ import {
 import type { InstallManifestResponse } from "./install.js";
 import {
   InstallAvailabilitySchema,
+  installManifestHashSchema,
   installManifestNpmPackageVersionSchema,
   installManifestPackageRuntimeHintSchema,
   installManifestPackageTransportSchema,
@@ -194,7 +195,13 @@ const resolveServerIdentifierClientResponseSchema = clientObject({
     title: z.string().min(1),
     version: z.string().min(1).nullable(),
     canonicalUrl: httpUrlSchema,
-    matchedBy: z.enum(["slug", "alias", "canonical_registry_name", "package_identifier"]),
+    matchedBy: z.enum([
+      "slug",
+      "alias",
+      "canonical_registry_name",
+      "package_identifier",
+      "github_repository",
+    ]),
     matchedValue: z.string().min(1),
     needsRedirect: z.boolean(),
     installAvailability: InstallAvailabilitySchema.optional(),
@@ -438,6 +445,7 @@ const installManifestClientSchema = clientObject({
 
 const installManifestClientResponseSchema = clientObject({
   data: installManifestClientSchema,
+  manifestHash: installManifestHashSchema,
   meta: clientObject({ requestId: requestIdSchema }),
 }).superRefine((manifest, context) => {
   const forbiddenPath = findForbiddenInstallManifestPath(manifest);

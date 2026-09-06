@@ -209,6 +209,7 @@ describe("shared public-api contracts", () => {
     expect(PUBLIC_API_INSTALL_SAFETY.environmentValueSource).toBe("environment");
 
     const packageResponse = {
+      manifestHash: "a".repeat(64),
       data: {
         schemaVersion: 1,
         server: {

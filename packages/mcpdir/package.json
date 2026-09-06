@@ -1,0 +1,30 @@
+{
+  "name": "mcpdir",
+  "version": "0.2.1",
+  "private": false,
+  "description": "The CLI for The MCP Directory.",
+  "type": "module",
+  "bin": {
+    "mcpdir": "bin/mcpdir.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "license": "MIT",
+  "homepage": "https://themcpdirectory.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/themcpdirectory/themcpdirectory.git",
+    "directory": "packages/mcpdir"
+  },
+  "engines": {
+    "node": ">=24.10 <25"
+  },
+  "dependencies": {
+    "@themcpdirectory/cli": "workspace:0.2.1"
+  }
+}
