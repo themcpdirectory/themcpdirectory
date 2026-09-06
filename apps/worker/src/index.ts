@@ -17,7 +17,7 @@ import {
   trustSignals,
   type Database,
 } from "@themcpdirectory/db";
-import { loadEnv, loadWebEnv } from "@themcpdirectory/config";
+import { loadEnv, loadWorkerEnv } from "@themcpdirectory/config";
 import {
   OfficialRegistryClient,
   RegistryPageSchema,
@@ -774,12 +774,12 @@ export async function startWorker(): Promise<void> {
     return;
   }
 
-  const webEnv = loadWebEnv();
+  const workerEnv = loadWorkerEnv();
   const accountErasureDeps = createAccountErasureDeps({
     db,
     env: {
-      GITHUB_APP_ID: webEnv.GITHUB_APP_ID,
-      GITHUB_APP_PRIVATE_KEY: webEnv.GITHUB_APP_PRIVATE_KEY,
+      GITHUB_APP_ID: workerEnv.GITHUB_APP_ID,
+      GITHUB_APP_PRIVATE_KEY: workerEnv.GITHUB_APP_PRIVATE_KEY,
     },
     fetchImpl: fetch,
   });

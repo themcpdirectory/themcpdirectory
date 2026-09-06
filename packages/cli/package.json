@@ -32,12 +32,13 @@
     }
   },
   "scripts": {
-    "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && esbuild src/index.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/index.js && rollup --config rollup.config.mjs",
+    "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && esbuild src/index.ts --bundle --platform=node --format=esm --target=node24 --banner:js=\"import { createRequire as __mcpdirCreateRequire } from 'node:module'; const require = __mcpdirCreateRequire(import.meta.url);\" --outfile=dist/index.js && rollup --config rollup.config.mjs",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@inquirer/prompts": "8.7.1",
     "@types/node": "^20",
     "zod": "4.5.4"
   },

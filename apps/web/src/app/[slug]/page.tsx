@@ -7,9 +7,11 @@ import {
   getServerDetailBySlug,
 } from "@themcpdirectory/domain";
 import { normalizeHttpUrl } from "@themcpdirectory/security";
+import { CLI_EXECUTABLE_NAME } from "@themcpdirectory/cli/command-metadata";
 import { DeletedUpstreamBanner } from "@/components/deleted-upstream-banner";
-import { HealthObservation } from "@/components/health-observation";
-import { TrustProfile } from "@/components/trust-profile";
+import { InstallCommand } from "@/components/install-command";
+import { ServerDetailHeader } from "@/components/server-detail-header";
+import { ServerEvidenceSummary } from "@/components/server-evidence-summary";
 import { getDb } from "@/lib/db";
 import { buildDocumentMetadata, buildCanonicalUrl } from "@/lib/metadata";
 import {
@@ -169,139 +171,21 @@ export default async function ServerDetailPage({ params }: Props) {
           <span>{detail.title}</span>
         </nav>
 
-        {/* Header */}
-        <header style={{ marginBottom: "1.75rem" }}>
-          <div
-            style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem", flexWrap: "wrap" }}
-          >
-            <h1
-              style={{
-                fontSize: "clamp(1.25rem, 3vw, 1.75rem)",
-                fontWeight: 700,
-                lineHeight: 1.15,
-                margin: 0,
-              }}
-            >
-              {detail.title}
-            </h1>
-
-            {detail.registrySourceKey === "official" &&
-              detail.currentUpstreamStatus === "active" &&
-              detail.listingStatus === "active" && (
-                <span
-                  title="Listed in the Official MCP Registry"
-                  style={{
-                    fontSize: "0.6875rem",
-                    border: "1px solid var(--border)",
-                    borderRadius: "var(--radius-sm)",
-                    padding: "0.125rem 0.4rem",
-                    color: "var(--fg-muted)",
-                    fontFamily: "var(--font-mono)",
-                    alignSelf: "center",
-                    background: "var(--surface-2)",
-                  }}
-                >
-                  official registry
-                </span>
-              )}
-
-            <span
-              style={{
-                fontSize: "0.6875rem",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-sm)",
-                padding: "0.125rem 0.4rem",
-                color: detail.listingStatus === "active" ? "var(--success-fg)" : "var(--warn-fg)",
-                background:
-                  detail.listingStatus === "active" ? "var(--success-bg)" : "var(--warn-bg)",
-                alignSelf: "center",
-              }}
-            >
-              {detail.listingStatus}
-            </span>
-          </div>
-
-          <p
-            style={{
-              color: "var(--fg-muted)",
-              fontSize: "0.9375rem",
-              marginTop: "0.5rem",
-              lineHeight: 1.5,
-            }}
-          >
-            {detail.shortDescription}
-          </p>
-
-          {detail.publisherDisplayName && (
-            <p style={{ fontSize: "0.8125rem", color: "var(--fg-muted)", marginTop: "0.375rem" }}>
-              Published by{" "}
-              {publisherWebsiteUrl ? (
-                <a
-                  href={publisherWebsiteUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: "var(--accent)" }}
-                >
-                  {detail.publisherDisplayName}
-                </a>
-              ) : (
-                <span>{detail.publisherDisplayName}</span>
-              )}
-              {detail.publisherVerified && (
-                <span
-                  title="Publisher identity verified"
-                  style={{
-                    marginLeft: "0.375rem",
-                    color: "var(--success-fg)",
-                    fontSize: "0.75rem",
-                  }}
-                >
-                  ✓ verified
-                </span>
-              )}
-            </p>
-          )}
-        </header>
+        <ServerDetailHeader detail={detail} publisherWebsiteUrl={publisherWebsiteUrl} />
 
         <DeletedUpstreamBanner listingStatus={publicDetail.listingStatus} />
 
-        <div className="detail-observations">
-          <section className="detail-observation" aria-labelledby="trust-profile-heading">
-            <h2 id="trust-profile-heading">Trust profile</h2>
-            <TrustProfile trustProfile={publicDetail.trustProfile} />
-          </section>
+        <ServerEvidenceSummary
+          trustProfile={publicDetail.trustProfile}
+          health={publicDetail.latestHealth}
+          compatibility={publicDetail.compatibility}
+        />
 
-          <section className="detail-observation" aria-labelledby="health-observation-heading">
-            <h2 id="health-observation-heading">Latest remote health</h2>
-            <HealthObservation health={publicDetail.latestHealth} />
-          </section>
-        </div>
-
-        {/* CLI unavailable note */}
-        <section
-          aria-labelledby="install-heading"
-          style={{
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-md)",
-            padding: "1rem",
-            background: "var(--surface-2)",
-            marginBottom: "1.5rem",
-          }}
-        >
-          <h2
-            id="install-heading"
-            style={{ fontSize: "0.875rem", fontWeight: 600, marginBottom: "0.375rem" }}
-          >
-            Installation
-          </h2>
-          <p style={{ fontSize: "0.8125rem", color: "var(--fg-muted)", margin: 0 }}>
-            {publicDetail.installAvailability === "upstream_deleted"
-              ? "Installation is blocked because this listing was removed upstream."
-              : publicDetail.installAvailability === "install_unavailable"
-                ? "Installation details are currently unavailable."
-                : "Installation metadata is available. CLI installation instructions are coming soon."}
-          </p>
-        </section>
+        <InstallCommand
+          slug={detail.slug}
+          cliExecutableName={CLI_EXECUTABLE_NAME}
+          installAvailability={publicDetail.installAvailability}
+        />
 
         <div
           style={{

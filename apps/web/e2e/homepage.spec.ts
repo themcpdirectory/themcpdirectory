@@ -47,10 +47,54 @@ test.describe("Homepage", () => {
     await expect(searchInput).toBeVisible();
   });
 
+  test("search input keeps a persistent visible label", async ({ page }) => {
+    await page.goto("/");
+    const label = page.locator('label[for="search-input"]');
+    await expect(label).toBeVisible();
+    await expect(label).toContainText(/search/i);
+  });
+
   test("shows server cards from seeded data", async ({ page }) => {
     await page.goto("/");
     // At least one server card should appear
     await expect(page.getByRole("article").first()).toBeVisible();
+  });
+
+  test("shows a category and client entry-point rail in the first viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    const entryRail = page.getByRole("navigation", { name: "Quick entry points" });
+    await expect(entryRail).toBeInViewport();
+    await expect(entryRail.getByRole("link", { name: "Supported clients" })).toBeVisible();
+    await expect(entryRail.getByRole("link", { name: "All categories" })).toBeVisible();
+  });
+
+  test("shows a real server row within the first 1440x900 viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await expect(page.getByRole("article").first()).toBeInViewport();
+  });
+
+  test("Supported clients entry point reaches the CLI supported-clients section", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page
+      .getByRole("navigation", { name: "Quick entry points" })
+      .getByRole("link", { name: "Supported clients" })
+      .click();
+    await expect(page).toHaveURL(/\/docs\/cli$/);
+    await expect(page.getByRole("heading", { level: 1, name: "CLI Reference" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Supported clients" })).toBeVisible();
+  });
+
+  test("disables the homepage entry transition under reduced motion", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/");
+    const durationSeconds = await page
+      .locator(".home-hero")
+      .evaluate((el) => parseFloat(getComputedStyle(el).animationDuration));
+    expect(durationSeconds).toBeLessThan(0.001);
   });
 
   test("search form submits via GET to /search", async ({ page }) => {

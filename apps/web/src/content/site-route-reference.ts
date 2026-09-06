@@ -100,6 +100,20 @@ export const PUBLIC_SITE_ROUTE_REFERENCE: readonly PublicSiteRouteReference[] = 
     availability: "available",
   },
   {
+    path: "/cookies",
+    title: "Cookie policy",
+    auth: "anonymous",
+    index: true,
+    availability: "available",
+  },
+  {
+    path: "/imprint",
+    title: "Operator information",
+    auth: "anonymous",
+    index: true,
+    availability: "available",
+  },
+  {
     path: "/about",
     title: "About",
     auth: "anonymous",

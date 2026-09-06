@@ -37,14 +37,43 @@ test.describe("Navigation and 404", () => {
 
     const mobileNav = page.getByRole("navigation", { name: "Mobile navigation" });
     await expect(mobileNav).toBeVisible();
-    await mobileNav.getByRole("link", { name: "Search" }).click();
-    await expect(page).toHaveURL(/\/search$/);
+    await mobileNav.getByRole("link", { name: "Browse" }).click();
+    await expect(page).toHaveURL(/\/categories$/);
   });
 
-  test("categories link is in nav", async ({ page }) => {
+  test("mobile navigation exposes Browse, Security, Docs, and Publish with correct destinations", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto("/");
+    await page.getByRole("button", { name: /navigation menu/i }).click();
+
+    const mobileNav = page.getByRole("navigation", { name: "Mobile navigation" });
+    await expect(mobileNav.getByRole("link", { name: "Browse", exact: true })).toHaveAttribute(
+      "href",
+      "/categories",
+    );
+    await expect(mobileNav.getByRole("link", { name: "Security", exact: true })).toHaveAttribute(
+      "href",
+      "/security",
+    );
+    await expect(mobileNav.getByRole("link", { name: "Docs", exact: true })).toHaveAttribute(
+      "href",
+      "/docs",
+    );
+    await expect(mobileNav.getByRole("link", { name: "Publish", exact: true })).toHaveAttribute(
+      "href",
+      "/publish",
+    );
+  });
+
+  test("primary navigation exposes Browse, Security, Docs, and Publish", async ({ page }) => {
     await page.goto("/");
     const siteNav = page.getByRole("navigation", { name: "Site navigation" });
-    await expect(siteNav.getByRole("link", { name: "Categories", exact: true })).toBeVisible();
+    await expect(siteNav.getByRole("link", { name: "Browse", exact: true })).toBeVisible();
+    await expect(siteNav.getByRole("link", { name: "Security", exact: true })).toBeVisible();
+    await expect(siteNav.getByRole("link", { name: "Docs", exact: true })).toBeVisible();
+    await expect(siteNav.getByRole("link", { name: "Publish", exact: true })).toBeVisible();
   });
 });
 

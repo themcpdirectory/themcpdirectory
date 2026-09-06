@@ -103,6 +103,20 @@ test("docs landing lists the exact current and planned route facts", async ({ pa
       availability: "Availability: available now.",
     },
     {
+      path: "/cookies",
+      title: "Cookie policy",
+      access: "Access: available without signing in.",
+      index: "Search indexing: included in the public index.",
+      availability: "Availability: available now.",
+    },
+    {
+      path: "/imprint",
+      title: "Operator information",
+      access: "Access: available without signing in.",
+      index: "Search indexing: included in the public index.",
+      availability: "Availability: available now.",
+    },
+    {
       path: "/about",
       title: "About",
       access: "Access: available without signing in.",

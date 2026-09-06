@@ -37,6 +37,7 @@ export function getPublishDocument(): ReleaseDocument {
           "Publisher members can use role-scoped dashboard tools to inspect listings and manage claims or memberships when their role permits it.",
           "Account export includes account audit summaries. Export and erasure are available from the publisher account workflow; active legal holds or publisher ownership responsibilities can delay erasure.",
         ],
+        links: [{ label: "Publisher dashboard", href: "/dashboard" }],
       },
     ],
   };

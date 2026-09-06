@@ -28,6 +28,7 @@ export function SearchForm({
   return (
     <form
       role="search"
+      className="directory-search"
       action="/search"
       method="GET"
       onSubmit={handleSubmit}

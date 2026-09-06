@@ -1,10 +1,10 @@
 # Portainer Deployment Reference
 
-This reference describes the intended Portainer Business Edition deployment on a Docker Standalone endpoint. GitHub Actions builds one application image for the web, migration, and worker services and publishes it to the GitHub Container Registry (GHCR). Portainer only pulls the published image; it does not build on the Docker host.
+This reference describes the Portainer Business Edition deployment on a Docker Standalone endpoint. GitHub Actions builds one application image for the API, web, migration, and worker services and publishes it to the GitHub Container Registry (GHCR). Portainer only pulls the published image; it does not build on the Docker host.
 
-> **Current deployment status: Blocked.** `compose.portainer.yml` does not define or proxy the standalone `apps/api` service, and its web and worker environments do not include the Better Auth and GitHub App variables required by publisher sign-in, claims, and account-erasure jobs. It also starts web and worker in parallel after migration. Do not deploy this incomplete stack to production. Every applicable item in [`docs/production-authorisation-blockers.md`](production-authorisation-blockers.md) must have recorded evidence and approval before any command or UI procedure below is executed.
+> **Technical stack status: Ready for controlled deployment.** `compose.portainer.yml` defines the API, web, migration, worker, and PostgreSQL services; limits credentials by service; exposes only API and web to the proxy network; and starts the worker only after API and web are healthy. This technical readiness is not production authorization. Every applicable item in [`docs/production-authorisation-blockers.md`](production-authorisation-blockers.md) still requires recorded evidence and approval before any command or UI procedure below is executed.
 
-The remaining sections are a future operator reference, not current deployment authorization. After the stack wiring is implemented, reviewed, and release-tested, an authorised operator must still approve each requested external action separately.
+The remaining sections are an operator reference, not deployment authorization. An authorised operator must approve each requested external action separately.
 
 ## Release Verification
 
@@ -19,10 +19,10 @@ See [`docs/release-runbook.md`](release-runbook.md) for the controlled sequence 
 - A Docker Standalone environment managed by Portainer Business Edition
 - An existing external Docker network named `proxy`
 - Nginx Proxy Manager attached to the `proxy` network
-- DNS for `themcpdirectory.org` pointing to the proxy host
+- DNS for `themcpdirectory.org` and `api.themcpdirectory.org` pointing to the proxy host
 - GitHub Actions enabled for the repository
 
-The production stack does not publish application or PostgreSQL ports on the host. Nginx Proxy Manager reaches the web service through the shared `proxy` network.
+The production stack does not publish application or PostgreSQL ports on the host. Nginx Proxy Manager reaches `mcpdirectory-web:3000` and `mcpdirectory-api:3001` through the shared `proxy` network.
 
 ## Container Image
 
@@ -31,7 +31,7 @@ The [Publish container workflow](../.github/workflows/publish-container.yml) run
 - `ghcr.io/themcpdirectory/themcpdirectory:main` for the latest successful `main` build
 - `ghcr.io/themcpdirectory/themcpdirectory:sha-<full-commit-sha>` for an immutable deployment and rollback target
 
-Only after the current deployment blockers are resolved and the action-specific approvals are recorded:
+Only after the action-specific approvals are recorded:
 
 1. Obtain explicit approval to merge or push the deployment changes to `main`.
 2. Wait for both **CI** and **Publish container** to finish successfully for the same commit.
@@ -42,7 +42,7 @@ New GHCR packages are private by default, even when linked to a public repositor
 
 ## Portainer Stack
 
-After the blocking stack changes and approvals are complete, select **Stacks**, **Add stack**, then **Git repository** in Portainer and configure:
+After approvals are complete, select **Stacks**, **Add stack**, then **Git repository** in Portainer and configure:
 
 | Setting                      | Value                        |
 | ---------------------------- | ---------------------------- |
@@ -61,7 +61,6 @@ Add these environment variables in Portainer:
 | `POSTGRES_PASSWORD`             | A long URL-safe password, for example from `openssl rand -hex 32`   |
 | `MCP_REGISTRY_BASE_URL`         | `https://registry.modelcontextprotocol.io`                          |
 | `NEXT_PUBLIC_BASE_URL`          | Approved canonical HTTPS web origin                                 |
-| `BETTER_AUTH_URL`               | Optional `/api/auth` URL on the canonical web origin                |
 | `BETTER_AUTH_SECRET`            | Secret-manager value with at least 32 characters                    |
 | `GITHUB_CLIENT_ID`              | Approved production GitHub OAuth application client ID              |
 | `GITHUB_CLIENT_SECRET`          | Secret-manager value for the production OAuth application           |
@@ -76,7 +75,7 @@ Add these environment variables in Portainer:
 | `GITHUB_TOKEN`                  | Optional GitHub token for higher enrichment rate limits             |
 | `APP_IMAGE`                     | Immutable `sha-...` image tag for the approved candidate            |
 
-The reviewed replacement stack must pass the API values to the API service and the Better Auth and GitHub App values to both web and worker. It derives the internal `DATABASE_URL` from the PostgreSQL settings, so do not add it separately. Keep `POSTGRES_USER`, `POSTGRES_DB`, and `POSTGRES_PASSWORD` URL-safe because they form that connection URL. Do not set `THEMCP_TEST_ADMIN_DATABASE_URL` or commit production values to an environment file.
+The stack passes API values only to the API, Better Auth and OAuth values only to the web service, and only the GitHub App credentials required for account erasure to the worker. It derives the internal `DATABASE_URL` from the PostgreSQL settings, so do not add it separately. Keep `POSTGRES_USER`, `POSTGRES_DB`, and `POSTGRES_PASSWORD` URL-safe because they form that connection URL. Do not set `THEMCP_TEST_ADMIN_DATABASE_URL` or commit production values to an environment file.
 
 Deploy only the reviewed, complete stack. Expected service state after startup:
 
@@ -90,16 +89,16 @@ The worker queues an Official MCP Registry synchronisation when it starts. The w
 
 ## Nginx Proxy Manager
 
-After deployment approval, create an access-restricted preview hostname in Nginx Proxy Manager with:
+After deployment approval, first create an access-restricted preview hostname for each upstream in Nginx Proxy Manager. Route the web preview to `mcpdirectory-web:3000` and the API preview to `mcpdirectory-api:3001`; use distinct approved preview hostnames.
 
-| Setting               | Value                                            |
-| --------------------- | ------------------------------------------------ |
-| Domain Names          | Approved non-public release-preview hostname     |
-| Scheme                | `http`                                           |
-| Forward Hostname / IP | `mcpdirectory-web`                               |
-| Forward Port          | `3000`                                           |
-| Websockets Support    | On                                               |
-| Access List           | Approved operator IP allowlist or authentication |
+| Setting               | Web value                                       | API value                                       |
+| --------------------- | ----------------------------------------------- | ----------------------------------------------- |
+| Domain Names          | Approved access-restricted web preview hostname | Approved access-restricted API preview hostname |
+| Scheme                | `http`                                          | `http`                                          |
+| Forward Hostname / IP | `mcpdirectory-web`                              | `mcpdirectory-api`                              |
+| Forward Port          | `3000`                                          | `3001`                                          |
+| Websockets Support    | On                                              | On                                              |
+| Access List           | Approved IP allowlist or authentication         | Approved IP allowlist or authentication         |
 
 Issue a valid certificate, enable **Force SSL**, and verify these routes through the access-restricted TLS endpoint:
 
@@ -109,7 +108,9 @@ Issue a valid certificate, enable **Force SSL**, and verify these routes through
 - `/robots.txt`
 - `/sitemap.xml`
 
-After every applicable health and smoke check in the release runbook passes and public routing has separate approval, configure the canonical hostname with the same upstream and TLS policy. Enable unrestricted public routing only after smoke tests pass. Repeat the applicable smoke checks through the canonical public endpoint and restore the access restriction immediately if any check fails.
+Verify the API preview returns `{ "status": "ok" }` at `/`, then run the API smoke checks from the release runbook. The configured production `API_CORS_ALLOWED_ORIGINS` remains the canonical web origin; preview API calls should be direct operator checks rather than browser requests from the preview web origin unless that temporary origin has been explicitly reviewed and added.
+
+After every applicable health and smoke check in the release runbook passes and public routing has separate approval, configure `themcpdirectory.org` to forward to `mcpdirectory-web:3000` and `api.themcpdirectory.org` to forward to `mcpdirectory-api:3001`, both with the same TLS policy. Enable unrestricted public routing only after smoke tests pass. Repeat the applicable smoke checks through both canonical public endpoints and restore the access restriction immediately if any check fails.
 
 ## Updates
 
@@ -122,7 +123,7 @@ After production deployment is unblocked, use this sequence for an approved upda
 3. Wait for both CI and the **Publish container** workflow to pass for that commit.
 4. Set `APP_IMAGE` to the candidate's immutable `sha-<full-commit-sha>` tag.
 5. In Portainer, open the stack and use **Pull and redeploy**.
-6. Confirm that `migrate` exits successfully and that `web` and `worker` are running.
+6. Confirm that `migrate` exits successfully, API and web become healthy, and exactly one worker is running.
 
 Keep GitOps updates disabled unless deployment ordering is automated separately. A Git poll can detect the commit before GitHub Actions has finished publishing its image. Restarting an individual container is also insufficient for an image update because it reuses the existing container. Each worker recreation attempts to enqueue one singleton Registry synchronisation job, so run only one worker container.
 
@@ -135,7 +136,7 @@ docker exec -i <postgres-container> pg_restore --list < mcpdirectory.dump > /dev
 
 Copy the verified dump off the Docker host. Regularly test restoration on a disposable database; an untested backup is not a recovery plan.
 
-The migration service runs committed Drizzle migrations before the updated web and worker services start. If migration fails, those services remain stopped and the migration logs should be inspected before retrying.
+The migration service runs committed Drizzle migrations before the updated API and web services start. If migration fails, those services remain stopped; because the worker requires both services to be healthy, it also remains stopped. Inspect migration logs before retrying.
 
 ### Password authentication failures
 
@@ -161,8 +162,8 @@ Disable GitOps updates during recovery. In the stack environment variables, set 
 ghcr.io/themcpdirectory/themcpdirectory:sha-0123456789abcdef0123456789abcdef01234567
 ```
 
-Use **Pull and redeploy**, then verify the migration, web, and worker service states. Remove `APP_IMAGE`, or set it to the desired newer immutable tag, when the incident is resolved. The default `main` tag is convenient for normal deployments but is not a reproducible rollback target.
+Use **Pull and redeploy**, then verify the migration, API, web, and worker service states. Remove `APP_IMAGE`, or set it to the desired newer immutable tag, when the incident is resolved. The default `main` tag is convenient for normal deployments but is not a reproducible rollback target.
 
-Application rollback does not automatically reverse database migrations. Keep migrations backwards compatible with the previous application revision. When that is not possible, stop Web and Worker, restore the verified pre-deployment database dump, and deploy its matching application revision before restoring public traffic.
+Application rollback does not automatically reverse database migrations. Keep migrations backwards compatible with the previous application revision. When that is not possible, stop API, web, and worker, restore the verified pre-deployment database dump, and deploy its matching application revision before restoring public traffic.
 
 Do not improvise recovery from this page alone. The release runbook defines when to stop, roll back only the application, forward-fix, or restore the database, along with the required post-action smoke checks.

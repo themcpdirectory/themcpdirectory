@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getCategoryServers, getCategories } from "@themcpdirectory/domain";
 import { getDb } from "@/lib/db";
 import { buildDocumentMetadata } from "@/lib/metadata";
-import { ServerCard } from "@/components/server-card";
+import { ServerDirectoryList } from "@/components/server-directory-list";
 import Link from "next/link";
 
 interface Props {
@@ -71,21 +71,7 @@ export default async function CategoryDetailPage({ params }: Props) {
           </p>
         )}
 
-        {servers.length === 0 ? (
-          <p style={{ color: "var(--fg-muted)" }}>No servers in this category yet.</p>
-        ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 20rem), 1fr))",
-              gap: "0.75rem",
-            }}
-          >
-            {servers.map((server) => (
-              <ServerCard key={server.id} server={server} />
-            ))}
-          </div>
-        )}
+        <ServerDirectoryList servers={servers} emptyMessage="No servers in this category yet." />
       </div>
     </main>
   );

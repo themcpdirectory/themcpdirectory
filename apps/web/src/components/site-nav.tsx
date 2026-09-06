@@ -63,10 +63,10 @@ export function SiteNav() {
               minHeight: "2.75rem",
             }}
           >
-            Categories
+            Browse
           </Link>
           <Link
-            href="/search"
+            href="/security"
             style={{
               fontSize: "0.875rem",
               color: "var(--fg-muted)",
@@ -76,7 +76,7 @@ export function SiteNav() {
               minHeight: "2.75rem",
             }}
           >
-            Search
+            Security
           </Link>
           <Link
             href="/docs"
@@ -92,7 +92,7 @@ export function SiteNav() {
             Docs
           </Link>
           <Link
-            href="/dashboard"
+            href="/publish"
             style={{
               fontSize: "0.875rem",
               color: "var(--fg-muted)",
@@ -102,7 +102,7 @@ export function SiteNav() {
               minHeight: "2.75rem",
             }}
           >
-            Dashboard
+            Publish
           </Link>
         </nav>
 
@@ -150,10 +150,10 @@ export function SiteNav() {
             minHeight: "2.75rem",
           }}
         >
-          Categories
+          Browse
         </Link>
         <Link
-          href="/search"
+          href="/security"
           onClick={() => setMenuOpen(false)}
           style={{
             color: "var(--fg)",
@@ -164,7 +164,7 @@ export function SiteNav() {
             minHeight: "2.75rem",
           }}
         >
-          Search
+          Security
         </Link>
         <Link
           href="/docs"
@@ -181,7 +181,7 @@ export function SiteNav() {
           Docs
         </Link>
         <Link
-          href="/dashboard"
+          href="/publish"
           onClick={() => setMenuOpen(false)}
           style={{
             color: "var(--fg)",
@@ -192,7 +192,7 @@ export function SiteNav() {
             minHeight: "2.75rem",
           }}
         >
-          Dashboard
+          Publish
         </Link>
       </nav>
     </header>

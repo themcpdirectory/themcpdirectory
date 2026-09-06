@@ -29,7 +29,7 @@ Production launch remains blocked until every applicable item below has a named 
 
 ## Infrastructure And Recovery
 
-- The current Portainer deployment gaps documented in [`docs/release-runbook.md`](release-runbook.md) are resolved: standalone API service and routing, publisher-authentication environment, service ordering, and production smoke coverage.
+- The reviewed Portainer stack configuration matches the intended API and web proxy routes, least-privilege service environments, health checks, and service ordering for the exact candidate commit.
 - The exact candidate commit has a green `pnpm verify:release` result and retained release reports on supported Node.js 24.
 - The immutable GHCR image tag and digest match that commit. CI and **Publish container** both passed for the same SHA.
 - GHCR package visibility and pull credentials are approved. Making a package public is an external, potentially irreversible action.

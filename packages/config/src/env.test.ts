@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { loadApiEnv, loadEnv, loadWebEnv, resolveWebUrls } from "./env.js";
+import { loadApiEnv, loadEnv, loadWebEnv, loadWorkerEnv, resolveWebUrls } from "./env.js";
 
 const BASE_ENV = {
   DATABASE_URL: "postgresql://user:pass@localhost:5432/db",
@@ -136,5 +136,21 @@ describe("loadWebEnv", () => {
         }),
       ),
     ).toThrow(/same origin/i);
+  });
+});
+
+describe("loadWorkerEnv", () => {
+  it("requires GitHub App erasure credentials without requiring web OAuth secrets", () => {
+    const env = loadWorkerEnv({
+      DATABASE_URL: "postgresql://localhost:5432/themcpdirectory",
+      MCP_REGISTRY_BASE_URL: "https://registry.modelcontextprotocol.io",
+      GITHUB_APP_ID: "12345",
+      GITHUB_APP_PRIVATE_KEY: "test-private-key",
+    });
+
+    expect(env.GITHUB_APP_ID).toBe("12345");
+    expect(env.GITHUB_APP_PRIVATE_KEY).toBe("test-private-key");
+    expect(env).not.toHaveProperty("BETTER_AUTH_SECRET");
+    expect(env).not.toHaveProperty("GITHUB_CLIENT_SECRET");
   });
 });

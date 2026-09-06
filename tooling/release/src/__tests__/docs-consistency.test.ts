@@ -39,7 +39,13 @@ describe("operator docs consistency", () => {
     };
 
     expect(compose).toMatch(/^ {2}web:$/m);
-    expect(compose).not.toMatch(/^ {2}api:$/m);
+    expect(compose).toMatch(/^ {2}api:$/m);
+    expect(compose).toContain("mcpdirectory-web");
+    expect(compose).toContain("mcpdirectory-api");
+    expect(compose).toContain('API_PORT: "3001"');
+    expect(compose).toContain("condition: service_healthy");
+    expect(compose).toMatch(/worker:[\s\S]*api:\n {8}condition: service_healthy/);
+    expect(compose).toMatch(/worker:[\s\S]*web:\n {8}condition: service_healthy/);
     for (const requiredWebVariable of [
       "BETTER_AUTH_SECRET",
       "GITHUB_CLIENT_ID",
@@ -49,8 +55,30 @@ describe("operator docs consistency", () => {
       "GITHUB_APP_SLUG",
     ]) {
       expect(environmentSchema).toContain(`${requiredWebVariable}:`);
-      expect(compose).not.toContain(requiredWebVariable);
+      expect(compose).toContain(`${requiredWebVariable}:`);
     }
+    for (const requiredApiVariable of [
+      "API_BASE_URL",
+      "API_CORS_ALLOWED_ORIGINS",
+      "API_CURSOR_SIGNING_SECRET",
+      "API_RATE_LIMIT_WINDOW_SECONDS",
+      "API_RATE_LIMIT_MAX_READS",
+    ]) {
+      expect(environmentSchema).toContain(`${requiredApiVariable}:`);
+      expect(compose).toContain(`${requiredApiVariable}:`);
+    }
+    const apiEnvironment = compose.slice(
+      compose.indexOf("x-api-environment:"),
+      compose.indexOf("x-worker-environment:"),
+    );
+    const workerEnvironment = compose.slice(
+      compose.indexOf("x-worker-environment:"),
+      compose.indexOf("x-logging:"),
+    );
+    expect(apiEnvironment).not.toContain("BETTER_AUTH_SECRET");
+    expect(apiEnvironment).not.toContain("GITHUB_CLIENT_SECRET");
+    expect(workerEnvironment).not.toContain("BETTER_AUTH_SECRET");
+    expect(workerEnvironment).not.toContain("GITHUB_CLIENT_SECRET");
     expect(ciWorkflow).toContain("run: pnpm verify:release");
     expect(publishWorkflow).toContain("branches: [main]");
     expect(publishWorkflow).not.toContain("workflow_run");
@@ -83,15 +111,15 @@ describe("operator docs consistency", () => {
     expect(deployment).toContain("rollback");
     expect(deployment).toContain("docs/release-runbook.md");
     expect(deployment).toContain("docs/production-authorisation-blockers.md");
-    expect(deployment).toContain("**Current deployment status: Blocked.**");
-    expect(deployment).toContain("Do not deploy this incomplete stack to production.");
+    expect(deployment).toContain("**Technical stack status: Ready for controlled deployment.**");
+    expect(deployment).toContain("api.themcpdirectory.org");
+    expect(deployment).toContain("mcpdirectory-api");
     expect(deployment).not.toContain("The MVP can be deployed");
-    expect(deployment).not.toContain("Deploy the stack.");
     const portainerVariablesStart = deployment.indexOf(
       "Add these environment variables in Portainer:",
     );
     const portainerVariablesEnd = deployment.indexOf(
-      "The reviewed replacement stack must pass",
+      "The stack passes API values only to the API",
       portainerVariablesStart,
     );
     expect(portainerVariablesStart).toBeGreaterThanOrEqual(0);

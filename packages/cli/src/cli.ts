@@ -1,33 +1,13 @@
 #!/usr/bin/env node
 
-import { runAddCliCommand } from "./commands/add.js";
-import { runInfoCommand } from "./commands/info.js";
-import { runListCommand } from "./commands/list.js";
-import { runDoctorCommand } from "./commands/doctor.js";
-import { runRemoveCliCommand } from "./commands/remove.js";
-import type { CommandResult } from "./commands/result.js";
-import { runSearchCommand } from "./commands/search.js";
-import { runUpdateCliCommand } from "./commands/update.js";
-import { getCliCommandMetadata, renderCliHelp } from "./command-metadata.js";
+import { dispatchCommand } from "./command-dispatch.js";
+import { renderCliHelp } from "./command-metadata.js";
 import { createDefaultCliDependencies, type CliDependencies } from "./dependencies.js";
-import { serializeJsonEnvelope } from "./output/json.js";
-import { renderHumanEnvelope, sanitizeTerminalText } from "./output/render.js";
+import { runInteractiveSession } from "./interactive/session.js";
 import packageMetadata from "../package.json" with { type: "json" };
 
 export const CLI_HELP_TEXT = renderCliHelp();
 export const CLI_VERSION = packageMetadata.version;
-
-type CliCommandHandler = (argv: readonly string[], deps: CliDependencies) => Promise<CommandResult>;
-
-const COMMAND_HANDLERS: Readonly<Record<string, CliCommandHandler>> = Object.freeze({
-  add: runAddCliCommand,
-  doctor: runDoctorCommand,
-  search: runSearchCommand,
-  info: runInfoCommand,
-  list: runListCommand,
-  remove: runRemoveCliCommand,
-  update: runUpdateCliCommand,
-});
 
 export async function runCli(argv: readonly string[]): Promise<number>;
 export async function runCli(argv: readonly string[], deps: CliDependencies): Promise<number>;
@@ -36,7 +16,17 @@ export async function runCli(argv: readonly string[], deps?: CliDependencies): P
   const resolvedDeps = deps ?? createDefaultCliDependencies();
   const [command, ...commandArgs] = argv;
 
-  if (!command || command === "help" || command === "--help" || command === "-h") {
+  if (!command) {
+    if (resolvedDeps.promptIO.isInteractive) {
+      const sessionExitCode = await runInteractiveSession(resolvedDeps);
+      return finalizeExitCode(sessionExitCode, ownsProcessExit);
+    }
+
+    resolvedDeps.output.writeStdout(`${CLI_HELP_TEXT}\n`);
+    return finalizeExitCode(0, ownsProcessExit);
+  }
+
+  if (command === "help" || command === "--help" || command === "-h") {
     resolvedDeps.output.writeStdout(`${CLI_HELP_TEXT}\n`);
     return finalizeExitCode(0, ownsProcessExit);
   }
@@ -46,42 +36,14 @@ export async function runCli(argv: readonly string[], deps?: CliDependencies): P
     return finalizeExitCode(0, ownsProcessExit);
   }
 
-  const commandMetadata = getCliCommandMetadata(command);
-  if (commandMetadata && (commandArgs.includes("--help") || commandArgs.includes("-h"))) {
-    resolvedDeps.output.writeStdout(`${commandMetadata.usage}\n`);
-    return finalizeExitCode(0, ownsProcessExit);
-  }
-
-  const handler = COMMAND_HANDLERS[command];
-  if (!handler) {
-    resolvedDeps.output.writeStderr(`Unknown command: ${sanitizeTerminalText(command)}\n`);
-    resolvedDeps.output.writeStderr("Run mcpdir --help for available commands.\n");
-    return finalizeExitCode(1, ownsProcessExit);
-  }
-
-  const result = await handler(commandArgs, resolvedDeps);
-  writeCommandResult(result, commandArgs.includes("--json"), resolvedDeps);
-  return finalizeExitCode(result.exitCode, ownsProcessExit);
+  return finalizeExitCode(
+    await dispatchCommand(command, commandArgs, resolvedDeps),
+    ownsProcessExit,
+  );
 }
 
 export async function runCliMain(argv: readonly string[] = process.argv.slice(2)): Promise<void> {
   await runCli(argv);
-}
-
-function writeCommandResult(result: CommandResult, jsonMode: boolean, deps: CliDependencies): void {
-  if (result.stdout) {
-    if (jsonMode) {
-      deps.output.writeStdout(`${serializeJsonEnvelope(result.stdout)}\n`);
-    } else {
-      for (const line of renderHumanEnvelope(result.stdout)) {
-        deps.output.writeStdout(`${line}\n`);
-      }
-    }
-  }
-
-  for (const line of result.stderrLines) {
-    deps.output.writeStderr(`${sanitizeTerminalText(line)}\n`);
-  }
 }
 
 function finalizeExitCode(exitCode: number, ownsProcessExit: boolean): number {

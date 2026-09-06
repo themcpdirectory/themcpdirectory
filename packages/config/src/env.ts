@@ -103,9 +103,15 @@ const WebAuthEnvSchema = SharedEnvSchema.extend({
   }
 });
 
+const WorkerEnvSchema = SharedEnvSchema.extend({
+  GITHUB_APP_ID: z.string().regex(/^\d+$/),
+  GITHUB_APP_PRIVATE_KEY: z.string().min(1),
+});
+
 export type DirectoryEnv = z.infer<typeof SharedEnvSchema>;
 export type ApiEnv = z.infer<typeof ApiEnvSchema>;
 export type WebEnv = z.infer<typeof WebAuthEnvSchema>;
+export type WorkerEnv = z.infer<typeof WorkerEnvSchema>;
 
 export function loadEnv(raw: Record<string, string | undefined> = process.env): DirectoryEnv {
   const result = SharedEnvSchema.safeParse(raw);
@@ -127,6 +133,14 @@ export function loadWebEnv(raw: Record<string, string | undefined> = process.env
   const result = WebAuthEnvSchema.safeParse(raw);
   if (!result.success) {
     throw new Error(`Invalid web environment configuration: ${result.error.message}`);
+  }
+  return result.data;
+}
+
+export function loadWorkerEnv(raw: Record<string, string | undefined> = process.env): WorkerEnv {
+  const result = WorkerEnvSchema.safeParse(raw);
+  if (!result.success) {
+    throw new Error(`Invalid worker environment configuration: ${result.error.message}`);
   }
   return result.data;
 }

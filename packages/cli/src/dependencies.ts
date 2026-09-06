@@ -1,5 +1,3 @@
-import { createInterface } from "node:readline/promises";
-import { Writable } from "node:stream";
 import {
   createAdapterRegistry,
   createClaudeCodeAdapter,
@@ -14,6 +12,7 @@ import type { ReceiptStore } from "./config/receipt-store.js";
 import { createReceiptStore } from "./config/receipt-store.js";
 import { type CliRuntimeConfig, resolveCliRuntimeConfig } from "./config/runtime.js";
 import { resolveCliStatePaths } from "./config/state-paths.js";
+import { createInquirerPromptIO, resolvePromptMode } from "./prompts/inquirer.js";
 
 export interface PromptIO {
   readonly isInteractive: boolean;
@@ -79,7 +78,7 @@ export function createDefaultCliDependencies(
       createVsCodeAdapter(adapterRuntime),
     ]),
     receiptStore: createReceiptStore(statePaths, { now: clock }),
-    promptIO: createPromptIO(stdin, stdout),
+    promptIO: createPromptIO(stdin, stdout, { environment: env }),
     output: createOutputWriter(stdout, stderr),
     runtime,
     environment: env,
@@ -101,98 +100,15 @@ export function createOutputWriter(
   };
 }
 
-export function createPromptIO(stdin: NodeJS.ReadStream, stdout: NodeJS.WriteStream): PromptIO {
-  const isInteractive = Boolean(stdin.isTTY && stdout.isTTY);
-
-  return {
-    isInteractive,
-    async select<T extends string>(message: string, options: readonly T[]): Promise<T> {
-      assertInteractive(isInteractive);
-      const optionLines = options.map((option, index) => `${index + 1}. ${option}`).join("\n");
-
-      while (true) {
-        const answer = await ask(stdin, stdout, `${message}\n${optionLines}\nSelect an option: `);
-        const byNumber = Number(answer.trim());
-        if (Number.isInteger(byNumber) && byNumber >= 1 && byNumber <= options.length) {
-          return options[byNumber - 1]!;
-        }
-
-        const byValue = options.find((option) => option === answer.trim());
-        if (byValue) {
-          return byValue;
-        }
-
-        stdout.write("Please choose one of the listed options.\n");
-      }
-    },
-
-    async input(message: string): Promise<string> {
-      assertInteractive(isInteractive);
-      return await ask(stdin, stdout, `${message}: `);
-    },
-
-    async secretInput(message: string): Promise<string> {
-      assertInteractive(isInteractive);
-      return await askSecret(stdin, stdout, `${message}: `);
-    },
-
-    async confirm(message: string): Promise<boolean> {
-      assertInteractive(isInteractive);
-
-      while (true) {
-        const answer = (await ask(stdin, stdout, `${message} [y/N]: `)).trim().toLowerCase();
-        if (answer === "y" || answer === "yes") {
-          return true;
-        }
-
-        if (answer === "" || answer === "n" || answer === "no") {
-          return false;
-        }
-
-        stdout.write("Please answer yes or no.\n");
-      }
-    },
-  };
-}
-
-async function askSecret(
+export function createPromptIO(
   stdin: NodeJS.ReadStream,
   stdout: NodeJS.WriteStream,
-  message: string,
-): Promise<string> {
-  const mutedOutput = new Writable({
-    write(_chunk, _encoding, callback): void {
-      callback();
-    },
+  options: { readonly environment?: Readonly<NodeJS.ProcessEnv> } = {},
+): PromptIO {
+  return createInquirerPromptIO({
+    input: stdin,
+    output: stdout,
+    isInteractive: Boolean(stdin.isTTY && stdout.isTTY),
+    mode: resolvePromptMode(options.environment ?? process.env),
   });
-  const readline = createInterface({ input: stdin, output: mutedOutput, terminal: true });
-  stdout.write(message);
-
-  try {
-    return await readline.question("");
-  } finally {
-    stdout.write("\n");
-    readline.close();
-    mutedOutput.destroy();
-  }
-}
-
-async function ask(
-  stdin: NodeJS.ReadStream,
-  stdout: NodeJS.WriteStream,
-  message: string,
-): Promise<string> {
-  const readline = createInterface({ input: stdin, output: stdout });
-
-  try {
-    return await readline.question(message);
-  } finally {
-    readline.close();
-  }
-}
-
-function assertInteractive(isInteractive: boolean): void {
-  if (!isInteractive) {
-    throw new Error("Interactive prompting is unavailable in non-interactive mode");
-  }
 }

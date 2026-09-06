@@ -1,8 +1,32 @@
-x-app-environment: &app-environment
+x-common-environment: &common-environment
   DATABASE_URL: postgresql://${POSTGRES_USER:-mcpdirectory}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-mcpdirectory}
   MCP_REGISTRY_BASE_URL: ${MCP_REGISTRY_BASE_URL:-https://registry.modelcontextprotocol.io}
+
+x-web-environment: &web-environment
+  <<: *common-environment
   NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://themcpdirectory.org}
+  BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
+  GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:?GITHUB_CLIENT_ID is required}
+  GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:?GITHUB_CLIENT_SECRET is required}
+  GITHUB_APP_ID: ${GITHUB_APP_ID:?GITHUB_APP_ID is required}
+  GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:?GITHUB_APP_PRIVATE_KEY is required}
+  GITHUB_APP_SLUG: ${GITHUB_APP_SLUG:?GITHUB_APP_SLUG is required}
   WEB_PORT: "3000"
+
+x-api-environment: &api-environment
+  <<: *common-environment
+  API_BASE_URL: ${API_BASE_URL:-https://api.themcpdirectory.org}
+  API_CORS_ALLOWED_ORIGINS: ${API_CORS_ALLOWED_ORIGINS:-https://themcpdirectory.org}
+  API_CURSOR_SIGNING_SECRET: ${API_CURSOR_SIGNING_SECRET:?API_CURSOR_SIGNING_SECRET is required}
+  API_RATE_LIMIT_WINDOW_SECONDS: ${API_RATE_LIMIT_WINDOW_SECONDS:-60}
+  API_RATE_LIMIT_MAX_READS: ${API_RATE_LIMIT_MAX_READS:-120}
+  API_PORT: "3001"
+
+x-worker-environment: &worker-environment
+  <<: *common-environment
+  GITHUB_APP_ID: ${GITHUB_APP_ID:?GITHUB_APP_ID is required}
+  GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:?GITHUB_APP_PRIVATE_KEY is required}
+  GITHUB_TOKEN: ${GITHUB_TOKEN:-}
 
 x-logging: &default-logging
   driver: json-file
@@ -38,7 +62,7 @@ services:
     pull_policy: always
     command: ["pnpm", "db:migrate"]
     restart: "no"
-    environment: *app-environment
+    environment: *common-environment
     depends_on:
       postgres:
         condition: service_healthy
@@ -46,12 +70,44 @@ services:
       - app
     logging: *default-logging
 
+  api:
+    image: ${APP_IMAGE:-ghcr.io/themcpdirectory/themcpdirectory:main}
+    pull_policy: always
+    command: ["pnpm", "--filter", "@themcpdirectory/api", "start"]
+    restart: unless-stopped
+    init: true
+    environment: *api-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3001/').then((response)=>{if(!response.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    expose:
+      - "3001"
+    networks:
+      app: {}
+      proxy:
+        aliases:
+          - mcpdirectory-api
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+    stop_grace_period: 30s
+
   web:
     image: ${APP_IMAGE:-ghcr.io/themcpdirectory/themcpdirectory:main}
     pull_policy: always
     restart: unless-stopped
     init: true
-    environment: *app-environment
+    environment: *web-environment
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -83,15 +139,12 @@ services:
     command: ["pnpm", "--filter", "@themcpdirectory/worker", "start"]
     restart: unless-stopped
     init: true
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-mcpdirectory}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-mcpdirectory}
-      - MCP_REGISTRY_BASE_URL=${MCP_REGISTRY_BASE_URL:-https://registry.modelcontextprotocol.io}
-      - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL:-https://themcpdirectory.org}
-      - WEB_PORT=3000
-      - GITHUB_TOKEN
+    environment: *worker-environment
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
     networks:
       - app
     security_opt:

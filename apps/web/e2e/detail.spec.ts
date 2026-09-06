@@ -269,10 +269,9 @@ test.describe("Server detail page", () => {
     }
   });
 
-  test("shows CLI unavailable note (no install action)", async ({ page }) => {
+  test("shows a real install command when installation is available", async ({ page }) => {
     await page.goto("/github");
-    // Should show unavailable note for CLI, not a fake install command
-    await expect(page.getByText(/cli.*not yet available|installation.*coming/i)).toBeVisible();
+    await expect(page.locator(".install-command__code")).toHaveText("mcpdir add github");
   });
 
   test("no horizontal overflow at 320px", async ({ page }) => {

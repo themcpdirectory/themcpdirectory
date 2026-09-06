@@ -89,6 +89,7 @@ export function getPrivacyDraftDocument(): ReleaseDocument {
         body: [
           "Signed-in publisher features use strictly necessary authentication cookies. No behavioural analytics, advertising, fingerprinting, session replay, marketing pixels, or cross-site tracking is added at launch.",
         ],
+        links: [{ href: "/cookies", label: "Read the cookie policy" }],
       },
       {
         id: "directory-observations",
@@ -155,6 +156,7 @@ export function getTermsDraftDocument(): ReleaseDocument {
           `The MCP Directory is operated by ${OPERATOR_ADDRESS[0]}. It provides public discovery information, factual trust and health observations, installation planning, a public API, a command-line client, and publisher account features.`,
           "These terms are a draft and do not take effect as final production terms until they have received qualified legal review and an effective date has been published.",
         ],
+        links: [{ href: "/imprint", label: "Operator information" }],
       },
       {
         id: "trust-information",
@@ -212,6 +214,85 @@ export function getTermsDraftDocument(): ReleaseDocument {
         heading: "Governing law and final legal terms",
         body: [
           "Governing law, jurisdiction, limitation of liability, warranty language, age requirements, and an effective date remain subject to qualified legal review. No placeholder in this draft should be treated as a concluded legal position.",
+        ],
+      },
+    ],
+  };
+}
+
+export function getCookieDraftDocument(): ReleaseDocument {
+  return {
+    title: "Cookie policy",
+    description:
+      "The storage used for sign-in, why it is necessary, and what changes would require consent.",
+    draftLabel: LEGAL_DRAFT_LABEL,
+    sections: [
+      {
+        id: "current-use",
+        heading: "Current use",
+        body: [
+          "The public directory can be browsed without an account. At launch, the service does not use advertising, behavioural analytics, fingerprinting, session replay, marketing pixels, or cross-site tracking cookies.",
+          "Strictly necessary cookies are set only when you begin GitHub sign-in or use an authenticated publisher session. Disabling them prevents sign-in and publisher account features from working.",
+        ],
+      },
+      {
+        id: "auth-state",
+        heading: "better-auth.state",
+        body: [
+          "Purpose: preserves and validates the short-lived GitHub OAuth sign-in transaction, helping prevent forged or mismatched callbacks.",
+          "Duration: temporary and limited to the sign-in flow. Protection: Secure, HttpOnly, SameSite=Lax, Path=/.",
+        ],
+      },
+      {
+        id: "session-token",
+        heading: "better-auth.session_token",
+        body: [
+          "Purpose: identifies an authenticated publisher session so protected account and listing-management features can be provided.",
+          "Duration: until the session expires or is ended. Expired server-side session records follow the retention period described in the privacy notice. Protection: Secure, HttpOnly, SameSite=Lax, Path=/.",
+        ],
+      },
+      {
+        id: "consent",
+        heading: "Consent and future changes",
+        body: [
+          "No consent banner is shown for the strictly necessary storage described above. If optional analytics, advertising, personalization, or other non-essential storage is introduced, it must remain off until the required choice has been offered and recorded.",
+          "This policy must be updated before any new cookie or comparable browser storage is enabled in production.",
+        ],
+        links: [{ href: "/privacy", label: "Read the privacy notice" }],
+      },
+    ],
+  };
+}
+
+export function getImprintDraftDocument(): ReleaseDocument {
+  return {
+    title: "Operator information",
+    description:
+      "Identity and contact information for the organisation responsible for The MCP Directory.",
+    draftLabel: LEGAL_DRAFT_LABEL,
+    sections: [
+      {
+        id: "operator",
+        heading: "Service operator",
+        body: [OPERATOR_ADDRESS.join("\n")],
+      },
+      {
+        id: "status",
+        heading: "Publication status",
+        body: [
+          "The service is pre-release. Verified company-registration details, an authorised representative, a monitored legal contact, tax information where applicable, and any jurisdiction-specific mandatory disclosures must be approved before this page is treated as final legal notice.",
+          "No missing identifier or contact detail should be inferred from this draft, and no unmonitored contact channel is represented as available.",
+        ],
+      },
+      {
+        id: "responsibility",
+        heading: "Content responsibility",
+        body: [
+          "Directory records and repository metadata are obtained from named third-party sources. Trust and health signals are factual observations, not certification, endorsement, or a guarantee of safety or availability.",
+        ],
+        links: [
+          { href: "/terms", label: "Terms of service" },
+          { href: "/security", label: "Security policy" },
         ],
       },
     ],

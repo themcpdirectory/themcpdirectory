@@ -45,18 +45,28 @@ function runCommand(
   });
 }
 
-async function trackedFiles(rootDirectory: string): Promise<readonly string[]> {
+export async function releaseCandidateFiles(rootDirectory: string): Promise<readonly string[]> {
   const result = await runCommand(
     "git",
-    ["ls-files", "-z", "--", ...SECRET_SCAN_TARGETS],
+    ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...SECRET_SCAN_TARGETS],
     rootDirectory,
   );
   if (result.exitCode !== 0) throw new Error(`git ls-files failed: ${result.stderr.trim()}`);
-  return result.stdout.split("\0").filter(Boolean);
+  const files = result.stdout.split("\0").filter(Boolean);
+  const presentFiles: string[] = [];
+  for (const relativeFile of files) {
+    try {
+      await lstat(path.resolve(rootDirectory, relativeFile));
+      presentFiles.push(relativeFile);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
+  return presentFiles.sort();
 }
 
 async function stageTrackedFiles(rootDirectory: string, stagingDirectory: string): Promise<number> {
-  const files = await trackedFiles(rootDirectory);
+  const files = await releaseCandidateFiles(rootDirectory);
   for (const relativeFile of files) {
     const source = path.resolve(rootDirectory, relativeFile);
     if (!source.startsWith(`${path.resolve(rootDirectory)}${path.sep}`)) {

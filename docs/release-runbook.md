@@ -59,9 +59,7 @@ The required logical order for a complete deployment is:
 7. Run the applicable smoke tests through that restricted route.
 8. Enable unrestricted public routing only after smoke tests pass.
 
-The current Portainer stack enforces `postgres -> migrate -> web and worker`, starts web and worker in parallel after migration, and has no standalone API service. It therefore does not implement the complete order above. Do not advertise the production API or publisher workflows until the stack includes the API, passes the full web authentication environment, starts the worker last, and has been reviewed and release-tested.
-
-For the currently supported anonymous web/worker stack, use Portainer Business Edition **Pull and redeploy**, require `migrate` to exit successfully, require `web` to become healthy, and confirm exactly one worker is running. Do not run the deterministic development seed in production.
+The Portainer stack encodes this order as `postgres (healthy) -> migrate (completed) -> API and web (healthy) -> worker`. Use Portainer Business Edition **Pull and redeploy**, require `migrate` to exit successfully, require API and web to become healthy, and confirm exactly one worker is running. Do not run the deterministic development seed in production.
 
 ## Health And Smoke Checks
 
@@ -71,6 +69,7 @@ Run pre-public checks through the access-restricted preview hostname or operator
 
 - PostgreSQL reports healthy and accepts `SELECT 1` through the application network.
 - `migrate` exited with code `0` and did not restart.
+- API is healthy at `/` and its container restart count is stable.
 - Web is healthy at `/` and its container restart count is stable.
 - Exactly one worker is running; inspect structured logs for startup, queue creation, Registry synchronization, trust refresh, publisher outbox, erasure, and retention failures. The worker has no HTTP health endpoint.
 - Nginx Proxy Manager presents the expected certificate and redirects HTTP to HTTPS.
@@ -82,13 +81,13 @@ Run pre-public checks through the access-restricted preview hostname or operator
 - Security headers and the production nonce CSP are present on HTML responses.
 - Search and detail content reflect the expected database state; no development seed claim is inferred from an empty first synchronization.
 
-### Standalone API, When Deployed
+### Standalone API
 
 - `GET /` returns `{ "status": "ok" }` on the API service.
 - `GET /api/v1/openapi.json`, `/api/v1/search?q=github`, `/api/v1/servers/github`, and `/api/v1/clients` return schema-valid success responses.
 - The public proxy preserves request IDs, cache headers, CORS policy, rate limits, and `/api/v1` paths.
 
-### Publisher Authentication, When Enabled
+### Publisher Authentication
 
 - GitHub OAuth callback URLs and the GitHub App setup URL use the production origin.
 - Sign-in completes with a dedicated release account and does not persist GitHub access, refresh, installation, or ID tokens.
@@ -114,7 +113,6 @@ Escalate immediately for suspected credential exposure, authorization bypass, pe
 - No open-source license has been selected; repository and package metadata grant no redistribution permission.
 - Privacy and Terms are drafts pending qualified legal approval.
 - A configured, monitored, and tested responsible-disclosure contact is still required before launch wording can be final.
-- The current Portainer stack omits the standalone API and publisher-authentication/GitHub App environment, and starts web and worker in parallel after migration.
 - The worker has no HTTP readiness endpoint and only one worker instance is supported by the current operating guidance.
 - Registry synchronization is queued at worker startup; no recurring Registry schedule is currently documented.
 - The GHCR publish workflow and CI run independently on `main`; image existence does not prove release verification passed.
