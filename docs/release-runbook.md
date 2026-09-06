@@ -109,8 +109,8 @@ Escalate immediately for suspected credential exposure, authorization bypass, pe
 
 ## Known Limitations
 
-- The CLI package is `private`, `UNLICENSED`, and not published to npm. The tarball gate is verification, not publication.
-- No open-source license has been selected; repository and package metadata grant no redistribution permission.
+- The CLI package is published to npm under the MIT license. The tarball gate verifies a candidate artefact but does not publish it.
+- npm publication is independent from application deployment; a published CLI version does not prove that its configured Directory API is publicly available.
 - Privacy and Terms are drafts pending qualified legal approval.
 - A configured, monitored, and tested responsible-disclosure contact is still required before launch wording can be final.
 - The worker has no HTTP readiness endpoint and only one worker instance is supported by the current operating guidance.

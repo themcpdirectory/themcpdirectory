@@ -1,6 +1,6 @@
 {
   "name": "@themcpdirectory/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "description": "Command-line client for The MCP Directory.",
   "type": "module",
@@ -8,8 +8,8 @@
     "mcpdir": "dist/index.js"
   },
   "publishConfig": {
-  "access": "public"
-},
+    "access": "public"
+  },
   "files": [
     "dist",
     "README.md"

@@ -82,10 +82,10 @@ describe("operator docs consistency", () => {
     expect(ciWorkflow).toContain("run: pnpm verify:release");
     expect(publishWorkflow).toContain("branches: [main]");
     expect(publishWorkflow).not.toContain("workflow_run");
-    expect(cliPackage).toMatchObject({ license: "UNLICENSED", private: true });
+    expect(cliPackage).toMatchObject({ license: "MIT", private: false });
 
-    expect(readme).not.toContain("npm install -g @themcpdirectory/cli");
-    expect(readme).toContain("No open-source license has been selected yet.");
+    expect(readme).toContain("npm install --global @themcpdirectory/cli");
+    expect(readme).toContain("[MIT License](LICENSE)");
     expect(readme).toContain("docs/release-runbook.md");
     expect(readme).toContain("pnpm verify:release does not publish to npm or deploy the stack.");
     expect(readme).toContain("**Production deployment is blocked.**");

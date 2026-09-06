@@ -191,7 +191,7 @@ pnpm --filter @themcpdirectory/cli exec mcpdir --help
 pnpm prettier --check README.md docs/development.md docs/superpowers/plans/2026-09-01-phase-e-cli-installation.md
 ```
 
-The built file at `packages/cli/dist/index.js` is a bundled local-development executable. Run `pnpm release:cli-tarball` from the repository root to check the publish allowlist, record the tarball SHA-256, install the exact archive into a temporary prefix, and exercise its packed binary and adapters. This validates an artefact but does not publish it; `@themcpdirectory/cli` remains private and `UNLICENSED`.
+The built file at `packages/cli/dist/index.js` is a bundled local-development executable. Run `pnpm release:cli-tarball` from the repository root to check the publish allowlist, record the tarball SHA-256, install the exact archive into a temporary prefix, and exercise its packed binary and adapters. This validates an artefact but does not publish it. The public package is installed with `npm install --global @themcpdirectory/cli`.
 
 ## Validation
 

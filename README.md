@@ -16,7 +16,14 @@ The MCP Directory is an open directory for discovering and installing Model Cont
 
 ## CLI
 
-Build the executable and inspect its commands:
+Install the published CLI with Node.js 24:
+
+```sh
+npm install --global @themcpdirectory/cli
+mcpdir --help
+```
+
+To build the executable from this repository instead:
 
 ```sh
 pnpm --filter @themcpdirectory/cli build
@@ -27,7 +34,7 @@ The CLI provides `search`, `info`, `add`, `list`, `remove`, `update`, and `docto
 
 Install and removal plans are restricted to adapter-owned executables, configuration roots, capabilities, and deeplinks. Mutating commands show or require confirmation unless `--yes` is supplied, receipts are written only after successful verification, and `doctor` performs read-only configuration inspection without starting installed MCP servers. Output and receipts never contain environment values or persisted secrets.
 
-The workspace build is intended for local development. `pnpm release:cli-tarball` builds, inspects, hashes, installs, and smoke-tests the packed CLI in an isolated temporary environment. The package remains private and unpublished; do not present it as a public npm installation until licensing and publication are explicitly approved.
+`pnpm release:cli-tarball` builds, inspects, hashes, installs, and smoke-tests the packed CLI in an isolated temporary environment before publication.
 
 ## Quick Start
 
@@ -135,8 +142,8 @@ The browser suite creates, migrates, seeds, and drops an isolated PostgreSQL dat
 
 ## Contributing and Security
 
-External code contributions are paused until the project selects licensing and contribution terms. Maintainers and invited contributors should read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change. Follow the private process in [SECURITY.md](SECURITY.md) for vulnerability details; never put technical vulnerability information in a public issue.
+External code contributions are paused until the project finalizes its contribution terms. Maintainers and invited contributors should read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change. Follow the private process in [SECURITY.md](SECURITY.md) for vulnerability details; never put technical vulnerability information in a public issue.
 
 ## License
 
-No open-source license has been selected yet. Do not assume permission to copy, modify, or redistribute the repository until the project publishes an explicit license.
+The project is available under the [MIT License](LICENSE).

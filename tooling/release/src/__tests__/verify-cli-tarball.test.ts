@@ -3,6 +3,10 @@ import { CLI_TARBALL_ALLOWLIST, CLI_TARBALL_SMOKE_STEPS } from "../verify-cli-ta
 import { RELEASE_CHECKS } from "../verify-release.js";
 
 describe("cli tarball smoke", () => {
+  it("includes the package license", () => {
+    expect(CLI_TARBALL_ALLOWLIST).toContain("LICENSE");
+  });
+
   it("allows the public JavaScript entry point and generated TypeScript declarations", () => {
     expect(CLI_TARBALL_ALLOWLIST).toContain("dist/index.js");
     expect(CLI_TARBALL_ALLOWLIST).toContain("dist/index.d.ts");

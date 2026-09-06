@@ -16,6 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { startFakeDirectoryApi } from "./fake-directory-api.js";
 
 export const CLI_TARBALL_ALLOWLIST = [
+  "LICENSE",
   "README.md",
   "dist/index.d.ts",
   "dist/index.js",
