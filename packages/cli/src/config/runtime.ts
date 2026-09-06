@@ -1,6 +1,6 @@
 import { resolveCliStatePaths } from "./state-paths.js";
 
-const DEFAULT_API_BASE_URL = "http://127.0.0.1:3001/api/v1";
+const DEFAULT_API_BASE_URL = "https://api.themcpdirectory.org/api/v1";
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 
 export interface CliRuntimeConfig {

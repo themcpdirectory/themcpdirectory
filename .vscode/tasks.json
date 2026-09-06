@@ -1,255 +1,253 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"label": "Inspect Phase D-H worktree",
-			"type": "shell",
-			"command": "/usr/bin/git",
-			"args": [
-				"-C",
-				"/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
-				"status",
-				"--short"
-			],
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "build"
-		},
-		{
-			"label": "Stage Phase E Task 13",
-			"type": "shell",
-			"command": "/usr/bin/git",
-			"args": [
-				"-C",
-				"/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
-				"add",
-				"--",
-				".superpowers/sdd/2026-09-01-phase-e-cli-installation/progress.md",
-				"packages/cli/src/cli.ts",
-				"packages/cli/src/output/json.ts",
-				"packages/cli/src/output/render.ts",
-				"packages/cli/src/__tests__/list-remove.test.ts",
-				"packages/cli/src/commands/list.ts",
-				"packages/cli/src/commands/remove.ts",
-				"packages/client-adapters/src/application-detection.ts",
-				"packages/client-adapters/src/__tests__/registry.test.ts",
-				"packages/client-adapters/src/cursor.ts",
-				"packages/client-adapters/src/vscode.ts"
-			],
-			"isBackground": false,
-			"problemMatcher": []
-		},
-		{
-			"label": "Stage Phase E Task 13 code",
-			"type": "shell",
-			"command": "/usr/bin/git",
-			"args": [
-				"-C",
-				"/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
-				"add",
-				"--",
-				"packages/cli/src/cli.ts",
-				"packages/cli/src/output/json.ts",
-				"packages/cli/src/output/render.ts",
-				"packages/cli/src/__tests__/list-remove.test.ts",
-				"packages/cli/src/commands/list.ts",
-				"packages/cli/src/commands/remove.ts",
-				"packages/client-adapters/src/application-detection.ts",
-				"packages/client-adapters/src/__tests__/registry.test.ts",
-				"packages/client-adapters/src/cursor.ts",
-				"packages/client-adapters/src/vscode.ts"
-			],
-			"isBackground": false,
-			"problemMatcher": []
-		},
-		{
-			"label": "Commit Phase E Task 13",
-			"type": "shell",
-			"command": "/usr/bin/git",
-			"args": [
-				"-C",
-				"/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
-				"commit",
-				"-m",
-				"feat(cli): add list and remove commands"
-			],
-			"isBackground": false,
-			"problemMatcher": []
-		},
-		{
-			"label": "phase-e-task14-red",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"--dir",
-				"/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
-				"--filter",
-				"@themcpdirectory/cli",
-				"exec",
-				"vitest",
-				"run",
-				"src/__tests__/update.test.ts"
-			],
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "test"
-		},
-		{
-			"label": "phase-e-task14-typecheck",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"--dir",
-				"/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
-				"--filter",
-				"@themcpdirectory/cli",
-				"typecheck"
-			],
-			"isBackground": false,
-			"problemMatcher": [
-				"$tsc"
-			],
-			"group": "build"
-		},
-		{
-			"label": "phase-e-task14-lint",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"--dir",
-				"/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
-				"--filter",
-				"@themcpdirectory/cli",
-				"lint"
-			],
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "build"
-		},
-		{
-			"label": "phase-e-task14-format",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"--dir",
-				"/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
-				"exec",
-				"prettier",
-				"--write",
-				"packages/cli/src/commands/update.ts",
-				"packages/cli/src/__tests__/update.test.ts",
-				"packages/cli/src/cli.ts",
-				"packages/cli/src/index.ts",
-				"packages/cli/src/output/render.ts"
-			],
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "build"
-		},
-		{
-			"label": "phase-e-task14-format-check",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"--dir",
-				"/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
-				"exec",
-				"prettier",
-				"--check",
-				"packages/cli/src/commands/update.ts",
-				"packages/cli/src/__tests__/update.test.ts",
-				"packages/cli/src/cli.ts",
-				"packages/cli/src/index.ts",
-				"packages/cli/src/output/render.ts"
-			],
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "build"
-		},
-		{
-			"label": "phase-e-task14-diff",
-			"type": "shell",
-			"command": "git",
-			"args": [
-				"-C",
-				"/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
-				"diff",
-				"--check"
-			],
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "build"
-		},
-		{
-			"label": "phase-e-task14-status",
-			"type": "shell",
-			"command": "git",
-			"args": [
-				"-C",
-				"/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
-				"status",
-				"--short"
-			],
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "build"
-		},
-		{
-			"label": "phase-e-task14-commit",
-			"type": "shell",
-			"command": "git",
-			"args": [
-				"-C",
-				"/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
-				"add",
-				"packages/cli/src/commands/update.ts",
-				"packages/cli/src/__tests__/update.test.ts",
-				"packages/cli/src/cli.ts",
-				"packages/cli/src/index.ts",
-				"packages/cli/src/output/render.ts",
-				"&&",
-				"git",
-				"-C",
-				"/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
-				"commit",
-				"-m",
-				"feat(cli): add update command"
-			],
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "build"
-		},
-		{
-			"label": "phase-e-task15-red",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"--dir",
-				"/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
-				"--filter",
-				"@themcpdirectory/cli",
-				"exec",
-				"vitest",
-				"run",
-				"src/__tests__/doctor.test.ts"
-			],
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "test"
-		},
-		{
-			"label": "phase-e-task15-strip-prefix",
-			"type": "shell",
-			"command": "perl",
-			"args": [
-				"-pi",
-				"-e",
-				"s/^\\+//",
-				"/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h/packages/cli/src/commands/doctor.ts"
-			],
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "build"
-		}
-	]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Inspect Phase D-H worktree",
+      "type": "shell",
+      "command": "/usr/bin/git",
+      "args": [
+        "-C",
+        "/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
+        "status",
+        "--short"
+      ],
+      "isBackground": false,
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Stage Phase E Task 13",
+      "type": "shell",
+      "command": "/usr/bin/git",
+      "args": [
+        "-C",
+        "/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
+        "add",
+        "--",
+        ".superpowers/sdd/2026-09-01-phase-e-cli-installation/progress.md",
+        "packages/cli/src/cli.ts",
+        "packages/cli/src/output/json.ts",
+        "packages/cli/src/output/render.ts",
+        "packages/cli/src/__tests__/list-remove.test.ts",
+        "packages/cli/src/commands/list.ts",
+        "packages/cli/src/commands/remove.ts",
+        "packages/client-adapters/src/application-detection.ts",
+        "packages/client-adapters/src/__tests__/registry.test.ts",
+        "packages/client-adapters/src/cursor.ts",
+        "packages/client-adapters/src/vscode.ts"
+      ],
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "Stage Phase E Task 13 code",
+      "type": "shell",
+      "command": "/usr/bin/git",
+      "args": [
+        "-C",
+        "/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
+        "add",
+        "--",
+        "packages/cli/src/cli.ts",
+        "packages/cli/src/output/json.ts",
+        "packages/cli/src/output/render.ts",
+        "packages/cli/src/__tests__/list-remove.test.ts",
+        "packages/cli/src/commands/list.ts",
+        "packages/cli/src/commands/remove.ts",
+        "packages/client-adapters/src/application-detection.ts",
+        "packages/client-adapters/src/__tests__/registry.test.ts",
+        "packages/client-adapters/src/cursor.ts",
+        "packages/client-adapters/src/vscode.ts"
+      ],
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "Commit Phase E Task 13",
+      "type": "shell",
+      "command": "/usr/bin/git",
+      "args": [
+        "-C",
+        "/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
+        "commit",
+        "-m",
+        "feat(cli): add list and remove commands"
+      ],
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "phase-e-task14-red",
+      "type": "shell",
+      "command": "pnpm",
+      "args": [
+        "--dir",
+        "/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
+        "--filter",
+        "@themcpdirectory/cli",
+        "exec",
+        "vitest",
+        "run",
+        "src/__tests__/update.test.ts"
+      ],
+      "isBackground": false,
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "phase-e-task14-typecheck",
+      "type": "shell",
+      "command": "pnpm",
+      "args": [
+        "--dir",
+        "/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
+        "--filter",
+        "@themcpdirectory/cli",
+        "typecheck"
+      ],
+      "isBackground": false,
+      "problemMatcher": ["$tsc"],
+      "group": "build"
+    },
+    {
+      "label": "phase-e-task14-lint",
+      "type": "shell",
+      "command": "pnpm",
+      "args": [
+        "--dir",
+        "/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
+        "--filter",
+        "@themcpdirectory/cli",
+        "lint"
+      ],
+      "isBackground": false,
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "phase-e-task14-format",
+      "type": "shell",
+      "command": "pnpm",
+      "args": [
+        "--dir",
+        "/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
+        "exec",
+        "prettier",
+        "--write",
+        "packages/cli/src/commands/update.ts",
+        "packages/cli/src/__tests__/update.test.ts",
+        "packages/cli/src/cli.ts",
+        "packages/cli/src/index.ts",
+        "packages/cli/src/output/render.ts"
+      ],
+      "isBackground": false,
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "phase-e-task14-format-check",
+      "type": "shell",
+      "command": "pnpm",
+      "args": [
+        "--dir",
+        "/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
+        "exec",
+        "prettier",
+        "--check",
+        "packages/cli/src/commands/update.ts",
+        "packages/cli/src/__tests__/update.test.ts",
+        "packages/cli/src/cli.ts",
+        "packages/cli/src/index.ts",
+        "packages/cli/src/output/render.ts"
+      ],
+      "isBackground": false,
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "phase-e-task14-diff",
+      "type": "shell",
+      "command": "git",
+      "args": [
+        "-C",
+        "/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
+        "diff",
+        "--check"
+      ],
+      "isBackground": false,
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "phase-e-task14-status",
+      "type": "shell",
+      "command": "git",
+      "args": [
+        "-C",
+        "/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
+        "status",
+        "--short"
+      ],
+      "isBackground": false,
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "phase-e-task14-commit",
+      "type": "shell",
+      "command": "git",
+      "args": [
+        "-C",
+        "/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
+        "add",
+        "packages/cli/src/commands/update.ts",
+        "packages/cli/src/__tests__/update.test.ts",
+        "packages/cli/src/cli.ts",
+        "packages/cli/src/index.ts",
+        "packages/cli/src/output/render.ts",
+        "&&",
+        "git",
+        "-C",
+        "/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
+        "commit",
+        "-m",
+        "feat(cli): add update command"
+      ],
+      "isBackground": false,
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "phase-e-task15-red",
+      "type": "shell",
+      "command": "pnpm",
+      "args": [
+        "--dir",
+        "/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h",
+        "--filter",
+        "@themcpdirectory/cli",
+        "exec",
+        "vitest",
+        "run",
+        "src/__tests__/doctor.test.ts"
+      ],
+      "isBackground": false,
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "phase-e-task15-strip-prefix",
+      "type": "shell",
+      "command": "perl",
+      "args": [
+        "-pi",
+        "-e",
+        "s/^\\+//",
+        "/Users/timohaseloff/themcpdirectory/.worktrees/phases-d-h/packages/cli/src/commands/doctor.ts"
+      ],
+      "isBackground": false,
+      "problemMatcher": [],
+      "group": "build"
+    }
+  ]
 }
