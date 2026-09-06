@@ -1,8 +1,13 @@
 import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 
 const PACKAGE_ROOT = fileURLToPath(new URL("../..", import.meta.url));
+const PACKAGE_JSON = JSON.parse(await readFile(resolve(PACKAGE_ROOT, "package.json"), "utf8")) as {
+  readonly bin: { readonly mcpdir: string };
+};
 
 beforeAll(async () => {
   const build = await runProcess("pnpm", ["run", "build"]);
@@ -13,7 +18,10 @@ beforeAll(async () => {
 
 describe("built CLI binary", () => {
   it("serves help through the package bin contract", async () => {
-    const result = await runProcess("pnpm", ["exec", "mcpdir", "--help"]);
+    const result = await runProcess(process.execPath, [
+      resolve(PACKAGE_ROOT, PACKAGE_JSON.bin.mcpdir),
+      "--help",
+    ]);
 
     expect(result).toEqual({
       exitCode: 0,

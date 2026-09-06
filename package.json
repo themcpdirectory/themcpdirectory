@@ -34,7 +34,6 @@
     "web:security-release": "WEB_E2E_MODE=production pnpm --filter @themcpdirectory/web exec playwright test e2e/security.release.spec.ts"
   },
   "devDependencies": {
-    "@themcpdirectory/cli": "workspace:*",
     "prettier": "3.9.6",
     "turbo": "2.10.12"
   }

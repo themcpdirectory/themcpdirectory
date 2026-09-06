@@ -8,9 +8,6 @@ importers:
 
   .:
     devDependencies:
-      '@themcpdirectory/cli':
-        specifier: workspace:*
-        version: link:packages/cli
       prettier:
         specifier: 3.9.6
         version: 3.9.6
