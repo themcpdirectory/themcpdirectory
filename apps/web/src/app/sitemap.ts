@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getPublicSitemapEntries } from "@themcpdirectory/domain";
+import { getPublicSitemapEntries, getVisibleCollections } from "@themcpdirectory/domain";
 import { buildIndexableSitemapPaths } from "@/content/site-route-reference";
 import { getDb } from "@/lib/db";
 import { buildCanonicalUrl } from "@/lib/metadata";
@@ -7,8 +7,16 @@ import { buildCanonicalUrl } from "@/lib/metadata";
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const { serverSlugs, categorySlugs } = await getPublicSitemapEntries(getDb());
-  const paths = buildIndexableSitemapPaths({ serverSlugs, categorySlugs });
+  const db = getDb();
+  const [{ serverSlugs, categorySlugs }, collections] = await Promise.all([
+    getPublicSitemapEntries(db),
+    getVisibleCollections(db),
+  ]);
+  const paths = buildIndexableSitemapPaths({
+    serverSlugs,
+    categorySlugs,
+    collectionSlugs: collections.map((collection) => collection.slug),
+  });
 
   return paths.map((path) => ({
     url: buildCanonicalUrl(path),

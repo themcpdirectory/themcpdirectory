@@ -16,7 +16,7 @@ const FOOTER_GROUPS: ReadonlyArray<{
   {
     title: "Product",
     links: [
-      { label: "Browse", href: "/search" },
+      { label: "Search", href: "/search" },
       { label: "Collections", href: "/collections" },
       { label: "Publish", href: "/publish" },
     ],

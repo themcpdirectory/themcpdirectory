@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import type { getServerDetailBySlug } from "@themcpdirectory/domain";
+import { CopyButton } from "@/components/copy-button";
 
 type PublicServerDetail = NonNullable<Awaited<ReturnType<typeof getServerDetailBySlug>>>;
 
@@ -22,17 +22,7 @@ export function InstallCommand({
   cliExecutableName,
   installAvailability,
 }: InstallCommandProps) {
-  const [status, setStatus] = useState("");
   const command = `${cliExecutableName} add ${slug}`;
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(command);
-      setStatus("Command copied.");
-    } catch {
-      setStatus("Copy failed. Select the command text manually.");
-    }
-  }
 
   return (
     <section aria-labelledby="install-heading" className="install-command-section">
@@ -45,13 +35,8 @@ export function InstallCommand({
           </p>
           <div className="install-command__row">
             <code className="install-command__code">{command}</code>
-            <button type="button" className="install-command__copy" onClick={handleCopy}>
-              Copy install command
-            </button>
+            <CopyButton value={command} />
           </div>
-          <p className="install-command__status" role="status" aria-live="polite">
-            {status}
-          </p>
         </div>
       ) : (
         <p className="detail-empty-state">

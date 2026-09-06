@@ -28,34 +28,42 @@ test.describe("Navigation and 404", () => {
   test("mobile nav toggle button has accessible label", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto("/");
-    const menuButton = page.getByRole("button", { name: /navigation menu/i });
-
-    await expect(menuButton).toBeVisible();
-    await expect(menuButton).toHaveAttribute("aria-expanded", "false");
-    await menuButton.click();
-    await expect(menuButton).toHaveAttribute("aria-expanded", "true");
-
+    const openButton = page.getByRole("button", { name: "Open navigation menu" });
     const mobileNav = page.getByRole("navigation", { name: "Mobile navigation" });
+
+    await expect(openButton).toBeVisible();
+    await expect(openButton).toHaveAttribute("aria-expanded", "false");
+    await expect(mobileNav).toBeHidden();
+
+    await openButton.click();
+
+    const closeButton = page.getByRole("button", { name: "Close navigation menu" });
+
+    await expect(closeButton).toBeVisible();
+    await expect(closeButton).toHaveAttribute("aria-expanded", "true");
     await expect(mobileNav).toBeVisible();
-    await mobileNav.getByRole("link", { name: "Browse" }).click();
-    await expect(page).toHaveURL(/\/categories$/);
+
+    await closeButton.click();
+
+    await expect(page.getByRole("button", { name: "Open navigation menu" })).toBeVisible();
+    await expect(mobileNav).toBeHidden();
   });
 
-  test("mobile navigation exposes Browse, Security, Docs, and Publish with correct destinations", async ({
+  test("mobile navigation exposes Search, Collections, Docs, and Publish with correct destinations", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto("/");
-    await page.getByRole("button", { name: /navigation menu/i }).click();
+    await page.getByRole("button", { name: "Open navigation menu" }).click();
 
     const mobileNav = page.getByRole("navigation", { name: "Mobile navigation" });
-    await expect(mobileNav.getByRole("link", { name: "Browse", exact: true })).toHaveAttribute(
+    await expect(mobileNav.getByRole("link", { name: "Search", exact: true })).toHaveAttribute(
       "href",
-      "/categories",
+      "/search",
     );
-    await expect(mobileNav.getByRole("link", { name: "Security", exact: true })).toHaveAttribute(
+    await expect(mobileNav.getByRole("link", { name: "Collections", exact: true })).toHaveAttribute(
       "href",
-      "/security",
+      "/collections",
     );
     await expect(mobileNav.getByRole("link", { name: "Docs", exact: true })).toHaveAttribute(
       "href",
@@ -65,13 +73,17 @@ test.describe("Navigation and 404", () => {
       "href",
       "/publish",
     );
+
+    await mobileNav.getByRole("link", { name: "Collections", exact: true }).click();
+    await expect(page).toHaveURL(/\/collections$/);
+    await expect(page.getByRole("button", { name: "Open navigation menu" })).toBeVisible();
   });
 
-  test("primary navigation exposes Browse, Security, Docs, and Publish", async ({ page }) => {
+  test("primary navigation exposes Search, Collections, Docs, and Publish", async ({ page }) => {
     await page.goto("/");
     const siteNav = page.getByRole("navigation", { name: "Site navigation" });
-    await expect(siteNav.getByRole("link", { name: "Browse", exact: true })).toBeVisible();
-    await expect(siteNav.getByRole("link", { name: "Security", exact: true })).toBeVisible();
+    await expect(siteNav.getByRole("link", { name: "Search", exact: true })).toBeVisible();
+    await expect(siteNav.getByRole("link", { name: "Collections", exact: true })).toBeVisible();
     await expect(siteNav.getByRole("link", { name: "Docs", exact: true })).toBeVisible();
     await expect(siteNav.getByRole("link", { name: "Publish", exact: true })).toBeVisible();
   });

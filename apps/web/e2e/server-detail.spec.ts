@@ -10,7 +10,7 @@ test.describe("Server detail hierarchy", () => {
     const identityHeading = page.getByRole("heading", { level: 1 });
     const evidenceRegion = page.getByRole("region", { name: "Trust profile" });
     const installHeading = page.getByRole("heading", { name: "Installation" });
-    const installControl = page.getByRole("button", { name: "Copy install command" });
+    const installControl = page.getByRole("button", { name: "Copy", exact: true });
 
     await expect(identityHeading).toBeInViewport();
     await expect(evidenceRegion).toBeInViewport();
@@ -74,26 +74,27 @@ test.describe("Server detail hierarchy", () => {
     ).toHaveCount(0);
   });
 
-  test("shows a labeled install command copy control with a polite success status", async ({
-    page,
-    context,
-  }) => {
+  test("uses the shared copy button behavior for install commands", async ({ page, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.goto("/github");
 
     const code = page.locator(".install-command__code");
     await expect(code).toHaveText("mcpdir add github");
 
-    const copyButton = page.getByRole("button", { name: "Copy install command" });
+    const copyButton = page.getByRole("button", { name: "Copy", exact: true });
     await expect(copyButton).toBeVisible();
     await copyButton.focus();
     await expect(copyButton).toBeFocused();
     await copyButton.click();
 
-    await expect(page.locator(".install-command__status")).toHaveText(/copied/i);
+    await expect(page.getByRole("button", { name: "Copied", exact: true })).toBeVisible();
+    await expect(page.getByRole("status")).toContainText("Command copied.");
 
     const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
     expect(clipboardText).toBe("mcpdir add github");
+
+    await page.waitForTimeout(2_100);
+    await expect(page.getByRole("button", { name: "Copy", exact: true })).toBeVisible();
   });
 
   test("explains the install command assumes the CLI is installed and links to CLI setup and status", async ({
@@ -118,8 +119,8 @@ test.describe("Server detail hierarchy", () => {
       });
     });
 
-    await page.getByRole("button", { name: "Copy install command" }).click();
-    await expect(page.locator(".install-command__status")).toHaveText(/manually|select/i);
+    await page.getByRole("button", { name: "Copy", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText(/manually|select/i);
 
     const selectable = await page.locator(".install-command__code").evaluate((element) => {
       const range = document.createRange();

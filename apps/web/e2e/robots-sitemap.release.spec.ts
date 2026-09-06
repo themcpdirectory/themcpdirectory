@@ -16,6 +16,7 @@ test("robots and sitemap expose only canonical indexable launch pages", async ({
     (match) => new URL(match[1]!).pathname,
   );
   expect(sitemapPaths).toContain("/docs/trust");
+  expect(sitemapPaths).toContain("/collections/official-registry-essentials");
   expect(sitemapPaths).toContain("/categories/developer-tools");
   expect(sitemapPaths).toContain("/github");
   expect(sitemapPaths).not.toContain("/search");
@@ -25,6 +26,7 @@ test("robots and sitemap expose only canonical indexable launch pages", async ({
 
   const collisionPaths = buildIndexableSitemapPaths({
     categorySlugs: [],
+    collectionSlugs: [],
     serverSlugs: ["search", "search-tool", "advertise", "dashboard", "dashboard-kit"],
   });
   expect(collisionPaths).not.toContain("/search");

@@ -19,7 +19,7 @@ describe("SiteNav", () => {
   it("renders the approved navigation labels and one mobile disclosure control", () => {
     const markup = renderToStaticMarkup(<SiteNav />);
 
-    expect(markup).toContain("Browse");
+    expect(markup).toContain("Search");
     expect(markup).toContain("Collections");
     expect(markup).toContain("Docs");
     expect(markup).toContain("Publish");
