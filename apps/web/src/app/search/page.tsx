@@ -4,10 +4,6 @@ import { getDb } from "@/lib/db";
 import { SearchForm } from "@/components/search-form";
 import { ServerDirectoryList } from "@/components/server-directory-list";
 
-interface Props {
-  searchParams: Promise<{ q?: string | string[] }>;
-}
-
 const MAX_SEARCH_QUERY_LENGTH = 200;
 
 function normalizeSearchQuery(value: string | string[] | undefined): string {
@@ -15,7 +11,7 @@ function normalizeSearchQuery(value: string | string[] | undefined): string {
   return firstValue?.trim().slice(0, MAX_SEARCH_QUERY_LENGTH) ?? "";
 }
 
-export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+export async function generateMetadata({ searchParams }: PageProps<"/search">): Promise<Metadata> {
   const { q } = await searchParams;
   const query = normalizeSearchQuery(q);
   return {
@@ -24,7 +20,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   };
 }
 
-export default async function SearchPage({ searchParams }: Props) {
+export default async function SearchPage({ searchParams }: PageProps<"/search">) {
   const { q } = await searchParams;
   const query = normalizeSearchQuery(q);
   const db = getDb();
@@ -32,36 +28,23 @@ export default async function SearchPage({ searchParams }: Props) {
   const results = query ? await searchServers(db, { query, limit: 30 }) : [];
 
   return (
-    <main id="main-content" tabIndex={-1} style={{ minHeight: "100vh" }}>
-      <div style={{ maxWidth: "60rem", margin: "0 auto", padding: "2rem 1rem" }}>
-        <h1
-          style={{
-            fontSize: "1.375rem",
-            fontWeight: 700,
-            marginBottom: "1.25rem",
-          }}
-        >
-          Search
-        </h1>
+    <main id="main-content" tabIndex={-1} className="page-shell">
+      <div className="page-container page-container--narrow">
+        <header className="page-header">
+          <h1 className="page-title">Search</h1>
+          <p className="page-description">Search the directory by server name or description.</p>
+        </header>
 
-        <div style={{ marginBottom: "1.5rem" }}>
+        <div className="search-panel">
           <SearchForm defaultValue={query} />
         </div>
 
-        {!query && (
-          <p style={{ color: "var(--fg-muted)", fontSize: "0.9375rem" }}>
-            Enter a search query to find MCP servers.
-          </p>
-        )}
+        {!query && <p className="page-description">Enter a search query to find MCP servers.</p>}
 
         {query && (
           <>
             {results.length > 0 && (
-              <p
-                style={{ fontSize: "0.8125rem", color: "var(--fg-muted)", marginBottom: "1rem" }}
-                aria-live="polite"
-                aria-atomic="true"
-              >
+              <p className="results-summary" aria-live="polite" aria-atomic="true">
                 {results.length} result{results.length !== 1 ? "s" : ""} for{" "}
                 <strong>&ldquo;{query}&rdquo;</strong>
               </p>

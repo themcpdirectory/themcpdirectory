@@ -3,36 +3,55 @@ import postgres from "postgres";
 import { TEST_DATABASE_URL } from "./setup/test-database";
 
 test.describe("Server detail hierarchy", () => {
-  test("orders identity before evidence before install in the first viewport", async ({ page }) => {
+  test("orders identity before requirements and install, then shows related servers", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/github");
 
     const identityHeading = page.getByRole("heading", { level: 1 });
+    const requirementsHeading = page.getByRole("heading", { name: "Requirements" });
     const evidenceRegion = page.getByRole("region", { name: "Trust profile" });
     const installHeading = page.getByRole("heading", { name: "Installation" });
-    const installControl = page.getByRole("button", { name: "Copy install command" });
+    const installControl = page.getByRole("button", { name: "Copy", exact: true });
+    const relatedHeading = page.getByRole("heading", { name: "Related servers" });
 
     await expect(identityHeading).toBeInViewport();
-    await expect(evidenceRegion).toBeInViewport();
+    await expect(requirementsHeading).toBeInViewport();
     await expect(installHeading).toBeInViewport();
     await expect(installControl).toBeInViewport();
+    await expect(evidenceRegion).toBeVisible();
+    await expect(relatedHeading).toBeVisible();
 
     const order = await page.evaluate(() => {
       const identity = document.querySelector("h1");
+      const requirements = document.getElementById("requirements-heading");
       const evidence = document.getElementById("trust-profile-heading");
       const install = document.getElementById("install-heading");
-      if (!identity || !evidence || !install) return null;
+      const related = document.getElementById("related-servers-heading");
+      if (!identity || !requirements || !evidence || !install || !related) return null;
       return {
-        identityBeforeEvidence: Boolean(
-          identity.compareDocumentPosition(evidence) & Node.DOCUMENT_POSITION_FOLLOWING,
+        identityBeforeRequirements: Boolean(
+          identity.compareDocumentPosition(requirements) & Node.DOCUMENT_POSITION_FOLLOWING,
         ),
-        evidenceBeforeInstall: Boolean(
-          evidence.compareDocumentPosition(install) & Node.DOCUMENT_POSITION_FOLLOWING,
+        requirementsBeforeInstall: Boolean(
+          requirements.compareDocumentPosition(install) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ),
+        installBeforeEvidence: Boolean(
+          install.compareDocumentPosition(evidence) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ),
+        evidenceBeforeRelated: Boolean(
+          evidence.compareDocumentPosition(related) & Node.DOCUMENT_POSITION_FOLLOWING,
         ),
       };
     });
 
-    expect(order).toEqual({ identityBeforeEvidence: true, evidenceBeforeInstall: true });
+    expect(order).toEqual({
+      identityBeforeRequirements: true,
+      requirementsBeforeInstall: true,
+      installBeforeEvidence: true,
+      evidenceBeforeRelated: true,
+    });
   });
 
   test("shows timestamped evidence language in the evidence summary", async ({ page }) => {
@@ -74,26 +93,27 @@ test.describe("Server detail hierarchy", () => {
     ).toHaveCount(0);
   });
 
-  test("shows a labeled install command copy control with a polite success status", async ({
-    page,
-    context,
-  }) => {
+  test("uses the shared copy button behavior for install commands", async ({ page, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.goto("/github");
 
     const code = page.locator(".install-command__code");
-    await expect(code).toHaveText("mcpdir add github");
+    await expect(code).toHaveText("npx @themcpdirectory/cli add github");
 
-    const copyButton = page.getByRole("button", { name: "Copy install command" });
+    const copyButton = page.getByRole("button", { name: "Copy", exact: true });
     await expect(copyButton).toBeVisible();
     await copyButton.focus();
     await expect(copyButton).toBeFocused();
     await copyButton.click();
 
-    await expect(page.locator(".install-command__status")).toHaveText(/copied/i);
+    await expect(page.getByRole("button", { name: "Copied", exact: true })).toBeVisible();
+    await expect(page.getByRole("status")).toContainText("Command copied.");
 
     const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
-    expect(clipboardText).toBe("mcpdir add github");
+    expect(clipboardText).toBe("npx @themcpdirectory/cli add github");
+
+    await page.waitForTimeout(2_100);
+    await expect(page.getByRole("button", { name: "Copy", exact: true })).toBeVisible();
   });
 
   test("explains the install command assumes the CLI is installed and links to CLI setup and status", async ({
@@ -102,8 +122,7 @@ test.describe("Server detail hierarchy", () => {
     await page.goto("/github");
 
     const supportText = page.locator(".install-command > .detail-empty-state");
-    await expect(supportText).toContainText(/assumes.*mcpdir.*is installed/i);
-    await expect(supportText.getByText(/npm/i)).toHaveCount(0);
+    await expect(supportText).toContainText(/runs.*@themcpdirectory\/cli.*with npx/i);
 
     const setupLink = supportText.getByRole("link", { name: "CLI setup and status" });
     await expect(setupLink).toHaveAttribute("href", "/docs/cli");
@@ -118,8 +137,8 @@ test.describe("Server detail hierarchy", () => {
       });
     });
 
-    await page.getByRole("button", { name: "Copy install command" }).click();
-    await expect(page.locator(".install-command__status")).toHaveText(/manually|select/i);
+    await page.getByRole("button", { name: "Copy", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText(/manually|select/i);
 
     const selectable = await page.locator(".install-command__code").evaluate((element) => {
       const range = document.createRange();

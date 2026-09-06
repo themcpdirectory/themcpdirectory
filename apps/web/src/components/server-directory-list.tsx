@@ -1,22 +1,11 @@
-import { ServerDirectoryRow, type DirectoryRowServer } from "@/components/server-directory-row";
+import { ServerGrid } from "@/components/server-grid";
+import type { ServerCardServer } from "@/components/server-card";
 
 interface ServerDirectoryListProps {
-  readonly servers: readonly DirectoryRowServer[];
+  readonly servers: readonly ServerCardServer[];
   readonly emptyMessage: string;
 }
 
 export function ServerDirectoryList({ servers, emptyMessage }: ServerDirectoryListProps) {
-  if (servers.length === 0) {
-    return <p className="directory-empty-state">{emptyMessage}</p>;
-  }
-
-  return (
-    <ul className="directory-row-list">
-      {servers.map((server) => (
-        <li key={server.id}>
-          <ServerDirectoryRow server={server} />
-        </li>
-      ))}
-    </ul>
-  );
+  return <ServerGrid servers={servers} emptyMessage={emptyMessage} />;
 }

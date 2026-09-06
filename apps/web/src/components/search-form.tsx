@@ -1,51 +1,77 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useRef } from "react";
+import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
+import { Button, TextField } from "@radix-ui/themes";
+import { useEffect, useRef } from "react";
 
 interface SearchFormProps {
-  defaultValue?: string;
-  placeholder?: string;
+  readonly defaultValue?: string;
+  readonly placeholder?: string;
+  readonly submitLabel?: string;
+  readonly variant?: "default" | "hero";
+  readonly showShortcutHint?: boolean;
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (target.isContentEditable) {
+    return true;
+  }
+
+  const tagName = target.tagName;
+  return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
 }
 
 export function SearchForm({
   defaultValue = "",
   placeholder = "Search MCP servers…",
+  submitLabel = "Search",
+  variant = "default",
+  showShortcutHint = false,
 }: SearchFormProps) {
-  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const q = inputRef.current?.value.trim() ?? "";
-    if (q) {
-      router.push(`/search?q=${encodeURIComponent(q)}`);
-    } else {
-      router.push("/search");
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.key !== "/") {
+        return;
+      }
+
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      event.preventDefault();
+      inputRef.current?.focus();
     }
-  }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     <form
       role="search"
-      className="directory-search"
+      className={`directory-search${variant === "hero" ? " directory-search--hero" : ""}`}
       action="/search"
       method="GET"
-      onSubmit={handleSubmit}
-      style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(0, 1fr) auto",
-        gap: "0.5rem",
-        width: "100%",
-      }}
     >
-      <label
-        htmlFor="search-input"
-        style={{ gridColumn: "1 / -1", fontSize: "0.8125rem", fontWeight: 600, color: "var(--fg)" }}
-      >
-        Search MCP servers
+      <label htmlFor="search-input" className="directory-search__label">
+        <span>Search MCP servers</span>
+        {showShortcutHint ? (
+          <span className="directory-search__shortcut" aria-hidden="true">
+            /
+          </span>
+        ) : null}
       </label>
-      <input
+      <TextField.Root
         ref={inputRef}
         id="search-input"
         type="search"
@@ -55,36 +81,16 @@ export function SearchForm({
         placeholder={placeholder}
         autoComplete="off"
         maxLength={200}
-        style={{
-          flex: 1,
-          minWidth: 0,
-          padding: "0.5rem 0.75rem",
-          border: "1px solid var(--control-border)",
-          borderRadius: "var(--radius-sm)",
-          background: "var(--surface)",
-          color: "var(--fg)",
-          fontSize: "0.9375rem",
-          minHeight: "2.75rem",
-        }}
+        size="3"
         aria-label="Search MCP servers"
-      />
-      <button
-        type="submit"
-        style={{
-          padding: "0.5rem 1rem",
-          background: "var(--action-bg)",
-          color: "var(--action-fg)",
-          border: "none",
-          borderRadius: "var(--radius-sm)",
-          cursor: "pointer",
-          fontSize: "0.875rem",
-          fontWeight: 600,
-          minHeight: "2.75rem",
-          whiteSpace: "nowrap",
-        }}
       >
-        Search
-      </button>
+        <TextField.Slot>
+          <MagnifyingGlassIcon aria-hidden="true" />
+        </TextField.Slot>
+      </TextField.Root>
+      <Button type="submit" size="3" className="directory-search__submit">
+        {submitLabel}
+      </Button>
     </form>
   );
 }

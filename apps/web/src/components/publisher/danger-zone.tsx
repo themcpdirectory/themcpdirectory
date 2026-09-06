@@ -82,9 +82,7 @@ export function DangerZone() {
       aria-labelledby="danger-zone-heading"
       className="publisher-panel publisher-danger-zone"
     >
-      <h2 id="danger-zone-heading" style={{ margin: "0 0 0.75rem", fontSize: "1.0625rem" }}>
-        Export and erasure
-      </h2>
+      <h2 id="danger-zone-heading">Export and erasure</h2>
       <p id="account-erasure-description" className="publisher-help-text">
         Download your account data or request erasure. Erasure removes your access and can lock
         publishers without another owner for manual review.

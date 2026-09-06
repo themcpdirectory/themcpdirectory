@@ -125,7 +125,7 @@ test("docs landing lists the exact current and planned route facts", async ({ pa
     },
     {
       path: "/open-source",
-      title: "Open source status",
+      title: "Source and licensing",
       access: "Access: available without signing in.",
       index: "Search indexing: included in the public index.",
       availability: "Availability: available now.",

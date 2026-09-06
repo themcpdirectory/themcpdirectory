@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import type { getServerDetailBySlug } from "@themcpdirectory/domain";
+import { CopyButton } from "@/components/copy-button";
+import { buildPublicAddCommand, PUBLIC_CLI_PACKAGE_NAME } from "@/lib/public-cli-command";
 
 type PublicServerDetail = NonNullable<Awaited<ReturnType<typeof getServerDetailBySlug>>>;
 
 export interface InstallCommandProps {
   readonly slug: string;
-  readonly cliExecutableName: string;
   readonly installAvailability: PublicServerDetail["installAvailability"];
 }
 
@@ -17,22 +17,8 @@ const UNAVAILABLE_COPY: Record<"install_unavailable" | "upstream_deleted", strin
   install_unavailable: "Installation details are currently unavailable.",
 };
 
-export function InstallCommand({
-  slug,
-  cliExecutableName,
-  installAvailability,
-}: InstallCommandProps) {
-  const [status, setStatus] = useState("");
-  const command = `${cliExecutableName} add ${slug}`;
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(command);
-      setStatus("Command copied.");
-    } catch {
-      setStatus("Copy failed. Select the command text manually.");
-    }
-  }
+export function InstallCommand({ slug, installAvailability }: InstallCommandProps) {
+  const command = buildPublicAddCommand(slug);
 
   return (
     <section aria-labelledby="install-heading" className="install-command-section">
@@ -40,21 +26,13 @@ export function InstallCommand({
       {installAvailability === "available" ? (
         <div className="install-command">
           <p className="detail-empty-state">
-            This assumes the {cliExecutableName} CLI is installed — see{" "}
-            <Link href="/docs/cli" style={{ color: "var(--accent)" }}>
-              CLI setup and status
-            </Link>{" "}
-            for current details.
+            This runs the {PUBLIC_CLI_PACKAGE_NAME} CLI with npx. See{" "}
+            <Link href="/docs/cli">CLI setup and status</Link> for current details.
           </p>
           <div className="install-command__row">
             <code className="install-command__code">{command}</code>
-            <button type="button" className="install-command__copy" onClick={handleCopy}>
-              Copy install command
-            </button>
+            <CopyButton value={command} />
           </div>
-          <p className="install-command__status" role="status" aria-live="polite">
-            {status}
-          </p>
         </div>
       ) : (
         <p className="detail-empty-state">

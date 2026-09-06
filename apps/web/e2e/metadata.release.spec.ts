@@ -6,6 +6,7 @@ test("launch pages emit canonical metadata and factual JSON-LD", async ({ page }
 
   const concreteRoute = (path: string) => {
     if (path === "/[slug]") return "/github";
+    if (path === "/collections/[slug]") return "/collections/official-registry-essentials";
     if (path === "/categories/[slug]") return "/categories/developer-tools";
     return path;
   };

@@ -46,19 +46,26 @@ async function searchColors(page: Page) {
   });
 }
 
-test("uses the supplied brand canvas and accent", async ({ page }) => {
-  await page.goto("/");
+for (const [colorScheme, expected] of [
+  ["light", { background: "#fcfcfc", accent: "#087523" }],
+  ["dark", { background: "#151515", accent: "#82f68e" }],
+] as const) {
+  test(`uses the supplied brand canvas and accent in ${colorScheme} mode`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme });
+    await page.addInitScript(() => localStorage.removeItem("mcp-directory-theme"));
+    await page.goto("/");
 
-  const palette = await page.evaluate(() => {
-    const rootStyle = getComputedStyle(document.documentElement);
-    return {
-      background: rootStyle.getPropertyValue("--bg").trim(),
-      accent: rootStyle.getPropertyValue("--accent").trim(),
-    };
+    const palette = await page.evaluate(() => {
+      const rootStyle = getComputedStyle(document.documentElement);
+      return {
+        background: rootStyle.getPropertyValue("--bg").trim(),
+        accent: rootStyle.getPropertyValue("--accent").trim(),
+      };
+    });
+
+    expect(palette).toEqual(expected);
   });
-
-  expect(palette).toEqual({ background: "#151515", accent: "#44ef56" });
-});
+}
 
 for (const colorScheme of ["light", "dark"] as const) {
   test(`search controls meet contrast requirements in ${colorScheme} mode`, async ({ page }) => {

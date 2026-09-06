@@ -95,13 +95,11 @@ export function DashboardShell({ dashboard }: DashboardShellProps) {
   }
 
   return (
-    <div style={{ maxWidth: "60rem", margin: "0 auto", padding: "2rem 1rem" }}>
+    <div className="page-container page-container--narrow">
       <header className="publisher-dashboard-header">
         <div>
-          <h1 style={{ margin: "0 0 0.25rem", fontSize: "1.5rem", fontWeight: 700 }}>
-            Publisher dashboard
-          </h1>
-          <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "0.875rem" }}>
+          <h1 className="publisher-dashboard-title">Publisher dashboard</h1>
+          <p className="publisher-dashboard-meta">
             Signed in as {viewer.name ?? viewer.email ?? "you"}
           </p>
         </div>
@@ -131,9 +129,9 @@ export function DashboardShell({ dashboard }: DashboardShellProps) {
       )}
 
       {activePublisher ? (
-        <div style={{ display: "grid", gap: "2rem" }}>
+        <div className="publisher-dashboard-sections">
           <section aria-labelledby="claims-heading" className="publisher-panel">
-            <h2 id="claims-heading" style={{ margin: "0 0 0.75rem", fontSize: "1.0625rem" }}>
+            <h2 id="claims-heading" className="section-title">
               Claimed listings
             </h2>
             {activePublisher.claims.length === 0 ? (

@@ -9,6 +9,20 @@ interface PublicSiteRouteReference {
 export const PUBLIC_SITE_ROUTE_REFERENCE: readonly PublicSiteRouteReference[] = [
   { path: "/", title: "Home", auth: "anonymous", index: true, availability: "available" },
   {
+    path: "/collections",
+    title: "Collections",
+    auth: "anonymous",
+    index: true,
+    availability: "available",
+  },
+  {
+    path: "/collections/[slug]",
+    title: "Collection detail",
+    auth: "anonymous",
+    index: true,
+    availability: "available",
+  },
+  {
     path: "/search",
     title: "Search",
     auth: "anonymous",
@@ -25,6 +39,20 @@ export const PUBLIC_SITE_ROUTE_REFERENCE: readonly PublicSiteRouteReference[] = 
   {
     path: "/categories/[slug]",
     title: "Category detail",
+    auth: "anonymous",
+    index: true,
+    availability: "available",
+  },
+  {
+    path: "/publishers",
+    title: "Publishers",
+    auth: "anonymous",
+    index: true,
+    availability: "available",
+  },
+  {
+    path: "/publishers/[slug]",
+    title: "Publisher detail",
     auth: "anonymous",
     index: true,
     availability: "available",
@@ -122,7 +150,7 @@ export const PUBLIC_SITE_ROUTE_REFERENCE: readonly PublicSiteRouteReference[] = 
   },
   {
     path: "/open-source",
-    title: "Open source status",
+    title: "Source and licensing",
     auth: "anonymous",
     index: true,
     availability: "available",
@@ -165,6 +193,8 @@ export const INDEXABLE_ROUTE_REFERENCE = Object.freeze(
 
 export function buildIndexableSitemapPaths(input: {
   readonly categorySlugs: readonly string[];
+  readonly collectionSlugs: readonly string[];
+  readonly publisherSlugs: readonly string[];
   readonly serverSlugs: readonly string[];
 }): readonly string[] {
   const concreteRoutePaths = new Set(
@@ -175,10 +205,20 @@ export function buildIndexableSitemapPaths(input: {
   const staticPaths = INDEXABLE_ROUTE_REFERENCE.filter((route) => !route.path.includes("[")).map(
     (route) => route.path,
   );
+  const collectionPaths = input.collectionSlugs.map((slug) => `/collections/${slug}`);
   const categoryPaths = input.categorySlugs.map((slug) => `/categories/${slug}`);
+  const publisherPaths = input.publisherSlugs.map((slug) => `/publishers/${slug}`);
   const serverPaths = input.serverSlugs
     .map((slug) => `/${slug}`)
     .filter((path) => !concreteRoutePaths.has(path));
 
-  return Object.freeze([...new Set([...staticPaths, ...categoryPaths, ...serverPaths])]);
+  return Object.freeze([
+    ...new Set([
+      ...staticPaths,
+      ...collectionPaths,
+      ...categoryPaths,
+      ...publisherPaths,
+      ...serverPaths,
+    ]),
+  ]);
 }

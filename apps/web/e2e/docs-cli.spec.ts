@@ -36,6 +36,7 @@ test("CLI docs project commands, clients, safety, and current distribution state
   await expect(
     page.getByText(/primary one-shot command is: npx @themcpdirectory\/cli@0\.2\.1 add github/i),
   ).toBeVisible();
+  await expect(page.getByText(/public on npm under the MIT licence/i)).toBeVisible();
   await expect(page.getByRole("region", { name: "Exit codes" })).toContainText(
     "2 means invalid command usage",
   );

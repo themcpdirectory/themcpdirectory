@@ -43,17 +43,16 @@ export default async function DashboardListingPage({
   }
 
   return (
-    <main id="main-content" tabIndex={-1} style={{ minHeight: "100vh", padding: "2rem 1rem" }}>
-      <div style={{ maxWidth: "40rem", margin: "0 auto" }}>
-        <h1 style={{ margin: "0 0 0.75rem", fontSize: "1.5rem", fontWeight: 700 }}>
-          {server.title}
-        </h1>
-        <p style={{ color: "var(--fg-muted)" }}>
-          Claim status: <strong style={{ color: "var(--fg)" }}>{server.claimStatus}</strong>
-        </p>
-        <Link href="/dashboard" style={{ color: "var(--accent)" }}>
-          Back to dashboard
-        </Link>
+    <main id="main-content" tabIndex={-1} className="page-shell">
+      <div className="page-container page-container--reading">
+        <header className="page-header">
+          <h1 className="page-title">{server.title}</h1>
+        </header>
+        <dl className="listing-status">
+          <dt>Claim status</dt>
+          <dd>{server.claimStatus}</dd>
+        </dl>
+        <Link href="/dashboard">Back to dashboard</Link>
       </div>
     </main>
   );

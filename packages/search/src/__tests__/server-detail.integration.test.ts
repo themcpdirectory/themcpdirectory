@@ -252,5 +252,6 @@ describe("getPublicSitemapEntries", () => {
 
     expect(entries.serverSlugs).toEqual(["github"]);
     expect(entries.categorySlugs).toEqual(["developer-tools"]);
+    expect(entries.publisherSlugs).toEqual(["github"]);
   });
 });

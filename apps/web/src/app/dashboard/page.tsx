@@ -26,9 +26,9 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   });
 
   return (
-    <main id="main-content" tabIndex={-1} style={{ minHeight: "100vh" }}>
+    <main id="main-content" tabIndex={-1} className="page-shell">
       <DashboardShell dashboard={dashboard} />
-      <div style={{ maxWidth: "60rem", margin: "0 auto", padding: "0 1rem 2rem" }}>
+      <div className="page-container page-container--narrow">
         <DangerZone />
       </div>
     </main>

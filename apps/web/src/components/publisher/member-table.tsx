@@ -41,7 +41,7 @@ export function MemberTable({ members, canManageMembers }: MemberTableProps) {
 
   return (
     <section aria-labelledby="members-heading" className="publisher-panel">
-      <h2 id="members-heading" style={{ margin: "0 0 0.75rem", fontSize: "1.0625rem" }}>
+      <h2 id="members-heading" className="section-title">
         Publisher members
       </h2>
 
@@ -50,7 +50,12 @@ export function MemberTable({ members, canManageMembers }: MemberTableProps) {
       {members.length === 0 ? (
         <p className="detail-empty-state">No members found.</p>
       ) : (
-        <div style={{ overflowX: "auto", maxWidth: "100%" }}>
+        <div
+          className="data-table-scroll"
+          role="region"
+          aria-label="Publisher members table"
+          tabIndex={0}
+        >
           <table className="publisher-member-table">
             <caption className="sr-only">Members of this publisher and their roles</caption>
             <thead>
@@ -73,7 +78,7 @@ export function MemberTable({ members, canManageMembers }: MemberTableProps) {
                         </label>
                         <select
                           id={`role-${member.membershipId}`}
-                          className="publisher-action"
+                          className="publisher-action form-control"
                           value={member.role}
                           disabled={pendingMembershipId === member.membershipId}
                           onChange={(event) =>
@@ -82,14 +87,6 @@ export function MemberTable({ members, canManageMembers }: MemberTableProps) {
                               event.target.value as PublisherRole,
                             )
                           }
-                          style={{
-                            padding: "0.375rem 0.5rem",
-                            border: "1px solid var(--control-border)",
-                            borderRadius: "var(--radius-sm)",
-                            background: "var(--surface)",
-                            color: "var(--fg)",
-                            minHeight: "2.75rem",
-                          }}
                         >
                           {ROLE_OPTIONS.map((role) => (
                             <option key={role} value={role}>

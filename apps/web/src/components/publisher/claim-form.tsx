@@ -11,18 +11,6 @@ const VERIFICATION_METHODS = [
 
 type VerificationMethod = (typeof VERIFICATION_METHODS)[number]["value"];
 
-const controlStyle = {
-  width: "100%",
-  boxSizing: "border-box",
-  padding: "0.5rem 0.75rem",
-  border: "1px solid var(--control-border)",
-  borderRadius: "var(--radius-sm)",
-  background: "var(--surface)",
-  color: "var(--fg)",
-  fontSize: "0.9375rem",
-  minHeight: "2.75rem",
-} as const;
-
 interface ClaimFormProps {
   readonly publisherId: string;
   readonly listings: NonNullable<PublisherDashboard["activePublisher"]>["claimableListings"];
@@ -115,13 +103,10 @@ export function ClaimForm({ publisherId, listings }: ClaimFormProps) {
 
   return (
     <section aria-labelledby="claim-heading" className="publisher-panel">
-      <h2 id="claim-heading" style={{ margin: "0 0 0.75rem", fontSize: "1.0625rem" }}>
+      <h2 id="claim-heading" className="section-title">
         Claim a listing
       </h2>
-      <p
-        id="claim-auth-explainer"
-        style={{ margin: "0 0 1rem", color: "var(--fg-muted)", fontSize: "0.8125rem" }}
-      >
+      <p id="claim-auth-explainer" className="publisher-help-text">
         GitHub sign-in only reads your identity. Claim verification starts a separate GitHub App
         authorisation and then checks repository admin or organisation admin access before using a
         one-time installation token with only the read permissions required for the chosen
@@ -131,17 +116,11 @@ export function ClaimForm({ publisherId, listings }: ClaimFormProps) {
       <ErrorSummary id="claim-error-summary" errors={errors} />
 
       <form onSubmit={(event) => void handleSubmit(event)} noValidate>
-        <div style={{ marginBottom: "1rem" }}>
-          <label
-            htmlFor="claim-listing-id"
-            style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem" }}
-          >
+        <div className="form-field">
+          <label htmlFor="claim-listing-id" className="form-label">
             Listing
           </label>
-          <p
-            id="claim-listing-hint"
-            style={{ margin: "0 0 0.375rem", color: "var(--fg-muted)", fontSize: "0.8125rem" }}
-          >
+          <p id="claim-listing-hint" className="form-hint">
             Enter the directory ID of the listing you want to claim.
           </p>
           <select
@@ -157,7 +136,7 @@ export function ClaimForm({ publisherId, listings }: ClaimFormProps) {
             aria-describedby={
               listingInvalid ? "claim-listing-hint claim-error-summary" : "claim-listing-hint"
             }
-            style={controlStyle}
+            className="form-control"
           >
             <option value="">Select a listing</option>
             {listings.map((listing) => (
@@ -168,18 +147,15 @@ export function ClaimForm({ publisherId, listings }: ClaimFormProps) {
           </select>
         </div>
 
-        <div style={{ marginBottom: "1.25rem" }}>
-          <label
-            htmlFor="claim-method"
-            style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem" }}
-          >
+        <div className="form-field">
+          <label htmlFor="claim-method" className="form-label">
             Verification method
           </label>
           <select
             id="claim-method"
             value={method}
             onChange={(event) => setMethod(event.target.value as VerificationMethod)}
-            style={controlStyle}
+            className="form-control"
           >
             {availableMethods.map((option) => (
               <option key={option.value} value={option.value}>
@@ -191,26 +167,15 @@ export function ClaimForm({ publisherId, listings }: ClaimFormProps) {
 
         <button
           type="submit"
-          className="publisher-action"
+          className="publisher-action publisher-primary-action"
           disabled={submitting}
-          style={{
-            padding: "0.5rem 1rem",
-            background: "var(--action-bg)",
-            color: "var(--action-fg)",
-            border: "none",
-            borderRadius: "var(--radius-sm)",
-            cursor: submitting ? "default" : "pointer",
-            fontSize: "0.875rem",
-            fontWeight: 600,
-            minHeight: "2.75rem",
-          }}
         >
           {submitting ? "Submitting…" : "Submit claim"}
         </button>
       </form>
 
       {status && (
-        <p role="status" style={{ marginTop: "1rem", color: "var(--success-fg)" }}>
+        <p role="status" className="form-status">
           {status}
         </p>
       )}

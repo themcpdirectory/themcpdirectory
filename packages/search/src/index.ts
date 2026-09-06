@@ -1,3 +1,4 @@
+import { httpUrlSchema } from "@themcpdirectory/api-contract";
 import { sql } from "drizzle-orm";
 import {
   categories,
@@ -12,6 +13,7 @@ import {
   type Database,
 } from "@themcpdirectory/db";
 import { recommendationScoreSql, searchPredicateSql, searchScoreSql } from "./ranking.js";
+import { currentOfficialRegistrySql, visibilityWhereSql } from "./discovery/queries.js";
 
 export { InvalidCursorError, createServerSearchCursorCodec } from "./public-api/cursor.js";
 export { createServerSearchFiltersHash } from "./public-api/query-fingerprint.js";
@@ -30,6 +32,32 @@ export type {
   ServerSearchCursorPayload,
 } from "./public-api/types.js";
 export { SEARCH_RANKING_WEIGHTS } from "./ranking.js";
+export {
+  browseServers,
+  getCollection,
+  getDiscoverySections,
+  getEcosystemFacts,
+  getPublicPublisher,
+  getRelatedServers,
+  getSearchSuggestions,
+  getVisibleCollections,
+} from "./discovery/queries.js";
+export type {
+  BrowseServersInput,
+  BrowseServersResult,
+  CollectionDetail,
+  CollectionSummary,
+  DiscoveryCategorySummary,
+  DiscoverySections,
+  DiscoveryServer,
+  DiscoverySort,
+  EcosystemFacts,
+  PageInput,
+  PublicPublisherDetail,
+  SearchSuggestionServer,
+  SearchSuggestionsInput,
+  SearchSuggestionsResult,
+} from "./discovery/types.js";
 
 type QueryDatabase = Pick<Database, "select" | "execute">;
 
@@ -122,18 +150,6 @@ function clampOffset(offset: number | undefined): number {
   return Math.max(0, Math.floor(offset));
 }
 
-function isCurrentOfficialRegistrySql() {
-  return sql<boolean>`exists (
-		select 1
-		from ${serverVersions} sv
-		inner join ${registrySources} rs on rs.id = sv.registry_source_id
-		where sv.id = ${servers.currentVersionId}
-			and rs.key = 'official'
-			and sv.upstream_status = 'active'
-			and ${servers.listingStatus} = 'active'
-	)`;
-}
-
 function categorySlugsSql() {
   return sql<readonly string[]>`coalesce((
 		select array_agg(distinct c.slug order by c.slug)
@@ -158,7 +174,7 @@ function publicListingColumns() {
     title: servers.title,
     shortDescription: servers.shortDescription,
     canonicalRegistryName: servers.canonicalRegistryName,
-    isOfficialRegistry: isCurrentOfficialRegistrySql(),
+    isOfficialRegistry: currentOfficialRegistrySql(),
     publisherDisplayName: publishers.displayName,
     publisherSlug: sql<string | null>`${publishers.slug}::text`,
     categorySlugs: categorySlugsSql(),
@@ -190,10 +206,6 @@ function mapListingRow(row: {
     categorySlugs: row.categorySlugs,
     recommendationScore: Number(row.recommendationScore),
   };
-}
-
-function visibilityWhereSql() {
-  return sql<boolean>`${servers.listingStatus} = 'active' and ${servers.moderationStatus} = 'normal'`;
 }
 
 export async function refreshServerSearchDocument(
@@ -273,7 +285,7 @@ export async function searchServers(
       title: servers.title,
       shortDescription: servers.shortDescription,
       canonicalRegistryName: servers.canonicalRegistryName,
-      isOfficialRegistry: isCurrentOfficialRegistrySql(),
+      isOfficialRegistry: currentOfficialRegistrySql(),
       publisherDisplayName: publishers.displayName,
       publisherSlug: sql<string | null>`${publishers.slug}::text`,
       categorySlugs: categorySlugsSql(),
@@ -714,9 +726,18 @@ export interface CategoryWithCount {
   readonly serverCount: number;
 }
 
+export interface PublicPublisherDirectoryEntry {
+  readonly slug: string;
+  readonly name: string;
+  readonly verified: true;
+  readonly websiteUrl: string | null;
+  readonly serverCount: number;
+}
+
 export interface PublicSitemapEntries {
   readonly serverSlugs: readonly string[];
   readonly categorySlugs: readonly string[];
+  readonly publisherSlugs: readonly string[];
 }
 
 export async function getCategories(db: QueryDatabase): Promise<readonly CategoryWithCount[]> {
@@ -752,6 +773,35 @@ export async function getCategories(db: QueryDatabase): Promise<readonly Categor
   }));
 }
 
+export async function getPublicPublishers(
+  db: QueryDatabase,
+): Promise<readonly PublicPublisherDirectoryEntry[]> {
+  const rows = await db
+    .select({
+      slug: sql<string>`${publishers.slug}::text`,
+      name: publishers.displayName,
+      websiteUrl: publishers.websiteUrl,
+      serverCount: sql<number>`count(distinct ${servers.id})::integer`,
+    })
+    .from(publishers)
+    .innerJoin(servers, sql`${servers.publisherId} = ${publishers.id}`)
+    .where(sql`${publishers.verificationState} = 'verified' and ${visibilityWhereSql()}`)
+    .groupBy(publishers.id, publishers.slug, publishers.displayName, publishers.websiteUrl)
+    .orderBy(sql`lower(${publishers.displayName}) asc`, sql`lower(${publishers.slug}::text) asc`);
+
+  return rows.map((row) => {
+    const websiteUrl = httpUrlSchema.safeParse(row.websiteUrl);
+
+    return {
+      slug: row.slug,
+      name: row.name,
+      verified: true,
+      websiteUrl: websiteUrl.success ? websiteUrl.data : null,
+      serverCount: Number(row.serverCount),
+    };
+  });
+}
+
 export async function getPublicSitemapEntries(db: QueryDatabase): Promise<PublicSitemapEntries> {
   const serverRows = await db
     .select({ slug: sql<string>`${servers.slug}::text` })
@@ -768,9 +818,18 @@ export async function getPublicSitemapEntries(db: QueryDatabase): Promise<Public
     .groupBy(categories.slug)
     .orderBy(categories.slug);
 
+  const publisherRows = await db
+    .select({ slug: sql<string>`${publishers.slug}::text` })
+    .from(publishers)
+    .innerJoin(servers, sql`${servers.publisherId} = ${publishers.id}`)
+    .where(sql`${publishers.verificationState} = 'verified' and ${visibilityWhereSql()}`)
+    .groupBy(publishers.slug)
+    .orderBy(sql`lower(${publishers.slug}::text) asc`);
+
   return {
     serverSlugs: serverRows.map(({ slug: serverSlug }) => serverSlug),
     categorySlugs: categoryRows.map(({ slug: categorySlug }) => categorySlug),
+    publisherSlugs: publisherRows.map(({ slug: publisherSlug }) => publisherSlug),
   };
 }
 
