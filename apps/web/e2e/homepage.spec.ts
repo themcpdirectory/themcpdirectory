@@ -1,9 +1,12 @@
+import AxeBuilder from "@axe-core/playwright";
 import { test, expect } from "@playwright/test";
 
 test.describe("Homepage", () => {
-  test("renders h1 with site title", async ({ page }) => {
+  test("renders the discovery hero with product identity", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("The MCP Directory");
+    await expect(page.getByRole("heading", { level: 1, name: "The MCP Directory" })).toBeVisible();
+    await expect(page.getByText("mcp>_", { exact: true })).toBeVisible();
+    await expect(page.getByText("Find it. Trust it. Install it.", { exact: true })).toBeVisible();
   });
 
   test("has skip link as first focusable element", async ({ page }) => {
@@ -55,38 +58,106 @@ test.describe("Homepage", () => {
     await expect(label).toContainText(/search/i);
   });
 
-  test("shows server cards from seeded data", async ({ page }) => {
+  test("focuses search with slash without hijacking normal typing", async ({ page }) => {
     await page.goto("/");
-    // At least one server card should appear
-    await expect(page.getByRole("article").first()).toBeVisible();
+    const searchInput = page.getByRole("searchbox", { name: "Search MCP servers" });
+
+    await page.keyboard.press("/");
+    await expect(searchInput).toBeFocused();
+    await expect(searchInput).toHaveValue("");
+
+    await searchInput.type("playwright");
+    await expect(searchInput).toHaveValue("playwright");
+
+    await searchInput.press("/");
+    await expect(searchInput).toHaveValue("playwright/");
   });
 
-  test("shows a category and client entry-point rail in the first viewport", async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
+  test("shows the public install command and copy action", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.goto("/");
-    const entryRail = page.getByRole("navigation", { name: "Quick entry points" });
-    await expect(entryRail).toBeInViewport();
-    await expect(entryRail.getByRole("link", { name: "Supported clients" })).toBeVisible();
-    await expect(entryRail.getByRole("link", { name: "All categories" })).toBeVisible();
+
+    await expect(
+      page.getByText("npx @themcpdirectory/cli add github", { exact: true }),
+    ).toBeVisible();
+
+    const commandBlock = page.locator(".command-block").filter({
+      hasText: "Production install command",
+    });
+    const copyButton = commandBlock.locator("button.copy-button");
+    await expect(copyButton).toHaveText("Copy");
+    await copyButton.click();
+    await expect(copyButton).toHaveText("Copied");
+
+    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clipboardText).toBe("npx @themcpdirectory/cli add github");
   });
 
-  test("shows a real server row within the first 1440x900 viewport", async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
+  test("shows factual ecosystem metrics from live discovery data", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("article").first()).toBeInViewport();
+
+    const facts = page.locator(".home-facts__item");
+    await expect(facts).toHaveCount(4);
+    await expect(facts.filter({ hasText: "Active servers" })).toContainText(/\d+/);
+    await expect(facts.filter({ hasText: "Official Registry servers" })).toContainText(/\d+/);
+    await expect(facts.filter({ hasText: "Verified publishers" })).toContainText(/\d+/);
+    await expect(facts.filter({ hasText: "CLI targets" })).toContainText("4");
+    await expect(page.getByText("Source", { exact: true })).toHaveCount(0);
   });
 
-  test("Supported clients entry point reaches the CLI supported-clients section", async ({
+  test("shows recommended and recently added sections with direct server links", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
-    await page
-      .getByRole("navigation", { name: "Quick entry points" })
-      .getByRole("link", { name: "Supported clients" })
-      .click();
-    await expect(page).toHaveURL(/\/docs\/cli$/);
-    await expect(page.getByRole("heading", { level: 1, name: "CLI Reference" })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Supported clients" })).toBeVisible();
+
+    const recommendedSection = page.locator("section").filter({
+      has: page.getByRole("heading", { level: 2, name: "Recommended servers" }),
+    });
+    const recentSection = page.locator("section").filter({
+      has: page.getByRole("heading", { level: 2, name: "Recently added" }),
+    });
+
+    await expect(recommendedSection).toBeVisible();
+    await expect(recentSection).toBeVisible();
+
+    const githubLink = page.getByRole("link", { name: /GitHub MCP/i }).first();
+    await expect(githubLink).toBeVisible();
+    await expect(githubLink).toHaveAttribute("href", "/github");
+
+    const recentServerLink = recentSection
+      .locator(
+        'a[href^="/"]:not([href^="/collections/"]):not([href^="/categories/"]):not([href="/browse"])',
+      )
+      .first();
+    await expect(recentServerLink).toBeVisible();
+    await expect(recentServerLink).toHaveAttribute(
+      "href",
+      /^\/(github|playwright|postgresql|supabase|shared-handle)$/,
+    );
+  });
+
+  test("shows only non-empty collections and categories plus a publisher CTA", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(page.getByRole("heading", { level: 2, name: "Collections" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Categories" })).toBeVisible();
+
+    await expect(page.getByRole("link", { name: /Official Registry essentials/i })).toHaveAttribute(
+      "href",
+      "/collections/official-registry-essentials",
+    );
+    await expect(page.getByRole("link", { name: /Developer Tools/i })).toHaveAttribute(
+      "href",
+      "/categories/developer-tools",
+    );
+    await expect(page.getByRole("link", { name: /Publish a server/i })).toHaveAttribute(
+      "href",
+      "/publish",
+    );
+
+    await expect(page.getByRole("link", { name: /Works with Codex/i })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Works with Cursor/i })).toHaveCount(0);
   });
 
   test("disables the homepage entry transition under reduced motion", async ({ page }) => {
@@ -104,6 +175,14 @@ test.describe("Homepage", () => {
     await input.fill("github");
     await input.press("Enter");
     await expect(page).toHaveURL(/\/search\?q=github/);
+  });
+
+  test("does not render the old quick-entry rail or full-registry section", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(page.getByRole("navigation", { name: "Quick entry points" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 2, name: /^Servers$/ })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "All categories" })).toHaveCount(0);
   });
 
   test("has Open Graph meta tags", async ({ page }) => {
@@ -124,5 +203,43 @@ test.describe("Homepage", () => {
     const bodyWidth = await page.evaluate(() => document.body.scrollWidth);
     const viewportWidth = await page.evaluate(() => window.innerWidth);
     expect(bodyWidth).toBeLessThanOrEqual(viewportWidth + 1);
+  });
+
+  test("passes the focused automated accessibility gate", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce", forcedColors: "active" });
+    await page.setViewportSize({ width: 320, height: 900 });
+
+    const response = await page.goto("/", { waitUntil: "domcontentloaded" });
+    expect(response?.ok(), "homepage response").toBe(true);
+
+    await page.keyboard.press("Tab");
+    const skipLink = page.getByRole("link", { name: "Skip to main content" });
+    await expect(skipLink).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#main-content")).toBeFocused();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+
+    const overflow = await page.evaluate(() => ({
+      pageWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+      elements: [...document.querySelectorAll<HTMLElement>("body *")]
+        .filter((element) => element.getBoundingClientRect().right > window.innerWidth + 1)
+        .map((element) => ({
+          element: element.tagName.toLowerCase(),
+          className: element.className,
+          right: Math.round(element.getBoundingClientRect().right),
+        }))
+        .slice(0, 10),
+    }));
+    expect(
+      overflow.pageWidth,
+      `homepage reflows at 320 CSS pixels; overflow candidates: ${JSON.stringify(overflow.elements)}`,
+    ).toBeLessThanOrEqual(overflow.viewportWidth + 1);
+
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(
+      results.violations.filter((entry) => ["serious", "critical"].includes(entry.impact ?? "")),
+      "homepage serious or critical Axe violations",
+    ).toEqual([]);
   });
 });

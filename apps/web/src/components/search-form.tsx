@@ -2,41 +2,74 @@
 
 import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
 import { Button, TextField } from "@radix-ui/themes";
-import { useRouter } from "next/navigation";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 interface SearchFormProps {
-  defaultValue?: string;
-  placeholder?: string;
+  readonly defaultValue?: string;
+  readonly placeholder?: string;
+  readonly submitLabel?: string;
+  readonly variant?: "default" | "hero";
+  readonly showShortcutHint?: boolean;
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (target.isContentEditable) {
+    return true;
+  }
+
+  const tagName = target.tagName;
+  return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
 }
 
 export function SearchForm({
   defaultValue = "",
   placeholder = "Search MCP servers…",
+  submitLabel = "Search",
+  variant = "default",
+  showShortcutHint = false,
 }: SearchFormProps) {
-  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const q = inputRef.current?.value.trim() ?? "";
-    if (q) {
-      router.push(`/search?q=${encodeURIComponent(q)}`);
-    } else {
-      router.push("/search");
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.key !== "/") {
+        return;
+      }
+
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      event.preventDefault();
+      inputRef.current?.focus();
     }
-  }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     <form
       role="search"
-      className="directory-search"
+      className={`directory-search${variant === "hero" ? " directory-search--hero" : ""}`}
       action="/search"
       method="GET"
-      onSubmit={handleSubmit}
     >
       <label htmlFor="search-input" className="directory-search__label">
-        Search MCP servers
+        <span>Search MCP servers</span>
+        {showShortcutHint ? (
+          <span className="directory-search__shortcut" aria-hidden="true">
+            /
+          </span>
+        ) : null}
       </label>
       <TextField.Root
         ref={inputRef}
@@ -55,8 +88,8 @@ export function SearchForm({
           <MagnifyingGlassIcon aria-hidden="true" />
         </TextField.Slot>
       </TextField.Root>
-      <Button type="submit" size="3">
-        Search
+      <Button type="submit" size="3" className="directory-search__submit">
+        {submitLabel}
       </Button>
     </form>
   );

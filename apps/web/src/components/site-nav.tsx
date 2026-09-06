@@ -17,8 +17,9 @@ export function SiteNav() {
   return (
     <header role="banner" className="site-header">
       <div className="site-header__inner">
-        <Link href="/" className="site-wordmark" aria-label="The MCP Directory home">
-          <BrandMark kind="full" className="site-wordmark__mark" />
+        <Link href="/" className="site-wordmark">
+          <BrandMark kind="full" aria-hidden="true" className="site-wordmark__mark" />
+          <span className="sr-only">The MCP Directory — home</span>
         </Link>
 
         <div className="site-nav__actions">
