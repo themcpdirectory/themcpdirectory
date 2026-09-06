@@ -34,6 +34,7 @@ export function getCliReferenceDocument(): ReleaseDocument {
         body: [
           "The primary one-shot command is: npx @themcpdirectory/cli@0.2.1 add github",
           "For repeated use, install the canonical package globally: npm install --global @themcpdirectory/cli",
+          ...CLI_DOCUMENTATION.distribution,
           run("--help"),
         ],
       },

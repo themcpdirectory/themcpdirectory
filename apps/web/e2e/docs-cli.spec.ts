@@ -43,5 +43,6 @@ test("CLI docs project commands, clients, safety, and current distribution state
   await expect(page.getByRole("region", { name: "Removal and uninstall" })).toContainText(
     `${cli} remove github-server --to codex --scope user --dry-run`,
   );
-  await expect(page.getByRole("region", { name: "Quick start" })).toContainText("npx mcpdir ");
+  await expect(page.getByText(/mcpdir wrapper is pending npm name approval/i)).toBeVisible();
+  await expect(page.getByRole("region", { name: "Quick start" })).not.toContainText("npx mcpdir ");
 });
