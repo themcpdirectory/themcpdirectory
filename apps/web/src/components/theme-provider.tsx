@@ -12,7 +12,17 @@ function isThemePreference(value: string | null): value is ThemePreference {
   return value === "light" || value === "dark" || value === "system";
 }
 
-export function readThemePreference(storage: Pick<Storage, "getItem">): ThemePreference {
+export function getThemeStorage(source: Pick<Window, "localStorage">): Storage | null {
+  try {
+    return source.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function readThemePreference(storage: Pick<Storage, "getItem"> | null): ThemePreference {
+  if (!storage) return "system";
+
   try {
     const preference = storage.getItem(THEME_STORAGE_KEY);
     return isThemePreference(preference) ? preference : "system";
@@ -22,9 +32,11 @@ export function readThemePreference(storage: Pick<Storage, "getItem">): ThemePre
 }
 
 export function writeThemePreference(
-  storage: Pick<Storage, "setItem">,
+  storage: Pick<Storage, "setItem"> | null,
   preference: ThemePreference,
 ): void {
+  if (!storage) return;
+
   try {
     storage.setItem(THEME_STORAGE_KEY, preference);
   } catch {

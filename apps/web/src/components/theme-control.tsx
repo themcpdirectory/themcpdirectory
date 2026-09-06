@@ -5,6 +5,7 @@ import { Select } from "@radix-ui/themes";
 import { useEffect, useSyncExternalStore } from "react";
 import {
   applyThemePreference,
+  getThemeStorage,
   readThemePreference,
   THEME_CHANGE_EVENT,
   writeThemePreference,
@@ -34,14 +35,14 @@ function subscribeToThemePreference(onStoreChange: () => void): () => void {
 export function ThemeControl() {
   const preference = useSyncExternalStore<ThemePreference>(
     subscribeToThemePreference,
-    () => readThemePreference(window.localStorage),
+    () => readThemePreference(getThemeStorage(window)),
     () => "system",
   );
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const syncSystemTheme = () => {
-      if (readThemePreference(window.localStorage) === "system") {
+      if (readThemePreference(getThemeStorage(window)) === "system") {
         applyThemePreference("system");
       }
     };
@@ -55,7 +56,7 @@ export function ThemeControl() {
   function updatePreference(value: string) {
     if (!isThemePreference(value)) return;
 
-    writeThemePreference(window.localStorage, value);
+    writeThemePreference(getThemeStorage(window), value);
     applyThemePreference(value);
     window.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: value }));
   }
