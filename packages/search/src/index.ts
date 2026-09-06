@@ -3,7 +3,6 @@ import {
   categories,
   publishers,
   registrySources,
-  repositorySnapshots,
   serverAliases,
   serverCategories,
   serverPackages,
@@ -12,6 +11,12 @@ import {
   servers,
   type Database,
 } from "@themcpdirectory/db";
+import {
+  SEARCH_RANKING_WEIGHTS,
+  currentOfficialRegistrySql,
+  recommendationScoreSql,
+  visibilityWhereSql,
+} from "./discovery/queries.js";
 
 export { InvalidCursorError, createServerSearchCursorCodec } from "./public-api/cursor.js";
 export { createServerSearchFiltersHash } from "./public-api/query-fingerprint.js";
@@ -29,19 +34,29 @@ export type {
   SearchServersPageRow,
   ServerSearchCursorPayload,
 } from "./public-api/types.js";
-
-export const SEARCH_RANKING_WEIGHTS = {
-  exactSlugBoost: 120,
-  exactTitleBoost: 100,
-  aliasExactBoost: 90,
-  ftsMultiplier: 40,
-  trigramMultiplier: 25,
-  activeVisibleBoost: 4,
-  publisherVerifiedBoost: 4,
-  maxMetadataCompletenessBoost: 6,
-  officialRegistryBoost: 5,
-  maintenanceBoost: 3,
-} as const;
+export {
+  SEARCH_RANKING_WEIGHTS,
+  browseServers,
+  getCollection,
+  getDiscoverySections,
+  getEcosystemFacts,
+  getPublicPublisher,
+  getRelatedServers,
+  getVisibleCollections,
+} from "./discovery/queries.js";
+export type {
+  BrowseServersInput,
+  BrowseServersResult,
+  CollectionDetail,
+  CollectionSummary,
+  DiscoveryCategorySummary,
+  DiscoverySections,
+  DiscoveryServer,
+  DiscoverySort,
+  EcosystemFacts,
+  PageInput,
+  PublicPublisherDetail,
+} from "./discovery/types.js";
 
 const SEARCH_SIMILARITY_THRESHOLD = 0.12;
 
@@ -136,58 +151,6 @@ function clampOffset(offset: number | undefined): number {
   return Math.max(0, Math.floor(offset));
 }
 
-function metadataCompletenessScoreSql() {
-  return sql<number>`(
-		(
-			case when ${servers.repositoryUrl} is not null then 1 else 0 end +
-			case when ${servers.homepageUrl} is not null then 1 else 0 end +
-			case when ${servers.documentationUrl} is not null then 1 else 0 end +
-			case when ${servers.licenseSpdx} is not null then 1 else 0 end +
-			case when ${servers.longDescription} is not null then 1 else 0 end +
-			case when ${servers.canonicalRegistryName} is not null then 1 else 0 end
-		)::double precision / 6.0
-	) * ${SEARCH_RANKING_WEIGHTS.maxMetadataCompletenessBoost}`;
-}
-
-function officialRegistryBoostSql() {
-  return sql<number>`case when exists (
-		select 1
-		from ${serverVersions} sv
-		inner join ${registrySources} rs on rs.id = sv.registry_source_id
-		where sv.id = ${servers.currentVersionId}
-			and rs.key = 'official'
-	) then ${SEARCH_RANKING_WEIGHTS.officialRegistryBoost} else 0 end`;
-}
-
-function isCurrentOfficialRegistrySql() {
-  return sql<boolean>`exists (
-		select 1
-		from ${serverVersions} sv
-		inner join ${registrySources} rs on rs.id = sv.registry_source_id
-		where sv.id = ${servers.currentVersionId}
-			and rs.key = 'official'
-			and sv.upstream_status = 'active'
-			and ${servers.listingStatus} = 'active'
-	)`;
-}
-
-function maintenanceBoostSql() {
-  return sql<number>`case when exists (
-		select 1
-		from ${repositorySnapshots} r
-		where r.server_id = ${servers.id}
-			and coalesce(r.is_archived, false) = false
-			and r.last_push_at >= now() - interval '180 days'
-	) then ${SEARCH_RANKING_WEIGHTS.maintenanceBoost} else 0 end`;
-}
-
-function publisherVerifiedBoostSql() {
-  return sql<number>`case when ${publishers.verificationState} = 'verified'
-		then ${SEARCH_RANKING_WEIGHTS.publisherVerifiedBoost}
-		else 0
-	end`;
-}
-
 function categorySlugsSql() {
   return sql<readonly string[]>`coalesce((
 		select array_agg(distinct c.slug order by c.slug)
@@ -205,16 +168,6 @@ function aliasesSql() {
 	), array[]::text[])`;
 }
 
-function recommendationScoreSql() {
-  return sql<number>`(
-		${SEARCH_RANKING_WEIGHTS.activeVisibleBoost} +
-		${publisherVerifiedBoostSql()} +
-		${metadataCompletenessScoreSql()} +
-		${officialRegistryBoostSql()} +
-		${maintenanceBoostSql()}
-	)`;
-}
-
 function publicListingColumns() {
   return {
     id: servers.id,
@@ -222,7 +175,7 @@ function publicListingColumns() {
     title: servers.title,
     shortDescription: servers.shortDescription,
     canonicalRegistryName: servers.canonicalRegistryName,
-    isOfficialRegistry: isCurrentOfficialRegistrySql(),
+    isOfficialRegistry: currentOfficialRegistrySql(),
     publisherDisplayName: publishers.displayName,
     publisherSlug: sql<string | null>`${publishers.slug}::text`,
     categorySlugs: categorySlugsSql(),
@@ -294,10 +247,6 @@ function searchScoreSql(normalizedQuery: string) {
 		${recommendationScoreSql()} +
 		${trigram}
 	)`;
-}
-
-function visibilityWhereSql() {
-  return sql<boolean>`${servers.listingStatus} = 'active' and ${servers.moderationStatus} = 'normal'`;
 }
 
 export async function refreshServerSearchDocument(
@@ -377,7 +326,7 @@ export async function searchServers(
       title: servers.title,
       shortDescription: servers.shortDescription,
       canonicalRegistryName: servers.canonicalRegistryName,
-      isOfficialRegistry: isCurrentOfficialRegistrySql(),
+      isOfficialRegistry: currentOfficialRegistrySql(),
       publisherDisplayName: publishers.displayName,
       publisherSlug: sql<string | null>`${publishers.slug}::text`,
       categorySlugs: categorySlugsSql(),
