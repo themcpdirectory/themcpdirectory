@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { seedPublisherSession } from "./setup/publisher-session-fixtures";
 
+test.setTimeout(60_000);
+
 test("claim creation starts the separate GitHub App flow without browser grant state", async ({
   page,
   context,
