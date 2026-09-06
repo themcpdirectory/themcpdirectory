@@ -24,7 +24,10 @@ const geistMono = Geist_Mono({
 const themeBootstrapScript = `
   (() => {
     const key = "mcp-directory-theme";
-    const stored = localStorage.getItem(key);
+    let stored = null;
+    try {
+      stored = localStorage.getItem(key);
+    } catch {}
     const preference = stored === "light" || stored === "dark" ? stored : "system";
     const theme = preference === "system"
       ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")

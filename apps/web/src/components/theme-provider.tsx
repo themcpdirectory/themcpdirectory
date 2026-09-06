@@ -8,6 +8,30 @@ export type ThemePreference = "light" | "dark" | "system";
 export const THEME_STORAGE_KEY = "mcp-directory-theme";
 export const THEME_CHANGE_EVENT = "mcp-directory-theme-change";
 
+function isThemePreference(value: string | null): value is ThemePreference {
+  return value === "light" || value === "dark" || value === "system";
+}
+
+export function readThemePreference(storage: Pick<Storage, "getItem">): ThemePreference {
+  try {
+    const preference = storage.getItem(THEME_STORAGE_KEY);
+    return isThemePreference(preference) ? preference : "system";
+  } catch {
+    return "system";
+  }
+}
+
+export function writeThemePreference(
+  storage: Pick<Storage, "setItem">,
+  preference: ThemePreference,
+): void {
+  try {
+    storage.setItem(THEME_STORAGE_KEY, preference);
+  } catch {
+    // Theme selection still applies for this page when persistent storage is unavailable.
+  }
+}
+
 export function applyThemePreference(preference: ThemePreference) {
   const resolvedTheme =
     preference === "system"

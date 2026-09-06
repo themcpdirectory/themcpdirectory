@@ -5,8 +5,9 @@ import { Select } from "@radix-ui/themes";
 import { useEffect, useSyncExternalStore } from "react";
 import {
   applyThemePreference,
+  readThemePreference,
   THEME_CHANGE_EVENT,
-  THEME_STORAGE_KEY,
+  writeThemePreference,
   type ThemePreference,
 } from "@/components/theme-provider";
 
@@ -18,11 +19,6 @@ const themeOptions = [
 
 function isThemePreference(value: string | null): value is ThemePreference {
   return value === "light" || value === "dark" || value === "system";
-}
-
-function getThemePreference(): ThemePreference {
-  const storedPreference = window.localStorage.getItem(THEME_STORAGE_KEY);
-  return isThemePreference(storedPreference) ? storedPreference : "system";
 }
 
 function subscribeToThemePreference(onStoreChange: () => void): () => void {
@@ -38,14 +34,14 @@ function subscribeToThemePreference(onStoreChange: () => void): () => void {
 export function ThemeControl() {
   const preference = useSyncExternalStore<ThemePreference>(
     subscribeToThemePreference,
-    getThemePreference,
+    () => readThemePreference(window.localStorage),
     () => "system",
   );
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const syncSystemTheme = () => {
-      if ((window.localStorage.getItem(THEME_STORAGE_KEY) ?? "system") === "system") {
+      if (readThemePreference(window.localStorage) === "system") {
         applyThemePreference("system");
       }
     };
@@ -59,7 +55,7 @@ export function ThemeControl() {
   function updatePreference(value: string) {
     if (!isThemePreference(value)) return;
 
-    window.localStorage.setItem(THEME_STORAGE_KEY, value);
+    writeThemePreference(window.localStorage, value);
     applyThemePreference(value);
     window.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: value }));
   }

@@ -63,7 +63,7 @@
   --fg: var(--gray-12);
   --fg-muted: var(--gray-11);
   --border: var(--gray-6);
-  --control-border: var(--gray-8);
+  --control-border: var(--gray-10);
   --accent: var(--green-11);
   --accent-hover: var(--green-12);
   --accent-fg: var(--green-contrast);
