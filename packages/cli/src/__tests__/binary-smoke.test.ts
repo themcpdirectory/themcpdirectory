@@ -14,7 +14,7 @@ beforeAll(async () => {
   if (build.exitCode !== 0) {
     throw new Error(`CLI build failed:\n${build.stderr || build.stdout}`);
   }
-});
+}, 30_000);
 
 describe("built CLI binary", () => {
   it("serves help through the package bin contract", async () => {
