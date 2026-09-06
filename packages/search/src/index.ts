@@ -1,3 +1,4 @@
+import { httpUrlSchema } from "@themcpdirectory/api-contract";
 import { sql } from "drizzle-orm";
 import {
   categories,
@@ -782,9 +783,18 @@ export interface CategoryWithCount {
   readonly serverCount: number;
 }
 
+export interface PublicPublisherDirectoryEntry {
+  readonly slug: string;
+  readonly name: string;
+  readonly verified: true;
+  readonly websiteUrl: string | null;
+  readonly serverCount: number;
+}
+
 export interface PublicSitemapEntries {
   readonly serverSlugs: readonly string[];
   readonly categorySlugs: readonly string[];
+  readonly publisherSlugs: readonly string[];
 }
 
 export async function getCategories(db: QueryDatabase): Promise<readonly CategoryWithCount[]> {
@@ -820,6 +830,35 @@ export async function getCategories(db: QueryDatabase): Promise<readonly Categor
   }));
 }
 
+export async function getPublicPublishers(
+  db: QueryDatabase,
+): Promise<readonly PublicPublisherDirectoryEntry[]> {
+  const rows = await db
+    .select({
+      slug: sql<string>`${publishers.slug}::text`,
+      name: publishers.displayName,
+      websiteUrl: publishers.websiteUrl,
+      serverCount: sql<number>`count(distinct ${servers.id})::integer`,
+    })
+    .from(publishers)
+    .innerJoin(servers, sql`${servers.publisherId} = ${publishers.id}`)
+    .where(sql`${publishers.verificationState} = 'verified' and ${visibilityWhereSql()}`)
+    .groupBy(publishers.id, publishers.slug, publishers.displayName, publishers.websiteUrl)
+    .orderBy(sql`lower(${publishers.displayName}) asc`, sql`lower(${publishers.slug}::text) asc`);
+
+  return rows.map((row) => {
+    const websiteUrl = httpUrlSchema.safeParse(row.websiteUrl);
+
+    return {
+      slug: row.slug,
+      name: row.name,
+      verified: true,
+      websiteUrl: websiteUrl.success ? websiteUrl.data : null,
+      serverCount: Number(row.serverCount),
+    };
+  });
+}
+
 export async function getPublicSitemapEntries(db: QueryDatabase): Promise<PublicSitemapEntries> {
   const serverRows = await db
     .select({ slug: sql<string>`${servers.slug}::text` })
@@ -836,9 +875,18 @@ export async function getPublicSitemapEntries(db: QueryDatabase): Promise<Public
     .groupBy(categories.slug)
     .orderBy(categories.slug);
 
+  const publisherRows = await db
+    .select({ slug: sql<string>`${publishers.slug}::text` })
+    .from(publishers)
+    .innerJoin(servers, sql`${servers.publisherId} = ${publishers.id}`)
+    .where(sql`${publishers.verificationState} = 'verified' and ${visibilityWhereSql()}`)
+    .groupBy(publishers.slug)
+    .orderBy(sql`lower(${publishers.slug}::text) asc`);
+
   return {
     serverSlugs: serverRows.map(({ slug: serverSlug }) => serverSlug),
     categorySlugs: categoryRows.map(({ slug: categorySlug }) => categorySlug),
+    publisherSlugs: publisherRows.map(({ slug: publisherSlug }) => publisherSlug),
   };
 }
 

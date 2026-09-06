@@ -27,6 +27,7 @@ test("robots and sitemap expose only canonical indexable launch pages", async ({
   const collisionPaths = buildIndexableSitemapPaths({
     categorySlugs: [],
     collectionSlugs: [],
+    publisherSlugs: [],
     serverSlugs: ["search", "search-tool", "advertise", "dashboard", "dashboard-kit"],
   });
   expect(collisionPaths).not.toContain("/search");

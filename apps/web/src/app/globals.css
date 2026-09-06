@@ -1289,6 +1289,7 @@ object {
 }
 
 .server-card__meta,
+.entity-card__meta,
 .site-footer__list {
   display: flex;
   flex-wrap: wrap;

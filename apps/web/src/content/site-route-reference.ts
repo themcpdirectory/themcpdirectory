@@ -44,6 +44,20 @@ export const PUBLIC_SITE_ROUTE_REFERENCE: readonly PublicSiteRouteReference[] = 
     availability: "available",
   },
   {
+    path: "/publishers",
+    title: "Publishers",
+    auth: "anonymous",
+    index: true,
+    availability: "available",
+  },
+  {
+    path: "/publishers/[slug]",
+    title: "Publisher detail",
+    auth: "anonymous",
+    index: true,
+    availability: "available",
+  },
+  {
     path: "/[slug]",
     title: "Server detail",
     auth: "anonymous",
@@ -180,6 +194,7 @@ export const INDEXABLE_ROUTE_REFERENCE = Object.freeze(
 export function buildIndexableSitemapPaths(input: {
   readonly categorySlugs: readonly string[];
   readonly collectionSlugs: readonly string[];
+  readonly publisherSlugs: readonly string[];
   readonly serverSlugs: readonly string[];
 }): readonly string[] {
   const concreteRoutePaths = new Set(
@@ -192,11 +207,18 @@ export function buildIndexableSitemapPaths(input: {
   );
   const collectionPaths = input.collectionSlugs.map((slug) => `/collections/${slug}`);
   const categoryPaths = input.categorySlugs.map((slug) => `/categories/${slug}`);
+  const publisherPaths = input.publisherSlugs.map((slug) => `/publishers/${slug}`);
   const serverPaths = input.serverSlugs
     .map((slug) => `/${slug}`)
     .filter((path) => !concreteRoutePaths.has(path));
 
   return Object.freeze([
-    ...new Set([...staticPaths, ...collectionPaths, ...categoryPaths, ...serverPaths]),
+    ...new Set([
+      ...staticPaths,
+      ...collectionPaths,
+      ...categoryPaths,
+      ...publisherPaths,
+      ...serverPaths,
+    ]),
   ]);
 }
