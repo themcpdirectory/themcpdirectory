@@ -20,7 +20,7 @@ export const metadata: Metadata = buildDocumentMetadata({
 
 export default function HomePage() {
   return (
-    <main id="main-content" tabIndex={-1} style={{ minHeight: "100vh" }}>
+    <main id="main-content" tabIndex={-1} className="page-shell">
       <Suspense fallback={<LoadingState withinMain />}>
         <HomeDirectory />
       </Suspense>
@@ -73,20 +73,10 @@ async function HomeDirectory() {
         </div>
       </section>
 
-      <div style={{ maxWidth: "72rem", margin: "0 auto", padding: "2rem 1rem" }}>
+      <div className="page-container">
         {/* Server listing */}
         <section aria-labelledby="servers-heading">
-          <h2
-            id="servers-heading"
-            style={{
-              fontSize: "0.8125rem",
-              fontWeight: 600,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              color: "var(--fg-muted)",
-              marginBottom: "0.875rem",
-            }}
-          >
+          <h2 id="servers-heading" className="section-label">
             Servers
           </h2>
           <ServerDirectoryList servers={servers} emptyMessage="No servers yet. Check back soon." />

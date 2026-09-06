@@ -5,103 +5,36 @@ import { LegalDraftBanner } from "@/components/legal-draft-banner";
 
 export function DocumentPage({ document }: { document: ReleaseDocument }) {
   return (
-    <main
-      id="main-content"
-      tabIndex={-1}
-      style={{ minHeight: "100vh", padding: "2.5rem 1rem 4rem" }}
-    >
-      <div style={{ maxWidth: "72rem", margin: "0 auto" }}>
+    <main id="main-content" tabIndex={-1} className="page-shell">
+      <div className="page-container">
         {document.draftLabel ? <LegalDraftBanner label={document.draftLabel} /> : null}
-        <header style={{ maxWidth: "48rem", padding: "1rem 0 2rem" }}>
-          <h1
-            style={{
-              margin: "0 0 0.75rem",
-              fontSize: "clamp(1.5rem, 4vw, 2.25rem)",
-              lineHeight: 1.15,
-            }}
-          >
-            {document.title}
-          </h1>
-          <p style={{ margin: "0 0 2rem", color: "var(--fg-muted)", fontSize: "1rem" }}>
-            {document.description}
-          </p>
+        <header className="page-header">
+          <h1 className="page-title">{document.title}</h1>
+          <p className="page-description">{document.description}</p>
         </header>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 18rem), 1fr))",
-            gap: "2.5rem clamp(2rem, 6vw, 6rem)",
-            alignItems: "start",
-          }}
-        >
-          <nav aria-label={`On this page: ${document.title}`}>
-            <p
-              style={{
-                margin: "0 0 0.75rem",
-                color: "var(--fg)",
-                fontFamily: "var(--font-geist-mono)",
-                fontSize: "0.75rem",
-                fontWeight: 700,
-                textTransform: "uppercase",
-              }}
-            >
-              On this page
-            </p>
-            <ol style={{ margin: 0, paddingLeft: "1.25rem", color: "var(--fg-muted)" }}>
+        <div className="document-layout">
+          <nav className="document-toc" aria-label={`On this page: ${document.title}`}>
+            <p className="section-label">On this page</p>
+            <ol>
               {document.sections.map((section) => (
-                <li key={section.id} style={{ marginBottom: "0.6rem", paddingLeft: "0.25rem" }}>
-                  <a
-                    href={`#${section.id}`}
-                    style={{ color: "inherit", textDecorationThickness: 1 }}
-                  >
-                    {section.heading}
-                  </a>
+                <li key={section.id}>
+                  <a href={`#${section.id}`}>{section.heading}</a>
                 </li>
               ))}
             </ol>
           </nav>
-          <article style={{ minWidth: 0 }}>
+          <article className="document-content">
             {document.sections.map((section) => (
-              <section
-                key={section.id}
-                aria-labelledby={section.id}
-                style={{ borderTop: "1px solid var(--border)", padding: "1.5rem 0 0.75rem" }}
-              >
-                <h2 id={section.id} style={{ margin: "0 0 0.75rem", fontSize: "1.125rem" }}>
-                  {section.heading}
-                </h2>
+              <section key={section.id} aria-labelledby={section.id} className="document-section">
+                <h2 id={section.id}>{section.heading}</h2>
                 {section.body.map((paragraph, paragraphIndex) => (
-                  <p
-                    key={`${section.id}-${paragraphIndex}`}
-                    style={{
-                      margin: "0 0 1rem",
-                      color: "var(--fg-muted)",
-                      overflowWrap: "anywhere",
-                      whiteSpace: "pre-wrap",
-                    }}
-                  >
-                    {paragraph}
-                  </p>
+                  <p key={`${section.id}-${paragraphIndex}`}>{paragraph}</p>
                 ))}
                 {section.links && section.links.length > 0 ? (
-                  <ul
-                    style={{
-                      margin: "0 0 1rem",
-                      padding: 0,
-                      listStyle: "none",
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: "0.75rem",
-                    }}
-                  >
+                  <ul className="document-links">
                     {section.links.map((link) => (
                       <li key={link.href}>
-                        <Link
-                          href={link.href as Route}
-                          style={{ color: "var(--accent)", fontWeight: 600 }}
-                        >
-                          {link.label}
-                        </Link>
+                        <Link href={link.href as Route}>{link.label}</Link>
                       </li>
                     ))}
                   </ul>

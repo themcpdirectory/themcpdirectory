@@ -146,7 +146,7 @@ export default async function ServerDetailPage({ params }: Props) {
   });
 
   return (
-    <main id="main-content" tabIndex={-1} style={{ minHeight: "100vh" }}>
+    <main id="main-content" tabIndex={-1} className="page-shell">
       <script
         nonce={nonce}
         type="application/ld+json"
@@ -158,15 +158,10 @@ export default async function ServerDetailPage({ params }: Props) {
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
 
-      <div style={{ maxWidth: "60rem", margin: "0 auto", padding: "2rem 1rem" }}>
+      <div className="page-container page-container--narrow">
         {/* Breadcrumb */}
-        <nav
-          aria-label="Breadcrumb"
-          style={{ marginBottom: "1rem", fontSize: "0.8125rem", color: "var(--fg-muted)" }}
-        >
-          <Link href="/" style={{ color: "var(--accent)", textDecoration: "none" }}>
-            The MCP Directory
-          </Link>
+        <nav aria-label="Breadcrumb" className="breadcrumb">
+          <Link href="/">The MCP Directory</Link>
           <span aria-hidden="true"> / </span>
           <span>{detail.title}</span>
         </nav>
@@ -187,78 +182,30 @@ export default async function ServerDetailPage({ params }: Props) {
           installAvailability={publicDetail.installAvailability}
         />
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 28rem), 1fr))",
-            gap: "1.25rem",
-          }}
-        >
+        <div className="detail-section-grid">
           {/* Package information */}
           {detail.packages.length > 0 && (
-            <section
-              aria-labelledby="packages-heading"
-              style={{
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-md)",
-                padding: "1rem",
-                background: "var(--surface)",
-              }}
-            >
-              <h2
-                id="packages-heading"
-                style={{ fontSize: "0.875rem", fontWeight: 600, marginBottom: "0.75rem" }}
-              >
-                Package
-              </h2>
+            <section aria-labelledby="packages-heading" className="detail-section">
+              <h2 id="packages-heading">Package</h2>
               {detail.packages.map((pkg) => (
-                <div
-                  key={pkg.id}
-                  style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}
-                >
-                  <code
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "0.8125rem",
-                      background: "var(--surface-2)",
-                      padding: "0.25rem 0.5rem",
-                      borderRadius: "var(--radius-sm)",
-                      wordBreak: "break-all",
-                      display: "block",
-                    }}
-                  >
+                <div key={pkg.id} className="detail-stack">
+                  <code className="detail-code">
                     {pkg.identifier}
                     {pkg.version ? `@${pkg.version}` : ""}
                   </code>
-                  <dl
-                    style={{
-                      fontSize: "0.8125rem",
-                      color: "var(--fg-muted)",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.25rem",
-                    }}
-                  >
-                    <div style={{ display: "flex", gap: "0.5rem" }}>
-                      <dt style={{ fontWeight: 600, minWidth: "6rem", flexShrink: 0 }}>Registry</dt>
-                      <dd style={{ margin: 0 }}>{pkg.registryType}</dd>
+                  <dl className="detail-fact-list">
+                    <div>
+                      <dt>Registry</dt>
+                      <dd>{pkg.registryType}</dd>
                     </div>
-                    <div style={{ display: "flex", gap: "0.5rem" }}>
-                      <dt style={{ fontWeight: 600, minWidth: "6rem", flexShrink: 0 }}>
-                        Transport
-                      </dt>
-                      <dd style={{ margin: 0 }}>{pkg.transportType}</dd>
+                    <div>
+                      <dt>Transport</dt>
+                      <dd>{pkg.transportType}</dd>
                     </div>
                     {pkg.runtimeHint && (
-                      <div style={{ display: "flex", gap: "0.5rem" }}>
-                        <dt style={{ fontWeight: 600, minWidth: "6rem", flexShrink: 0 }}>
-                          Runtime
-                        </dt>
-                        <dd
-                          style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: "0.75rem" }}
-                        >
-                          {pkg.runtimeHint}
-                        </dd>
+                      <div>
+                        <dt>Runtime</dt>
+                        <dd className="machine-value">{pkg.runtimeHint}</dd>
                       </div>
                     )}
                   </dl>
@@ -269,79 +216,29 @@ export default async function ServerDetailPage({ params }: Props) {
 
           {/* Remote endpoints */}
           {detail.remotes.length > 0 && (
-            <section
-              aria-labelledby="remotes-heading"
-              style={{
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-md)",
-                padding: "1rem",
-                background: "var(--surface)",
-              }}
-            >
-              <h2
-                id="remotes-heading"
-                style={{ fontSize: "0.875rem", fontWeight: 600, marginBottom: "0.75rem" }}
-              >
-                Remote endpoint
-              </h2>
+            <section aria-labelledby="remotes-heading" className="detail-section">
+              <h2 id="remotes-heading">Remote endpoint</h2>
               {detail.remotes.map((remote) => (
-                <div
-                  key={remote.id}
-                  style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}
-                >
-                  <code
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "0.75rem",
-                      background: "var(--surface-2)",
-                      padding: "0.25rem 0.5rem",
-                      borderRadius: "var(--radius-sm)",
-                      wordBreak: "break-all",
-                      display: "block",
-                    }}
-                  >
-                    {remote.urlTemplate}
-                  </code>
-                  <dl style={{ fontSize: "0.8125rem", color: "var(--fg-muted)" }}>
-                    <div style={{ display: "flex", gap: "0.5rem" }}>
-                      <dt style={{ fontWeight: 600, minWidth: "6rem", flexShrink: 0 }}>
-                        Transport
-                      </dt>
-                      <dd style={{ margin: 0 }}>{remote.transportType}</dd>
+                <div key={remote.id} className="detail-stack">
+                  <code className="detail-code">{remote.urlTemplate}</code>
+                  <dl className="detail-fact-list">
+                    <div>
+                      <dt>Transport</dt>
+                      <dd>{remote.transportType}</dd>
                     </div>
                   </dl>
                   {isRemoteVarsRecord(remote.variables) &&
                     Object.keys(remote.variables).length > 0 && (
-                      <div style={{ marginTop: "0.5rem" }}>
-                        <p
-                          style={{
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                            color: "var(--fg-muted)",
-                            marginBottom: "0.25rem",
-                          }}
-                        >
-                          URL variables
-                        </p>
-                        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                      <div className="detail-subsection">
+                        <p>URL variables</p>
+                        <ul className="detail-list">
                           {Object.entries(remote.variables as Record<string, RemoteVar>).map(
                             ([name, varInfo]) => (
-                              <li
-                                key={name}
-                                style={{
-                                  fontSize: "0.75rem",
-                                  color: "var(--fg-muted)",
-                                  display: "flex",
-                                  gap: "0.5rem",
-                                  alignItems: "baseline",
-                                }}
-                              >
-                                <code
-                                  style={{ fontFamily: "var(--font-mono)", color: "var(--fg)" }}
-                                >{`{${name}}`}</code>
+                              <li key={name} className="detail-list-item detail-inline">
+                                <code>{`{${name}}`}</code>
                                 {varInfo.description && <span>{varInfo.description}</span>}
                                 {varInfo.isRequired && (
-                                  <span style={{ color: "var(--error-fg)" }}>required</span>
+                                  <span className="detail-required">required</span>
                                 )}
                               </li>
                             ),
@@ -350,37 +247,14 @@ export default async function ServerDetailPage({ params }: Props) {
                       </div>
                     )}
                   {isRemoteHeaderArray(remote.headers) && remote.headers.length > 0 && (
-                    <div style={{ marginTop: "0.5rem" }}>
-                      <h3
-                        style={{
-                          fontSize: "0.75rem",
-                          fontWeight: 600,
-                          color: "var(--fg-muted)",
-                          marginBottom: "0.25rem",
-                        }}
-                      >
-                        Request headers
-                      </h3>
-                      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                    <div className="detail-subsection">
+                      <h3>Request headers</h3>
+                      <ul className="detail-list">
                         {remote.headers.map((header) => (
-                          <li
-                            key={header.name}
-                            style={{
-                              fontSize: "0.75rem",
-                              color: "var(--fg-muted)",
-                              display: "flex",
-                              gap: "0.5rem",
-                              alignItems: "baseline",
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            <code style={{ fontFamily: "var(--font-mono)", color: "var(--fg)" }}>
-                              {header.name}
-                            </code>
+                          <li key={header.name} className="detail-list-item detail-inline">
+                            <code>{header.name}</code>
                             {header.description && <span>{header.description}</span>}
-                            {header.isRequired && (
-                              <span style={{ color: "var(--error-fg)" }}>required</span>
-                            )}
+                            {header.isRequired && <span className="detail-required">required</span>}
                           </li>
                         ))}
                       </ul>
@@ -395,92 +269,19 @@ export default async function ServerDetailPage({ params }: Props) {
           {detail.packages.some(
             (p) => isEnvVarArray(p.environmentVariables) && p.environmentVariables.length > 0,
           ) && (
-            <section
-              aria-labelledby="envvars-heading"
-              style={{
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-md)",
-                padding: "1rem",
-                background: "var(--surface)",
-              }}
-            >
-              <h2
-                id="envvars-heading"
-                style={{ fontSize: "0.875rem", fontWeight: 600, marginBottom: "0.75rem" }}
-              >
-                Environment variables
-              </h2>
-              <ul
-                style={{
-                  listStyle: "none",
-                  padding: 0,
-                  margin: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.5rem",
-                }}
-              >
+            <section aria-labelledby="envvars-heading" className="detail-section">
+              <h2 id="envvars-heading">Environment variables</h2>
+              <ul className="detail-list">
                 {detail.packages.flatMap((pkg) =>
                   isEnvVarArray(pkg.environmentVariables)
                     ? pkg.environmentVariables.map((ev: EnvVar) => (
-                        <li
-                          key={ev.name}
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "0.125rem",
-                            fontSize: "0.8125rem",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: "0.5rem",
-                              alignItems: "center",
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            <code
-                              style={{
-                                fontFamily: "var(--font-mono)",
-                                fontWeight: 600,
-                                color: "var(--fg)",
-                              }}
-                            >
-                              {ev.name}
-                            </code>
-                            {ev.isRequired && (
-                              <span
-                                style={{
-                                  fontSize: "0.6875rem",
-                                  color: "var(--error-fg)",
-                                  background: "var(--error-bg)",
-                                  borderRadius: "var(--radius-sm)",
-                                  padding: "0 0.3rem",
-                                }}
-                              >
-                                required
-                              </span>
-                            )}
-                            {ev.isSecret && (
-                              <span
-                                style={{
-                                  fontSize: "0.6875rem",
-                                  color: "var(--warn-fg)",
-                                  background: "var(--warn-bg)",
-                                  borderRadius: "var(--radius-sm)",
-                                  padding: "0 0.3rem",
-                                }}
-                              >
-                                secret
-                              </span>
-                            )}
+                        <li key={ev.name} className="detail-list-item">
+                          <div className="detail-inline">
+                            <code>{ev.name}</code>
+                            {ev.isRequired && <span className="detail-required">required</span>}
+                            {ev.isSecret && <span className="detail-secret">secret</span>}
                           </div>
-                          {ev.description && (
-                            <span style={{ color: "var(--fg-muted)", fontSize: "0.75rem" }}>
-                              {ev.description}
-                            </span>
-                          )}
+                          {ev.description && <span>{ev.description}</span>}
                         </li>
                       ))
                     : [],
@@ -490,103 +291,55 @@ export default async function ServerDetailPage({ params }: Props) {
           )}
 
           {/* Server info */}
-          <section
-            aria-labelledby="server-info-heading"
-            style={{
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-md)",
-              padding: "1rem",
-              background: "var(--surface)",
-            }}
-          >
-            <h2
-              id="server-info-heading"
-              style={{ fontSize: "0.875rem", fontWeight: 600, marginBottom: "0.75rem" }}
-            >
-              Server info
-            </h2>
-            <dl
-              style={{
-                fontSize: "0.8125rem",
-                color: "var(--fg-muted)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.375rem",
-              }}
-            >
+          <section aria-labelledby="server-info-heading" className="detail-section">
+            <h2 id="server-info-heading">Server info</h2>
+            <dl className="detail-fact-list">
               {detail.currentVersion && (
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <dt style={{ fontWeight: 600, minWidth: "7rem", flexShrink: 0 }}>Version</dt>
-                  <dd style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: "0.75rem" }}>
-                    {detail.currentVersion}
-                  </dd>
+                <div>
+                  <dt>Version</dt>
+                  <dd className="machine-value">{detail.currentVersion}</dd>
                 </div>
               )}
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <dt style={{ fontWeight: 600, minWidth: "7rem", flexShrink: 0 }}>Last observed</dt>
-                <dd style={{ margin: 0 }}>
+              <div>
+                <dt>Last observed</dt>
+                <dd>
                   <time dateTime={detail.lastSeenAt.toISOString()}>{formattedLastSeen}</time>
                 </dd>
               </div>
               {detail.licenseSpdx && (
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <dt style={{ fontWeight: 600, minWidth: "7rem", flexShrink: 0 }}>License</dt>
-                  <dd style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: "0.75rem" }}>
-                    {detail.licenseSpdx}
-                  </dd>
+                <div>
+                  <dt>License</dt>
+                  <dd className="machine-value">{detail.licenseSpdx}</dd>
                 </div>
               )}
               {repositoryUrl && (
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <dt style={{ fontWeight: 600, minWidth: "7rem", flexShrink: 0 }}>Repository</dt>
-                  <dd style={{ margin: 0, overflow: "hidden" }}>
-                    <a
-                      href={repositoryUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: "var(--accent)", wordBreak: "break-all" }}
-                    >
+                <div>
+                  <dt>Repository</dt>
+                  <dd>
+                    <a href={repositoryUrl} target="_blank" rel="noopener noreferrer">
                       {repositoryUrl.replace(/^https?:\/\//, "")}
                     </a>
                   </dd>
                 </div>
               )}
               {homepageUrl && (
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <dt style={{ fontWeight: 600, minWidth: "7rem", flexShrink: 0 }}>Homepage</dt>
-                  <dd style={{ margin: 0, overflow: "hidden" }}>
-                    <a
-                      href={homepageUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: "var(--accent)", wordBreak: "break-all" }}
-                    >
+                <div>
+                  <dt>Homepage</dt>
+                  <dd>
+                    <a href={homepageUrl} target="_blank" rel="noopener noreferrer">
                       {homepageUrl.replace(/^https?:\/\//, "")}
                     </a>
                   </dd>
                 </div>
               )}
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <dt style={{ fontWeight: 600, minWidth: "7rem", flexShrink: 0 }}>Source</dt>
-                <dd style={{ margin: 0 }}>
-                  {getSourceAvailabilityLabel(detail.openSource, detail.sourceAvailable)}
-                </dd>
+              <div>
+                <dt>Source</dt>
+                <dd>{getSourceAvailabilityLabel(detail.openSource, detail.sourceAvailable)}</dd>
               </div>
               {detail.canonicalRegistryName && (
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <dt style={{ fontWeight: 600, minWidth: "7rem", flexShrink: 0 }}>
-                    Registry name
-                  </dt>
-                  <dd
-                    style={{
-                      margin: 0,
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "0.75rem",
-                      wordBreak: "break-all",
-                    }}
-                  >
-                    {detail.canonicalRegistryName}
-                  </dd>
+                <div>
+                  <dt>Registry name</dt>
+                  <dd className="machine-value">{detail.canonicalRegistryName}</dd>
                 </div>
               )}
             </dl>
@@ -594,35 +347,14 @@ export default async function ServerDetailPage({ params }: Props) {
 
           {/* Categories */}
           {detail.categorySlugs.length > 0 && (
-            <section
-              aria-labelledby="categories-heading"
-              style={{
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-md)",
-                padding: "1rem",
-                background: "var(--surface)",
-              }}
-            >
-              <h2
-                id="categories-heading"
-                style={{ fontSize: "0.875rem", fontWeight: 600, marginBottom: "0.75rem" }}
-              >
-                Categories
-              </h2>
-              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <section aria-labelledby="categories-heading" className="detail-section">
+              <h2 id="categories-heading">Categories</h2>
+              <div className="detail-tag-list">
                 {detail.categorySlugs.map((catSlug, i) => (
                   <Link
                     key={catSlug}
                     href={`/categories/${catSlug}` as Route}
-                    style={{
-                      fontSize: "0.8125rem",
-                      padding: "0.25rem 0.625rem",
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--radius-sm)",
-                      background: "var(--surface-2)",
-                      color: "var(--fg)",
-                      textDecoration: "none",
-                    }}
+                    className="detail-tag"
                   >
                     {detail.categoryNames[i] ?? catSlug}
                   </Link>
@@ -633,35 +365,11 @@ export default async function ServerDetailPage({ params }: Props) {
 
           {/* Aliases */}
           {detail.aliases.length > 0 && (
-            <section
-              aria-labelledby="aliases-heading"
-              style={{
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-md)",
-                padding: "1rem",
-                background: "var(--surface)",
-              }}
-            >
-              <h2
-                id="aliases-heading"
-                style={{ fontSize: "0.875rem", fontWeight: 600, marginBottom: "0.75rem" }}
-              >
-                Also known as
-              </h2>
-              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <section aria-labelledby="aliases-heading" className="detail-section">
+              <h2 id="aliases-heading">Also known as</h2>
+              <div className="detail-tag-list">
                 {detail.aliases.map((alias) => (
-                  <code
-                    key={alias}
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "0.8125rem",
-                      padding: "0.25rem 0.5rem",
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--radius-sm)",
-                      background: "var(--surface-2)",
-                      color: "var(--fg-muted)",
-                    }}
-                  >
+                  <code key={alias} className="detail-tag">
                     /{alias}
                   </code>
                 ))}
@@ -673,30 +381,10 @@ export default async function ServerDetailPage({ params }: Props) {
           {detail.longDescription && (
             <section
               aria-labelledby="description-heading"
-              style={{
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-md)",
-                padding: "1rem",
-                background: "var(--surface)",
-                gridColumn: "1 / -1",
-              }}
+              className="detail-section detail-section--wide"
             >
-              <h2
-                id="description-heading"
-                style={{ fontSize: "0.875rem", fontWeight: 600, marginBottom: "0.75rem" }}
-              >
-                Description
-              </h2>
-              <p
-                style={{
-                  fontSize: "0.9375rem",
-                  lineHeight: 1.6,
-                  color: "var(--fg-muted)",
-                  margin: 0,
-                }}
-              >
-                {detail.longDescription}
-              </p>
+              <h2 id="description-heading">Description</h2>
+              <p className="detail-long-copy">{detail.longDescription}</p>
             </section>
           )}
         </div>

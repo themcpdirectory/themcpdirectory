@@ -2,9 +2,12 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { connection } from "next/server";
+import { headers } from "next/headers";
 import type { Route } from "next";
+import "@radix-ui/themes/styles.css";
 import "./globals.css";
 import { SiteNav } from "@/components/site-nav";
+import { ThemeProvider } from "@/components/theme-provider";
 import { RELEASE_DOCUMENT_LINKS } from "@/content/release-nav";
 import { getSiteOrigin } from "@/lib/site-url";
 
@@ -17,6 +20,21 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+const themeBootstrapScript = `
+  (() => {
+    const key = "mcp-directory-theme";
+    const stored = localStorage.getItem(key);
+    const preference = stored === "light" || stored === "dark" ? stored : "system";
+    const theme = preference === "system"
+      ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+      : preference;
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.themePreference = preference;
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.style.colorScheme = theme;
+  })();
+`;
 
 export const metadata: Metadata = {
   title: {
@@ -37,69 +55,45 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   await connection();
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
+      </head>
       <body>
-        <a href="#main-content" className="skip-link">
-          Skip to main content
-        </a>
-        <SiteNav />
-        {children}
-        <footer
-          role="contentinfo"
-          style={{
-            borderTop: "1px solid var(--border)",
-            padding: "1.5rem 1rem",
-            color: "var(--fg-muted)",
-            fontSize: "0.875rem",
-          }}
-        >
-          <div
-            style={{
-              maxWidth: "72rem",
-              margin: "0 auto",
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "1rem 2rem",
-            }}
-          >
-            <div>
-              <span>© 2026 The MCP Directory</span>
-              {" · "}
-              <a
-                href="https://modelcontextprotocol.io"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: "var(--accent)" }}
-              >
-                MCP Protocol
-              </a>
+        <ThemeProvider>
+          <a href="#main-content" className="skip-link">
+            Skip to main content
+          </a>
+          <SiteNav />
+          {children}
+          <footer role="contentinfo" className="site-footer">
+            <div className="site-footer__inner">
+              <div>
+                <span>© 2026 The MCP Directory</span>
+                {" · "}
+                <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener noreferrer">
+                  MCP Protocol
+                </a>
+              </div>
+              <nav aria-label="Release information">
+                <ul className="site-footer__links">
+                  {RELEASE_DOCUMENT_LINKS.map((link) => (
+                    <li key={link.href}>
+                      <Link href={link.href as Route}>{link.label}</Link>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
             </div>
-            <nav aria-label="Release information">
-              <ul
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "0.5rem 1rem",
-                  margin: 0,
-                  padding: 0,
-                  listStyle: "none",
-                }}
-              >
-                {RELEASE_DOCUMENT_LINKS.map((link) => (
-                  <li key={link.href}>
-                    <Link href={link.href as Route} style={{ color: "var(--fg-muted)" }}>
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          </div>
-        </footer>
+          </footer>
+        </ThemeProvider>
       </body>
     </html>
   );

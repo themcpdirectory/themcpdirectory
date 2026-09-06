@@ -21,21 +21,9 @@ export function ErrorSummary({ errors, id }: ErrorSummaryProps) {
   }
 
   return (
-    <div
-      id={id}
-      ref={ref}
-      role="alert"
-      tabIndex={-1}
-      className="publisher-panel"
-      style={{
-        border: "1px solid var(--error-fg)",
-        background: "var(--error-bg)",
-        padding: "1rem",
-        marginBottom: "1.25rem",
-      }}
-    >
-      <h2 style={{ margin: "0 0 0.5rem", fontSize: "0.9375rem" }}>There is a problem</h2>
-      <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
+    <div id={id} ref={ref} role="alert" tabIndex={-1} className="publisher-error-summary">
+      <h2>There is a problem</h2>
+      <ul>
         {errors.map((error) => (
           <li key={error}>{error}</li>
         ))}

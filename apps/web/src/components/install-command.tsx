@@ -41,10 +41,7 @@ export function InstallCommand({
         <div className="install-command">
           <p className="detail-empty-state">
             This assumes the {cliExecutableName} CLI is installed — see{" "}
-            <Link href="/docs/cli" style={{ color: "var(--accent)" }}>
-              CLI setup and status
-            </Link>{" "}
-            for current details.
+            <Link href="/docs/cli">CLI setup and status</Link> for current details.
           </p>
           <div className="install-command__row">
             <code className="install-command__code">{command}</code>

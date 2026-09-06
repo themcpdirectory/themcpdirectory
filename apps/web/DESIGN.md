@@ -2,9 +2,9 @@
 
 ## Direction
 
-The interface is a technical trust ledger: a dense, calm registry in which source, health, compatibility, and installation evidence can be compared without turning those observations into scores. It keeps the established near-black canvas, white text, green action color, compact radii, Geist, and Geist Mono. It does not copy the identity, ASCII wordmark, monochrome palette, popularity ranking, or animation language of `skills.sh`.
+The interface is a technical trust ledger: a dense, calm registry in which source, health, compatibility, and installation evidence can be compared without turning those observations into scores. Radix Themes supplies accessible controls and interaction primitives while shared semantic tokens retain the established green action color, compact radii, Geist, and Geist Mono. It does not copy the identity, ASCII wordmark, monochrome palette, popularity ranking, or animation language of `skills.sh`.
 
-The product is usually used by a developer at a desktop workstation under ordinary indoor light. The dark canvas reduces visual noise around dense technical records; white and green remain crisp enough for fast scanning.
+The product supports light, dark, and system preferences. The selected preference is applied before paint and persists between visits. Both palettes keep technical records crisp and quiet without changing information hierarchy or meaning.
 
 ## Composition
 
@@ -17,9 +17,11 @@ The product is usually used by a developer at a desktop workstation under ordina
 
 ## Color And Material
 
-Use only shared color tokens. The system is restrained: neutral fields carry most of the surface and green identifies primary actions, links, focus, and positive factual states. Amber and red communicate warning and error states with text or icon support, never color alone.
+Use only shared semantic color tokens. Radix Themes components inherit the active appearance, while repository tokens cover bespoke layouts and evidence states. Neutral fields carry most of the surface and green identifies primary actions, links, focus, and positive factual states. Amber and red communicate warning and error states with text or icon support, never color alone.
 
 Borders and ruled rows are the primary material. Shadows, glass effects, decorative gradients, glow, and ornamental terminal chrome are outside the system. Surfaces may step from `--bg` to `--surface` or `--surface-2` to establish hierarchy.
+
+Theme selection uses the shared header control. New components must render correctly in both palettes and in Forced Colors; they must not read the operating-system preference directly when the stored application preference is available.
 
 ## Typography
 
@@ -33,11 +35,11 @@ Borders and ruled rows are the primary material. Shadows, glass effects, decorat
 
 ### Navigation
 
-The primary navigation is Browse, Security, Docs, and Publish. Publisher Dashboard is contextual rather than a universal primary destination. Desktop navigation is inline; mobile navigation uses a native button and disclosure region with unchanged reading order.
+The primary navigation is Browse, Security, Docs, and Publish. Publisher Dashboard is contextual rather than a universal primary destination. Desktop navigation is inline; mobile navigation uses a Radix icon button and disclosure region with unchanged reading order. The theme selector remains available at every viewport width.
 
 ### Search
 
-Search always has a persistent visible label. The control is at least `44px` high, supports submission by keyboard, and keeps query text in the URL. Supporting filters use native controls or established accessible primitives.
+Search always has a persistent visible label. The Radix text field and button are at least `44px` high, support submission by keyboard, and keep query text in the URL. Supporting filters use native controls or established accessible primitives.
 
 ### Directory Rows
 

@@ -38,40 +38,24 @@ export default async function CategoryDetailPage({ params }: Props) {
   }
 
   return (
-    <main id="main-content" tabIndex={-1} style={{ minHeight: "100vh" }}>
-      <div style={{ maxWidth: "60rem", margin: "0 auto", padding: "2rem 1rem" }}>
-        <nav
-          aria-label="Breadcrumb"
-          style={{ marginBottom: "1rem", fontSize: "0.8125rem", color: "var(--fg-muted)" }}
-        >
-          <Link href="/" style={{ color: "var(--accent)", textDecoration: "none" }}>
-            The MCP Directory
-          </Link>
+    <main id="main-content" tabIndex={-1} className="page-shell">
+      <div className="page-container page-container--narrow">
+        <nav aria-label="Breadcrumb" className="breadcrumb">
+          <Link href="/">The MCP Directory</Link>
           <span aria-hidden="true"> / </span>
-          <Link href="/categories" style={{ color: "var(--accent)", textDecoration: "none" }}>
-            Categories
-          </Link>
+          <Link href="/categories">Categories</Link>
           <span aria-hidden="true"> / </span>
           <span>{category.name}</span>
         </nav>
 
-        <h1
-          style={{
-            fontSize: "1.375rem",
-            fontWeight: 700,
-            marginBottom: category.description ? "0.5rem" : "1.25rem",
-          }}
-        >
-          {category.name}
-        </h1>
+        <header className="page-header">
+          <h1 className="page-title">{category.name}</h1>
+          {category.description && <p className="page-description">{category.description}</p>}
+        </header>
 
-        {category.description && (
-          <p style={{ color: "var(--fg-muted)", fontSize: "0.9375rem", marginBottom: "1.5rem" }}>
-            {category.description}
-          </p>
-        )}
-
-        <ServerDirectoryList servers={servers} emptyMessage="No servers in this category yet." />
+        <section aria-label={`${category.name} servers`} className="search-panel">
+          <ServerDirectoryList servers={servers} emptyMessage="No servers in this category yet." />
+        </section>
       </div>
     </main>
   );
