@@ -1,14 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
 import { connection } from "next/server";
 import { headers } from "next/headers";
-import type { Route } from "next";
 import "@radix-ui/themes/styles.css";
 import "./globals.css";
+import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
 import { ThemeProvider } from "@/components/theme-provider";
-import { RELEASE_DOCUMENT_LINKS } from "@/content/release-nav";
 import { getSiteOrigin } from "@/lib/site-url";
 
 const geistSans = Geist({
@@ -76,26 +74,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           </a>
           <SiteNav />
           {children}
-          <footer role="contentinfo" className="site-footer">
-            <div className="site-footer__inner">
-              <div>
-                <span>© 2026 The MCP Directory</span>
-                {" · "}
-                <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener noreferrer">
-                  MCP Protocol
-                </a>
-              </div>
-              <nav aria-label="Release information">
-                <ul className="site-footer__links">
-                  {RELEASE_DOCUMENT_LINKS.map((link) => (
-                    <li key={link.href}>
-                      <Link href={link.href as Route}>{link.label}</Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            </div>
-          </footer>
+          <SiteFooter />
         </ThemeProvider>
       </body>
     </html>
