@@ -30,6 +30,9 @@ export const metadata: Metadata = buildDocumentMetadata({
 export default async function HomePage() {
   const db = getDb();
   const [facts, sections] = await Promise.all([getEcosystemFacts(db), getDiscoverySections(db)]);
+  const homepageCollections = sections.collections.filter(
+    (collection) => !collection.slug.startsWith("works-with-"),
+  );
 
   return (
     <main id="main-content" tabIndex={-1} className="page-shell">
@@ -72,7 +75,7 @@ export default async function HomePage() {
               Browse collections
             </Link>
           }
-          items={sections.collections}
+          items={homepageCollections}
           renderItem={(collection) => <CollectionCard collection={collection} />}
         />
 

@@ -156,8 +156,11 @@ test.describe("Homepage", () => {
       "/publish",
     );
 
-    await expect(page.getByRole("link", { name: /Works with Codex/i })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: /Works with Cursor/i })).toHaveCount(0);
+    for (const client of ["Codex", "Claude Code", "Cursor", "VS Code"]) {
+      await expect(
+        page.getByRole("link", { name: new RegExp(`Works with ${client}`, "i") }),
+      ).toHaveCount(0);
+    }
   });
 
   test("disables the homepage entry transition under reduced motion", async ({ page }) => {
